@@ -2,41 +2,38 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
-use rand::Rng;
-use std::io;
-use std::cmp::Ordering;
+use std::fs::File;
+use std::fs::OpenOptions;
+use std::io::Read;
+
+mod shm;
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
-fn main() {
-    println!("Guess the number!");
+fn main() -> std::io::Result<()> {
+    let gameTable: &mut BWAPI_GameTable = shm::mapMemory("Local\\bwapi_shared_memory_game_list");
 
-    let secret = rand::thread_rng().gen_range(1, 101);
-    let test = BWAPI_GameData::default();
-
-    loop {
-        println!("Please !! Number!! :");
-
-        let mut guess = String::new();
-        io::stdin().read_line(&mut guess)
-            .expect("Wtf?");
-        let guess : u32 = match guess.trim().parse() {
-            Ok(x) => x,
-            Err(_) => {
-                println!("Try agaain");
-                continue
+    for game_instance in gameTable.gameInstances.iter() {
+        if game_instance.serverProcessID != 0 {
+            let pid = game_instance.serverProcessID;
+            let mut file: File = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(format!("\\\\.\\pipe\\bwapi_pipe_{}", pid))?;
+            let mut buf: [u8; 1] = [0];
+            println!("Connecting to {}", pid);
+            loop {
+                file.read(&mut buf)?;
+                if buf[0] == 2 {
+                    break;
+                }
             }
-        };
-
-        println!("You guessed {}", guess);
-
-        match guess.cmp(&secret) {
-            Ordering::Less => println!("Too small!"),
-            Ordering::Greater => println!("Too big!"),
-            Ordering::Equal => {
-                println!("Hit!");
-                break;
-            }
+            println!("Connected to {}", pid);
+            let gameData = &format!("Local\\bwapi_shared_memory_{}", pid);
+            let gameData: &mut BWAPI_GameData = shm::mapMemory(gameData);
+            println!("Client version: {}", gameData.client_version);
         }
     }
+
+    Ok(())
 }

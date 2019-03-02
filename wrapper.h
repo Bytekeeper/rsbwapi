@@ -2,3 +2,4 @@
 #include "BWAPI/Input.h"
 #include "BWAPI/Flag.h"
 #include "BWAPI/Client/GameData.h"
+#include "BWAPI/Client/GameTable.h"

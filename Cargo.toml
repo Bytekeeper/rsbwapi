@@ -1,11 +1,11 @@
 [package]
-name = "hello_world"
+name = "rsbwapi"
 version = "0.1.0"
 authors = ["Bytekeeper <therealdante@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-rand = "0.3.14"
+winapi = { version = "0.3", features = ["winuser", "memoryapi"] }
 
 [build-dependencies]
 bindgen = "0.47.3"
