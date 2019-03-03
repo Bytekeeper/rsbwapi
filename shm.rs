@@ -1,5 +1,3 @@
-extern crate winapi;
-
 use winapi::shared::minwindef::FALSE;
 use winapi::um::memoryapi::FILE_MAP_READ;
 use winapi::um::memoryapi::FILE_MAP_WRITE;
@@ -7,7 +5,7 @@ use winapi::um::memoryapi::MapViewOfFile;
 use winapi::um::winbase::OpenFileMappingA;
 use std::ffi::CString;
 
-pub fn mapMemory<T>(name: &str) -> &mut T {
+pub fn mapMemory<'a, T>(name: &str) -> Option<&'a mut T> {
     let memorySize = std::mem::size_of::<T>();
     let lpName = CString::new(name).unwrap();
     unsafe {
@@ -17,6 +15,6 @@ pub fn mapMemory<T>(name: &str) -> &mut T {
             0, 0,
             memorySize,
         ) as *mut T;
-        mapped.as_mut().unwrap()
+        mapped.as_mut()
     }
 }

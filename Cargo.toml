@@ -6,6 +6,8 @@ edition = "2018"
 
 [dependencies]
 winapi = { version = "0.3", features = ["winuser", "memoryapi"] }
+num-traits = "0.2"
+num-derive = "0.2"
 
 [build-dependencies]
 bindgen = "0.47.3"
