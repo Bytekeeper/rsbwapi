@@ -1,0 +1,3 @@
+[submodule "bwapi"]
+	path = bwapi
+	url = https://github.com/bwapi/bwapi.git

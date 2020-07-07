@@ -5,13 +5,12 @@ authors = ["Bytekeeper <therealdante@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-winapi = { version = "0.3", features = ["winuser", "memoryapi"] }
+bwapi_wrapper = { path = "bwapi_wrapper" }
+winapi = { version = "0.3", features = ["winuser", "memoryapi", "handleapi"] }
+memchr = "2.2.0"
 num-traits = "0.2"
 num-derive = "0.2"
 
-[build-dependencies]
-bindgen = "0.47.3"
-
 [[bin]]
-name = "hello_world"
-path = "main.rs"
+name = "rsbwapi"
+path = "src/main.rs"
