@@ -30,13 +30,6 @@ pub struct Game {
     units: Vec<usize>,
 }
 
-pub struct State<'a> {
-    players: Vec<Player<'a>>,
-    units: Vec<Unit<'a>>,
-    self_: usize,
-    enemy: usize,
-}
-
 #[derive(Default)]
 pub struct Commands {
     draws: Vec<DrawCommand>,
@@ -61,55 +54,13 @@ impl Commands {
         self.unit_commands.push(cmd)
     }
 
-    /*
-    pub fn draw_text_screen(&mut self, position: Position, string: &str) {
-        let (x, y) = position;
-        let id = self.strings.addString(string);
-        self.shapes.addShape(
-            BWAPIC_ShapeType_Enum::Text,
-            BWAPI_CoordinateType_Enum::Screen,
-            x,
-            y,
-            0,
-            0,
-            id as i32,
-            TextSize::Default as i32,
-            Color::Black,
-            false,
-        );
-    }
-
-    */
 }
 
 impl Game {
     pub fn new(data: Shm<BWAPI_GameData>) -> Self {
-        /*
-        let data_ = data.deref_mut();
-        let commands = Commands {
-            strings: Strings {
-                strings: &mut data_.strings,
-                string_count: &mut data_.stringCount,
-            },
-            shapes: Shapes {
-                shapes: &mut data_.shapes,
-                shape_count: &mut data_.shapeCount,
-            },
-            unit_commands: UnitCommands {
-                unit_commands: &mut data_.unitCommands,
-                unit_command_count: &mut data_.unitCommandCount,
-            },
-        };
-        let players = vec![Player::new(0, &data_.players[0])];
-        let state = State {
-            players,
-            units: vec![],
-            enemy: data_.self_ as usize,
-            self_: data_.enemy as usize,
-        };*/
         Game {
             data,
-            units: vec![],
+            units: vec![]
         }
     }
     pub(crate) fn init(&mut self) {
@@ -121,22 +72,21 @@ impl Game {
             .collect();
     }
 
-    pub fn isInGame(&self) -> bool {
-        //self.data.isInGame
-        false
+    pub fn is_in_game(&self) -> bool {
+        self.data.isInGame
     }
 
-    pub(crate) fn handleEvents(&mut self, module: &mut impl AiModule) {
+    pub(crate) fn handle_events(&mut self, module: &mut impl AiModule) {
         for i in 0..self.data.eventCount {
             let event: BWAPIC_Event = self.data.events[i as usize];
             match event.type_ {
                 BWAPI_EventType_Enum::MatchStart => {
                     self.init();
-                    module.onStart(self);
+                    module.on_start(self);
                 }
                 BWAPI_EventType_Enum::MatchFrame => {
                     let mut commands = Commands::default();
-                    module.onFrame(&self, &mut commands);
+                    module.on_frame(&self, &mut commands);
                     self.apply_commands(&commands)
                 }
                 _ => (),
@@ -184,8 +134,8 @@ impl Game {
     }
 
     fn draw_text_screen(&mut self, x: i32, y: i32, string: &str) {
-        let id = self.addString(string);
-        self.addShape(
+        let id = self.add_string(string);
+        self.add_shape(
             BWAPIC_ShapeType_Enum::Text,
             BWAPI_CoordinateType_Enum::Screen,
             x,
@@ -199,7 +149,7 @@ impl Game {
         );
     }
 
-    fn addString(&mut self, string: &str) -> usize {
+    fn add_string(&mut self, string: &str) -> usize {
         assert!(self.data.stringCount < BWAPI_GameData_MAX_STRINGS);
         let string_count = self.data.stringCount as usize;
         let string = CString::new(string).unwrap();
@@ -213,9 +163,9 @@ impl Game {
         string_count
     }
 
-    fn addShape(
+    fn add_shape(
         &mut self,
-        shapeType: BWAPIC_ShapeType_Enum,
+        shape_type: BWAPIC_ShapeType_Enum,
         coordinate_type: BWAPI_CoordinateType_Enum,
         x1: i32,
         y1: i32,
@@ -224,11 +174,11 @@ impl Game {
         extra1: i32,
         extra2: i32,
         color: Color,
-        isSolid: bool,
+        is_solid: bool,
     ) {
         assert!(self.data.shapeCount < BWAPI_GameData_MAX_SHAPES);
         let shape = BWAPIC_Shape {
-            type_: shapeType,
+            type_: shape_type,
             ctype: coordinate_type,
             x1,
             x2,
@@ -237,7 +187,7 @@ impl Game {
             extra1,
             extra2,
             color: color as i32,
-            isSolid,
+            isSolid: is_solid,
         };
         let shape_count = self.data.shapeCount as usize;
         self.data.shapes[shape_count] = shape;

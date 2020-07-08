@@ -21,9 +21,9 @@ pub struct MyModule {
 }
 
 impl AiModule for MyModule {
-    fn onStart(&self, _game: &mut Game) {}
+    fn on_start(&self, _game: &mut Game) {}
 
-    fn onFrame(&mut self, game: &Game, cmd: &mut Commands) {
+    fn on_frame(&mut self, game: &Game, cmd: &mut Commands) {
         let names: Vec<String> = game
             .get_players()
             .iter()
@@ -71,11 +71,11 @@ fn main() {
 
     println!("Waiting for game to start");
 
-    while !client.getGame().isInGame() {
+    while !client.get_game().is_in_game() {
         client.update(&mut my_module);
     }
 
-    while client.getGame().isInGame() {
+    while client.get_game().is_in_game() {
         client.update(&mut my_module);
     }
 }

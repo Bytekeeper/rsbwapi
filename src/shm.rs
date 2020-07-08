@@ -36,13 +36,13 @@ impl<T: ?Sized> Drop for Shm<T> {
     }
 }
 
-pub fn mapMemory<T>(name: &str) -> Option<Shm<T>> {
-    let memorySize = std::mem::size_of::<T>();
-    let lpName = CString::new(name).unwrap();
+pub fn map_memory<T>(name: &str) -> Option<Shm<T>> {
+    let memory_size = std::mem::size_of::<T>();
+    let lp_name = CString::new(name).unwrap();
     unsafe {
-        let handle = OpenFileMappingA(FILE_MAP_READ | FILE_MAP_WRITE, FALSE, lpName.as_ptr());
+        let handle = OpenFileMappingA(FILE_MAP_READ | FILE_MAP_WRITE, FALSE, lp_name.as_ptr());
         let mapped =
-            MapViewOfFile(handle, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, memorySize) as *mut T;
+            MapViewOfFile(handle, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, memory_size) as *mut T;
         Some(Shm(handle, NonNull::new_unchecked(mapped)))
     }
 }

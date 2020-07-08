@@ -45,10 +45,10 @@ impl ToStr for [i8] {
 impl Default for Client {
     fn default() -> Self {
         'outer: loop {
-            if let Some(gameTable) =
-                shm::mapMemory::<BWAPI_GameTable>("Local\\bwapi_shared_memory_game_list")
+            if let Some(game_table) =
+                shm::map_memory::<BWAPI_GameTable>("Local\\bwapi_shared_memory_game_list")
             {
-                for game_instance in gameTable.gameInstances.iter() {
+                for game_instance in game_table.gameInstances.iter() {
                     if game_instance.serverProcessID != 0 {
                         let pid = game_instance.serverProcessID;
                         let mut file: File = OpenOptions::new()
@@ -66,14 +66,14 @@ impl Default for Client {
                             }
                         }
                         println!("Connected to {}", pid);
-                        let gameData = &format!("Local\\bwapi_shared_memory_{}", pid);
-                        let gameData: shm::Shm<BWAPI_GameData> = shm::mapMemory(gameData).expect(
+                        let game_data = &format!("Local\\bwapi_shared_memory_{}", pid);
+                        let game_data: shm::Shm<BWAPI_GameData> = shm::map_memory(game_data).expect(
                             "Game table was found, but could not establish shared memory link.",
                         );
-                        println!("Client version: {}", gameData.client_version);
+                        println!("Client version: {}", game_data.client_version);
                         break 'outer Client {
                             pipe: file,
-                            game: Game::new(gameData),
+                            game: Game::new(game_data),
                         };
                     }
                 }
@@ -98,10 +98,10 @@ impl Client {
                 break;
             }
         }
-        self.game.handleEvents(module);
+        self.game.handle_events(module);
     }
 
-    pub fn getGame(&self) -> &Game {
+    pub fn get_game(&self) -> &Game {
         &self.game
     }
 }
