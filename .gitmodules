@@ -1,3 +1,6 @@
 [submodule "bwapi"]
+	path = bwapi
+	url = https://github.com/bwapi/bwapi.git
+[submodule "bwapi_wrapper/bwapi"]
 	path = bwapi_wrapper/bwapi
 	url = https://github.com/bwapi/bwapi.git
