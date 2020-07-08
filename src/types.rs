@@ -70,9 +70,27 @@ pub enum TextSize {
     Huge,
 }
 
+#[derive(Debug)]
 pub struct Position {
     pub x: i32,
     pub y: i32,
+}
+
+#[derive(Debug)]
+pub struct TilePosition {
+    pub x: i32,
+    pub y: i32,
+}
+
+pub struct Vector2D {
+    pub x: f64,
+    pub y: f64,
+}
+
+impl From<(i32, i32)> for TilePosition {
+    fn from(pos: (i32, i32)) -> Self {
+        Self { x: pos.0, y: pos.1 }
+    }
 }
 
 impl From<(i32, i32)> for Position {

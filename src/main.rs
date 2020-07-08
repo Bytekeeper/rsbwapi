@@ -1,10 +1,12 @@
 use crate::aimodule::AiModule;
 use crate::game::{Commands, Game};
+use crate::unit::Unit;
 
 mod shm;
 
 pub mod aimodule;
 mod bridge;
+pub mod bullet;
 pub mod client;
 pub mod game;
 pub mod player;
@@ -15,13 +17,24 @@ pub mod unit;
 
 use types::{UnitType, UnitTypeExt};
 
-
 pub struct MyModule {
     called: bool,
 }
 
 impl AiModule for MyModule {
-    fn on_start(&self, _game: &mut Game) {}
+    fn on_start(&self, game: &Game) {
+        for location in game.get_start_locations() {
+            println!("{:?}", location);
+        }
+    }
+
+    fn on_unit_create(&self, _game: &Game, _cmd: &mut Commands, unit: &Unit) {
+        println!("Created Unit {}", unit.get_id())
+    }
+
+    fn on_unit_destroy(&self, _game: &Game, _cmd: &mut Commands, unit: &Unit) {
+        println!("Destroyed Unit {}", unit.get_id())
+    }
 
     fn on_frame(&mut self, game: &Game, cmd: &mut Commands) {
         let names: Vec<String> = game
@@ -61,6 +74,15 @@ impl AiModule for MyModule {
             }
         } else {
             println!("No minerals found!");
+        }
+
+        for bullet in game.get_bullets().iter() {
+            println!(
+                "Bullet {} of player {:?} of unit {:?}",
+                bullet.get_id(),
+                bullet.get_player().map(|p| p.name().to_string()),
+                bullet.get_source().map(|u| u.get_id())
+            );
         }
     }
 }

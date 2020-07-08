@@ -1,18 +1,13 @@
 use crate::aimodule::AiModule;
+use crate::bullet::Bullet;
 use crate::shm::Shm;
+use crate::types::TilePosition;
 use crate::*;
 use bwapi_wrapper::*;
 
-
-use std::ffi::{CString};
-
-
-
-
+use std::ffi::CString;
 
 use crate::types::{Color, Position, TextSize};
-
-
 
 /*
 use crate::client::{
@@ -53,17 +48,17 @@ impl Commands {
     pub fn issue_command(&mut self, cmd: UnitCommand) {
         self.unit_commands.push(cmd)
     }
-
 }
 
 impl Game {
-    pub fn new(data: Shm<BWAPI_GameData>) -> Self {
+    pub(crate) fn new(data: Shm<BWAPI_GameData>) -> Self {
         Game {
             data,
-            units: vec![]
+            units: vec![],
         }
     }
-    pub(crate) fn init(&mut self) {
+
+    fn init(&mut self) {
         self.units = (0..self.data.initialUnitCount as usize)
             .filter(|&i| {
                 self.data.units[i].exists
@@ -72,6 +67,8 @@ impl Game {
             .collect();
     }
 
+    fn update(&mut self) {}
+
     pub fn is_in_game(&self) -> bool {
         self.data.isInGame
     }
@@ -79,18 +76,61 @@ impl Game {
     pub(crate) fn handle_events(&mut self, module: &mut impl AiModule) {
         for i in 0..self.data.eventCount {
             let event: BWAPIC_Event = self.data.events[i as usize];
+            use BWAPI_EventType_Enum::*;
+            let mut commands = Commands::default();
             match event.type_ {
-                BWAPI_EventType_Enum::MatchStart => {
+                MatchStart => {
                     self.init();
                     module.on_start(self);
                 }
-                BWAPI_EventType_Enum::MatchFrame => {
-                    let mut commands = Commands::default();
-                    module.on_frame(&self, &mut commands);
-                    self.apply_commands(&commands)
+                MatchFrame => {
+                    self.update();
+                    module.on_frame(self, &mut commands);
                 }
+                UnitCreate => {
+                    let id = event.v1;
+                    self.units.push(id as usize);
+                    module.on_unit_create(
+                        self,
+                        &mut commands,
+                        &self.get_unit(id).expect("Unit could not be retrieved"),
+                    );
+                }
+                UnitDestroy => {
+                    let id = event.v1 as usize;
+                    let index = self
+                        .units
+                        .iter()
+                        .position(|&i| i == id)
+                        .expect("UnitDestroy was called with non-existant unit id");
+                    self.units.swap_remove(index);
+                    module.on_unit_destroy(
+                        self,
+                        &mut commands,
+                        &self
+                            .get_unit(id as i32)
+                            .expect("Unit could not be retrieved"),
+                    );
+                }
+                UnitDiscover => {
+                    module.on_unit_discover(
+                        self,
+                        &mut commands,
+                        &self
+                            .get_unit(event.v1)
+                            .expect("Unit could not be retrieved"),
+                    );
+                }
+                UnitEvade => {}
+                UnitShow => {}
+                UnitHide => {}
+                UnitMorph => {}
+                UnitRenegade => {}
+                UnitComplete => {}
+
                 _ => (),
             }
+            self.apply_commands(&commands)
         }
     }
 
@@ -100,9 +140,14 @@ impl Game {
             .collect()
     }
 
-    pub fn get_player(&self, i: usize) -> Option<Player> {
-        let data = self.data.players.get(i)?;
-        Some(Player::new(i, &data))
+    pub fn get_player(&self, i: i32) -> Option<Player> {
+        if i < 0 {
+            None
+        } else {
+            let i = i as usize;
+            let data = self.data.players.get(i)?;
+            Some(Player::new(i, &data))
+        }
     }
 
     pub fn get_all_units(&self) -> Vec<Unit> {
@@ -112,12 +157,77 @@ impl Game {
             .collect()
     }
 
+    pub fn get_unit(&self, id: i32) -> Option<Unit> {
+        if id < 0 {
+            None
+        } else {
+            Some(Unit::new(id as usize, self, &self.data.units[id as usize]))
+        }
+    }
+
+    pub fn get_allies(&self) -> Vec<Player> {
+        let self_ = self.self_();
+        if let Some(self_) = self_ {
+            self.get_players()
+                .iter()
+                .filter(|p| p.is_ally(&self_))
+                .cloned()
+                .collect()
+        } else {
+            vec![]
+        }
+    }
+
+    pub fn get_bullets(&self) -> Vec<Bullet> {
+        self.data
+            .bullets
+            .iter()
+            .map(|b| Bullet::new(b.id as usize, self, b))
+            .filter(|b| b.exists())
+            .collect()
+    }
+
+    pub fn get_geysers(&self) -> Vec<Unit> {
+        self.get_all_units()
+            .iter()
+            .filter(|u| u.get_type() == UnitType::Resource_Vespene_Geyser)
+            .cloned()
+            .collect()
+    }
+
+    pub fn get_ground_height(&self, tile_x: i32, tile_y: i32) -> i32 {
+        self.data.getGroundHeight[tile_y as usize][tile_x as usize]
+    }
+
     pub fn enemy(&self) -> Option<Player> {
-        self.get_player(self.data.enemy as usize)
+        self.get_player(self.data.enemy)
     }
 
     pub fn self_(&self) -> Option<Player> {
-        self.get_player(self.data.self_ as usize)
+        self.get_player(self.data.self_)
+    }
+
+    pub fn get_frame_count(&self) -> i32 {
+        self.data.frameCount
+    }
+
+    pub fn get_nuke_dots(&self) -> Vec<Position> {
+        (0..self.data.nukeDotCount as usize)
+            .map(|i| self.data.nukeDots[i])
+            .map(|p| Position { x: p.x, y: p.y })
+            .collect()
+    }
+
+    pub fn get_start_locations(&self) -> Vec<TilePosition> {
+        (0..self.data.startLocationCount as usize)
+            .map(|i| self.data.startLocations[i])
+            .map(|p| TilePosition { x: p.x, y: p.y })
+            .collect()
+    }
+
+    pub fn has_creep<P: Into<TilePosition>>(&self, pos: P) -> bool {
+        let pos = pos.into();
+        self.data.hasCreep[pos.y as usize][pos.x as usize]
     }
 
     fn apply_commands(&mut self, commands: &Commands) {

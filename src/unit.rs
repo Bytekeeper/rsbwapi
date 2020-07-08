@@ -1,6 +1,5 @@
 use crate::player::Player;
 
-
 use crate::*;
 use bwapi_wrapper::*;
 
@@ -20,6 +19,10 @@ impl<'a> Unit<'a> {
         types::unit_type_from(self.data.type_)
     }
 
+    pub fn get_id(&self) -> usize {
+        self.id
+    }
+
     pub fn exists(&self) -> bool {
         self.data.exists
     }
@@ -29,7 +32,7 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_player(&self) -> Option<Player<'a>> {
-        self.game.get_player(self.data.player as usize)
+        self.game.get_player(self.data.player)
     }
 
     pub fn gather(&self, target: &Unit) -> UnitCommand {

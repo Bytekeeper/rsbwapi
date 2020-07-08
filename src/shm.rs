@@ -10,7 +10,7 @@ use winapi::um::memoryapi::FILE_MAP_WRITE;
 use winapi::um::winbase::OpenFileMappingA;
 use winapi::um::winnt::HANDLE;
 
-pub struct Shm<T: ?Sized>(HANDLE, NonNull<T>);
+pub(crate) struct Shm<T: ?Sized>(HANDLE, NonNull<T>);
 
 impl<T: ?Sized> Deref for Shm<T> {
     type Target = T;
@@ -36,7 +36,7 @@ impl<T: ?Sized> Drop for Shm<T> {
     }
 }
 
-pub fn map_memory<T>(name: &str) -> Option<Shm<T>> {
+pub(crate) fn map_memory<T>(name: &str) -> Option<Shm<T>> {
     let memory_size = std::mem::size_of::<T>();
     let lp_name = CString::new(name).unwrap();
     unsafe {

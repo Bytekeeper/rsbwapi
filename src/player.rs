@@ -1,3 +1,4 @@
+use crate::types::UnitType;
 use bwapi_wrapper::*;
 use std::ffi::CStr;
 
@@ -28,6 +29,14 @@ impl<'a> Player<'a> {
         CStr::from_bytes_with_nul(&name[..=name.iter().position(|&c| c == 0).unwrap()])
             .map(|n| n.to_str().unwrap())
             .unwrap()
+    }
+
+    pub fn armor(&self, _unit_type: UnitType) -> i32 {
+        unimplemented!()
+    }
+
+    pub fn is_ally(&self, other: &Player) -> bool {
+        self.data.isAlly[other.id]
     }
 }
 

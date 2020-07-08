@@ -21,9 +21,6 @@ pub struct Client {
     game: Game,
 }
 
-pub type Position = (i32, i32);
-pub type TilePosition = (i32, i32);
-
 pub trait ToStr {
     fn to_str(&self) -> &str;
 }
@@ -67,9 +64,10 @@ impl Default for Client {
                         }
                         println!("Connected to {}", pid);
                         let game_data = &format!("Local\\bwapi_shared_memory_{}", pid);
-                        let game_data: shm::Shm<BWAPI_GameData> = shm::map_memory(game_data).expect(
-                            "Game table was found, but could not establish shared memory link.",
-                        );
+                        let game_data: shm::Shm<BWAPI_GameData> = shm::map_memory(game_data)
+                            .expect(
+                                "Game table was found, but could not establish shared memory link.",
+                            );
                         println!("Client version: {}", game_data.client_version);
                         break 'outer Client {
                             pipe: file,
