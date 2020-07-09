@@ -2,3 +2,4 @@ os: windows
 language: rust
 rust: stable
 cache: cargo
+env: LIBCLANG_PATH="C:\\Program Files\\LLVM\\\\bin"
