@@ -28,11 +28,11 @@ impl AiModule for MyModule {
         }
     }
 
-    fn on_unit_create(&self, _game: &Game, _cmd: &mut Commands, unit: &Unit) {
+    fn on_unit_create(&self, _game: &Game, _cmd: &mut Commands, unit: Unit) {
         println!("Created Unit {}", unit.get_id())
     }
 
-    fn on_unit_destroy(&self, _game: &Game, _cmd: &mut Commands, unit: &Unit) {
+    fn on_unit_destroy(&self, _game: &Game, _cmd: &mut Commands, unit: Unit) {
         println!("Destroyed Unit {}", unit.get_id())
     }
 

@@ -1,5 +1,7 @@
 use bwapi_wrapper::*;
 use num_traits::FromPrimitive;
+use std::ffi::CStr;
+use std::os::raw::c_char;
 
 #[derive(Debug)]
 pub enum Color {
@@ -119,5 +121,14 @@ impl UnitTypeExt for BWAPI_UnitTypes_Enum_Enum {
         *self == BWAPI_UnitTypes_Enum_Enum::Resource_Mineral_Field
             || *self == BWAPI_UnitTypes_Enum_Enum::Resource_Mineral_Field_Type_2
             || *self == BWAPI_UnitTypes_Enum_Enum::Resource_Mineral_Field_Type_3
+    }
+}
+
+pub(crate) fn c_str_to_str(i: &[c_char]) -> &str {
+    unsafe {
+        let i = &*(i as *const [c_char] as *const [u8]);
+        CStr::from_bytes_with_nul_unchecked(&i[..=i.iter().position(|&c| c == 0).unwrap()])
+            .to_str()
+            .unwrap()
     }
 }

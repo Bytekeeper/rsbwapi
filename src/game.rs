@@ -1,6 +1,7 @@
 use crate::aimodule::AiModule;
 use crate::bullet::Bullet;
 use crate::shm::Shm;
+use crate::types::c_str_to_str;
 use crate::types::TilePosition;
 use crate::*;
 use bwapi_wrapper::*;
@@ -93,7 +94,7 @@ impl Game {
                     module.on_unit_create(
                         self,
                         &mut commands,
-                        &self.get_unit(id).expect("Unit could not be retrieved"),
+                        self.get_unit(id).expect("Unit could not be retrieved"),
                     );
                 }
                 UnitDestroy => {
@@ -107,8 +108,7 @@ impl Game {
                     module.on_unit_destroy(
                         self,
                         &mut commands,
-                        &self
-                            .get_unit(id as i32)
+                        self.get_unit(id as i32)
                             .expect("Unit could not be retrieved"),
                     );
                 }
@@ -116,19 +116,84 @@ impl Game {
                     module.on_unit_discover(
                         self,
                         &mut commands,
-                        &self
-                            .get_unit(event.v1)
+                        self.get_unit(event.v1)
                             .expect("Unit could not be retrieved"),
                     );
                 }
-                UnitEvade => {}
-                UnitShow => {}
-                UnitHide => {}
-                UnitMorph => {}
-                UnitRenegade => {}
-                UnitComplete => {}
-
-                _ => (),
+                UnitEvade => {
+                    module.on_unit_evade(
+                        self,
+                        &mut commands,
+                        self.get_unit(event.v1)
+                            .expect("Unit could not be retrieved"),
+                    );
+                }
+                UnitShow => module.on_unit_show(
+                    self,
+                    &mut commands,
+                    self.get_unit(event.v1)
+                        .expect("Unit could not be retrieved"),
+                ),
+                UnitHide => module.on_unit_hide(
+                    self,
+                    &mut commands,
+                    self.get_unit(event.v1)
+                        .expect("Unit could not be retrieved"),
+                ),
+                UnitMorph => module.on_unit_morph(
+                    self,
+                    &mut commands,
+                    self.get_unit(event.v1)
+                        .expect("Unit could not be retrieved"),
+                ),
+                UnitRenegade => module.on_unit_renegade(
+                    self,
+                    &mut commands,
+                    self.get_unit(event.v1)
+                        .expect("Unit could not be retrieved"),
+                ),
+                UnitComplete => module.on_unit_complete(
+                    self,
+                    &mut commands,
+                    self.get_unit(event.v1)
+                        .expect("Unit could not be retrieved"),
+                ),
+                MatchEnd => {
+                    module.on_end(self, event.v1 != 0);
+                }
+                MenuFrame => {}
+                SendText => module.on_send_text(
+                    self,
+                    &mut commands,
+                    c_str_to_str(&self.data.eventStrings[event.v1 as usize]),
+                ),
+                ReceiveText => module.on_receive_text(
+                    self,
+                    &mut commands,
+                    self.get_player(event.v1)
+                        .expect("Player could not be retrieved"),
+                    c_str_to_str(&self.data.eventStrings[event.v2 as usize]),
+                ),
+                PlayerLeft => module.on_player_left(
+                    self,
+                    &mut commands,
+                    self.get_player(event.v1)
+                        .expect("Player could not be retrieved"),
+                ),
+                NukeDetect => module.on_nuke_detect(
+                    self,
+                    &mut commands,
+                    Position {
+                        x: event.v1,
+                        y: event.v2,
+                    },
+                ),
+                SaveGame => module.on_save_game(
+                    self,
+                    &mut commands,
+                    c_str_to_str(&self.data.eventStrings[event.v1 as usize]),
+                ),
+                None => {}
             }
             self.apply_commands(&commands)
         }
