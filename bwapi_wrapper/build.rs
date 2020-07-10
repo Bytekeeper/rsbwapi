@@ -7,7 +7,8 @@ use std::io::Write;
 use std::path::PathBuf;
 
 fn main() {
-    should_replace();
+    should_replace1();
+    should_replace2();
 
     // Tell cargo to tell rustc to link the system bzip2
     // shared library.
@@ -48,7 +49,7 @@ fn main() {
     let result = bindings.to_string();
     let mut file = File::create(out_path.join("bindings.rs")).unwrap();
     let re =
-        Regex::new(r"#\s*\[\s*derive\s*\((?P<d>[^)]+)\)\]\s*pub\s+enum").unwrap();
+        Regex::new(r"#\s*\[\s*derive\s*\((?P<d>[^)]+)\)\s*\]\s*pub\s+enum").unwrap();
     let changed = re.replace_all(
         &result,
         "#[derive($d, FromPrimitive)]\npub enum",
@@ -58,7 +59,7 @@ fn main() {
         .expect("Couldn't write bindings!");
 }
 
-fn should_replace() {
+fn should_replace1() {
     // GIVEN
     let test = "# [ derive ( Debug , Copy , Clone , PartialEq , Eq , Hash ) ] pub enum std_deque__bindgen_ty_1";
 
@@ -72,4 +73,21 @@ fn should_replace() {
 
     // THEN
     assert_eq!("#[derive( Debug , Copy , Clone , PartialEq , Eq , Hash , FromPrimitive)]\npub enum std_deque__bindgen_ty_1", changed);
+}
+
+
+fn should_replace2() {
+    // GIVEN
+    let test = "# [ derive ( Debug , Copy , Clone , PartialEq , Eq , Hash ) ] pub enum BWAPI_Text_Size_Enum # [ derive ( Debug , Copy , Clone , PartialEq , Eq , Hash ) ] pub enum BWAPIC_CommandType_Enum ";
+
+    // WHEN
+    let re =
+        Regex::new(r"#\s*\[\s*derive\s*\((?P<d>[^)]+)\)\s*\]\s*pub\s+enum").unwrap();
+    let changed = re.replace_all(
+        &test,
+        "#[derive($d, FromPrimitive)]\npub enum",
+    );
+
+    // THEN
+    assert_eq!("#[derive( Debug , Copy , Clone , PartialEq , Eq , Hash , FromPrimitive)]\npub enum BWAPI_Text_Size_Enum #[derive( Debug , Copy , Clone , PartialEq , Eq , Hash , FromPrimitive)]\npub enum BWAPIC_CommandType_Enum ", changed);
 }
