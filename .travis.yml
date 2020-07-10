@@ -1,5 +1,13 @@
-os: windows
 language: rust
-rust: stable
 cache: cargo
-env: LIBCLANG_PATH="C:\\Program Files\\LLVM\\\\bin"
+os: windows
+rust: stable
+env: 
+  - LIBCLANG_PATH="C:\\Program Files\\LLVM\\\\bin"
+  - TARGET="x86_64-pc-windows-msvc"
+jobs:
+  fast_finish: true
+script:
+  - rustup target add "$TARGET"
+  - cargo build --verbose --target "$TARGET" --all
+  - cargo test --verbose --target "$TARGET" --all
