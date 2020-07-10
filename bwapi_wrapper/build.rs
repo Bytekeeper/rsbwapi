@@ -7,6 +7,8 @@ use std::io::Write;
 use std::path::PathBuf;
 
 fn main() {
+    should_replace();
+
     // Tell cargo to tell rustc to link the system bzip2
     // shared library.
     //    println!("cargo:rustc-link-lib=bz2");
@@ -54,4 +56,20 @@ fn main() {
     assert_ne!(changed, result, "Could not add FromPrimitive to bindings!");
     file.write_all(changed.as_bytes())
         .expect("Couldn't write bindings!");
+}
+
+fn should_replace() {
+    // GIVEN
+    let test = "# [ derive ( Debug , Copy , Clone , PartialEq , Eq , Hash ) ] pub enum std_deque__bindgen_ty_1";
+
+    // WHEN
+    let re =
+        Regex::new(r"#\s*\[\s*derive\s*\((?P<d>[^)]+)\)\s*\]\s*pub\s+enum").unwrap();
+    let changed = re.replace_all(
+        &test,
+        "#[derive($d, FromPrimitive)]\npub enum",
+    );
+
+    // THEN
+    assert_eq!("#[derive( Debug , Copy , Clone , PartialEq , Eq , Hash , FromPrimitive)]\npub enum std_deque__bindgen_ty_1", changed);
 }
