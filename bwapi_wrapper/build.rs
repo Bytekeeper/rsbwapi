@@ -46,10 +46,10 @@ fn main() {
     let result = bindings.to_string();
     let mut file = File::create(out_path.join("bindings.rs")).unwrap();
     let re =
-        Regex::new(r"#\[derive\(Debug, Copy, Clone, PartialEq, Eq, Hash\)\]\s*pub\s+enum").unwrap();
+        Regex::new(r"#\s*\[\s*derive\s*\((?P<d>[^)]+)\)\]\s*pub\s+enum").unwrap();
     let changed = re.replace_all(
         &result,
-        "#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FromPrimitive)]\npub enum",
+        "#[derive($d, FromPrimitive)]\npub enum",
     );
     assert_ne!(changed, result, "Could not add FromPrimitive to bindings!");
     file.write_all(changed.as_bytes())
