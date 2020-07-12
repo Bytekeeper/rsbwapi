@@ -45,6 +45,7 @@ impl Default for Client {
             if let Some(game_table) =
                 shm::map_memory::<BWAPI_GameTable>("Local\\bwapi_shared_memory_game_list")
             {
+                let game_table = game_table.get();
                 for game_instance in game_table.gameInstances.iter() {
                     if game_instance.serverProcessID != 0 {
                         let pid = game_instance.serverProcessID;
@@ -68,7 +69,7 @@ impl Default for Client {
                             .expect(
                                 "Game table was found, but could not establish shared memory link.",
                             );
-                        println!("Client version: {}", game_data.client_version);
+                        println!("Client version: {}", game_data.get().client_version);
                         break 'outer Client {
                             pipe: file,
                             game: Game::new(game_data),

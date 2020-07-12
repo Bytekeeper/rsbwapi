@@ -1,5 +1,5 @@
 use crate::aimodule::AiModule;
-use crate::game::{Commands, Game};
+use crate::game::{Commands, Frame};
 use crate::unit::Unit;
 
 mod shm;
@@ -22,22 +22,22 @@ pub struct MyModule {
 }
 
 impl AiModule for MyModule {
-    fn on_start(&self, game: &Game) {
-        for location in game.get_start_locations() {
+    fn on_start(&self, frame: &Frame) {
+        for location in frame.get_start_locations() {
             println!("{:?}", location);
         }
     }
 
-    fn on_unit_create(&self, _game: &Game, _cmd: &mut Commands, unit: Unit) {
+    fn on_unit_create(&self, _frame: &Frame, _cmd: &mut Commands, unit: Unit) {
         println!("Created Unit {}", unit.get_id())
     }
 
-    fn on_unit_destroy(&self, _game: &Game, _cmd: &mut Commands, unit: Unit) {
+    fn on_unit_destroy(&self, _frame: &Frame, _cmd: &mut Commands, unit: Unit) {
         println!("Destroyed Unit {}", unit.get_id())
     }
 
-    fn on_frame(&mut self, game: &Game, cmd: &mut Commands) {
-        let names: Vec<String> = game
+    fn on_frame(&mut self, frame: &Frame, cmd: &mut Commands) {
+        let names: Vec<String> = frame
             .get_players()
             .iter()
             .map(|p| String::from(p.name()))
@@ -45,11 +45,11 @@ impl AiModule for MyModule {
         for (i, name) in names.iter().enumerate() {
             cmd.draw_text_screen((10, (i as i32) * 10 + 20), name);
         }
-        cmd.draw_text_screen((10, 10), game.enemy().unwrap().name());
-        let units = game.get_all_units();
+        cmd.draw_text_screen((10, 10), frame.enemy().unwrap().name());
+        let units = frame.get_all_units();
         let mineral = units
             .iter()
-            .find(|u| u.get_type().is_mineral_field() && u.is_visible(&game.self_().unwrap()));
+            .find(|u| u.get_type().is_mineral_field() && u.is_visible(&frame.self_().unwrap()));
         if let Some(mineral) = mineral {
             if !self.called {
                 self.called = true;
@@ -61,7 +61,7 @@ impl AiModule for MyModule {
                         cmd.issue_command(u.gather(mineral));
                     });
             } else {
-                let enemy = units.iter().find(|u| u.get_player() == game.enemy());
+                let enemy = units.iter().find(|u| u.get_player() == frame.enemy());
                 if let Some(enemy) = enemy {
                     units
                         .iter()
@@ -76,7 +76,7 @@ impl AiModule for MyModule {
             println!("No minerals found!");
         }
 
-        for bullet in game.get_bullets().iter() {
+        for bullet in frame.get_bullets().iter() {
             println!(
                 "Bullet {} of player {:?} of unit {:?}",
                 bullet.get_id(),
@@ -91,7 +91,7 @@ fn main() {
     let mut my_module = MyModule { called: false };
     let mut client = client::Client::default();
 
-    println!("Waiting for game to start");
+    println!("Waiting for frame to start");
 
     while !client.get_game().is_in_game() {
         client.update(&mut my_module);

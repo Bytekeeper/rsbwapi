@@ -1,4 +1,5 @@
 use crate::player::Player;
+use core::ptr::NonNull;
 
 use crate::*;
 use bwapi_wrapper::*;
@@ -6,13 +7,13 @@ use bwapi_wrapper::*;
 #[derive(Clone, Copy)]
 pub struct Unit<'a> {
     pub id: usize,
-    game: &'a Game,
+    frame: NonNull<Frame<'a>>,
     data: &'a BWAPI_UnitData,
 }
 
 impl<'a> Unit<'a> {
-    pub(crate) fn new(id: usize, game: &'a Game, data: &'a BWAPI_UnitData) -> Self {
-        Unit { id, game, data }
+    pub(crate) fn new(id: usize, frame: NonNull<Frame<'a>>, data: &'a BWAPI_UnitData) -> Self {
+        Unit { id, frame, data }
     }
 
     pub fn get_type(&self) -> UnitType {
@@ -31,8 +32,13 @@ impl<'a> Unit<'a> {
         self.data.isVisible[player.id as usize]
     }
 
-    pub fn get_player(&self) -> Option<Player<'a>> {
-        self.game.get_player(self.data.player)
+    fn f(&self) -> &Frame<'a> {
+        // SAFETY: Frame outlives unit and cannot be null
+        unsafe { self.frame.as_ref() }
+    }
+
+    pub fn get_player(&self) -> Option<Player> {
+        self.f().get_player(self.data.player)
     }
 
     pub fn gather(&self, target: &Unit) -> UnitCommand {
