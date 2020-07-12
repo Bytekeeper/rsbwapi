@@ -137,7 +137,7 @@ impl Commands {
 
 impl<'a> Frame<'a> {
     pub fn get_player(&self, i: i32) -> Option<Player> {
-        if i < 0 {
+        if !(0..self.data.playerCount).contains(&i) {
             None
         } else {
             let i = i as usize;
@@ -146,7 +146,7 @@ impl<'a> Frame<'a> {
         }
     }
 
-    pub fn get_unit(&self, id: i32) -> Option<Unit<'a>> {
+    pub fn get_unit(&self, id: i32) -> Option<Unit> {
         if !(0..10000_i32).contains(&id) {
             None
         } else {

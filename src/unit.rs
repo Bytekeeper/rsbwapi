@@ -33,7 +33,7 @@ impl<'a> Unit<'a> {
     }
 
     fn f(&self) -> &Frame<'a> {
-        // SAFETY: Frame outlives unit and cannot be null
+        // SAFETY: Frame outlives unit and cannot be null, and frame will not be moved by game
         unsafe { self.frame.as_ref() }
     }
 
@@ -47,7 +47,6 @@ impl<'a> Unit<'a> {
             ..self.command_type(BWAPI_UnitCommandTypes_Enum_Enum::Gather)
         }
     }
-
     pub fn attack(&self, target: &Unit) -> UnitCommand {
         UnitCommand {
             targetIndex: target.id as i32,
