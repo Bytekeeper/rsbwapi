@@ -1,21 +1,6 @@
-use crate::aimodule::AiModule;
-use crate::game::{Commands, Frame};
-use crate::unit::Unit;
+use rsbwapi::*;
 
-mod shm;
-
-pub mod aimodule;
-mod bridge;
-pub mod bullet;
-pub mod client;
-pub mod game;
-pub mod player;
-pub mod types;
-pub mod unit;
-
-//use num_traits::{FromPrimitive, ToPrimitive};
-
-use types::{UnitType, UnitTypeExt};
+use rsbwapi::types::{UnitType, UnitTypeExt};
 
 pub struct MyModule {
     called: bool,
@@ -88,16 +73,5 @@ impl AiModule for MyModule {
 }
 
 fn main() {
-    let mut my_module = MyModule { called: false };
-    let mut client = client::Client::default();
-
-    println!("Waiting for frame to start");
-
-    while !client.get_game().is_in_game() {
-        client.update(&mut my_module);
-    }
-
-    while client.get_game().is_in_game() {
-        client.update(&mut my_module);
-    }
+    rsbwapi::start(MyModule { called: false });
 }

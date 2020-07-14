@@ -1,7 +1,8 @@
 [package]
 name = "rsbwapi"
-version = "0.1.0"
-authors = ["Bytekeeper <therealdante@gmail.com>"]
+version = "0.0.1"
+authors = ["Bytekeeper <bytekeeper@mailbox.org>"]
+description = "BWAPI client to write AI players for Starcraft Broodwar"
 edition = "2018"
 
 [dependencies]
@@ -10,7 +11,3 @@ winapi = { version = "0.3", features = ["winuser", "memoryapi", "handleapi"] }
 memchr = "2.2.0"
 num-traits = "0.2"
 num-derive = "0.2"
-
-[[bin]]
-name = "rsbwapi"
-path = "src/main.rs"

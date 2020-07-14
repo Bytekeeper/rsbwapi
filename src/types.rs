@@ -84,18 +84,74 @@ pub struct TilePosition {
     pub y: i32,
 }
 
+#[derive(Debug)]
+pub struct WalkPosition {
+    pub x: i32,
+    pub y: i32,
+}
+
 pub struct Vector2D {
     pub x: f64,
     pub y: f64,
 }
 
-impl From<(i32, i32)> for TilePosition {
-    fn from(pos: (i32, i32)) -> Self {
+type PositionTuple = (i32, i32);
+
+impl Position {
+    pub fn to_tile_position(&self) -> TilePosition {
+        TilePosition {
+            x: self.x / 32,
+            y: self.y / 32,
+        }
+    }
+
+    pub fn to_walk_position(&self) -> WalkPosition {
+        WalkPosition {
+            x: self.x / 8,
+            y: self.y / 8,
+        }
+    }
+}
+
+impl TilePosition {
+    pub fn to_position(&self) -> Position {
+        Position {
+            x: self.x * 32,
+            y: self.y * 32,
+        }
+    }
+
+    pub fn to_walk_position(&self) -> WalkPosition {
+        WalkPosition {
+            x: self.x * 8,
+            y: self.y * 8,
+        }
+    }
+}
+
+impl WalkPosition {
+    pub fn to_tile_position(&self) -> TilePosition {
+        TilePosition {
+            x: self.x / 4,
+            y: self.y / 4,
+        }
+    }
+
+    pub fn to_position(&self) -> Position {
+        Position {
+            x: self.x * 8,
+            y: self.y * 8,
+        }
+    }
+}
+
+impl From<PositionTuple> for TilePosition {
+    fn from(pos: PositionTuple) -> Self {
         Self { x: pos.0, y: pos.1 }
     }
 }
 
-impl From<(i32, i32)> for Position {
+impl From<PositionTuple> for Position {
     fn from(pos: (i32, i32)) -> Self {
         Self { x: pos.0, y: pos.1 }
     }

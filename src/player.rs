@@ -31,7 +31,7 @@ impl<'a> Player<'a> {
 }
 
 impl<'a> PartialEq for Player<'a> {
-    fn eq(&self, other: &Player) -> bool {
+    fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
 }

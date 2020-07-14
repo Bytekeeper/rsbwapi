@@ -80,4 +80,10 @@ impl<'a> Bullet<'a> {
     }
 }
 
+impl<'a> PartialEq for Bullet<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
 type BulletType = BWAPI_BulletTypes_Enum_Enum;

@@ -67,7 +67,7 @@ impl<'a> Unit<'a> {
 }
 
 impl<'a> PartialEq for Unit<'a> {
-    fn eq(&self, other: &Unit) -> bool {
+    fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
 }

@@ -30,15 +30,14 @@ struct CommandApplier<'a> {
 
 impl<'a> CommandApplier<'a> {
     fn apply_commands(&mut self, commands: &Commands) {
-        for draw in commands.draws.iter() {
-            match draw {
-                DrawCommand::DrawTextScreen { x, y, string } => {
+        for cmd in commands.commands.iter() {
+            use Command::*;
+            match cmd {
+                DrawTextScreen { x, y, string } => {
                     self.draw_text_screen(*x, *y, string)
                 }
+                UnitCommand(cmd) => self.issue_command(*cmd)
             }
-        }
-        for unit_command in commands.unit_commands.iter() {
-            self.issue_command(*unit_command)
         }
     }
 
@@ -112,18 +111,18 @@ impl<'a> CommandApplier<'a> {
 
 #[derive(Default)]
 pub struct Commands {
-    draws: Vec<DrawCommand>,
-    unit_commands: Vec<UnitCommand>,
+    commands: Vec<Command>,
 }
 
-pub enum DrawCommand {
+pub enum Command {
     DrawTextScreen { x: i32, y: i32, string: String },
+    UnitCommand(UnitCommand)
 }
 
 impl Commands {
     pub fn draw_text_screen<P: Into<Position>>(&mut self, position: P, string: &str) {
         let p = position.into();
-        self.draws.push(DrawCommand::DrawTextScreen {
+        self.commands.push(Command::DrawTextScreen {
             x: p.x,
             y: p.y,
             string: string.to_string(),
@@ -131,7 +130,7 @@ impl Commands {
     }
 
     pub fn issue_command(&mut self, cmd: UnitCommand) {
-        self.unit_commands.push(cmd)
+        self.commands.push(Command::UnitCommand(cmd))
     }
 }
 
