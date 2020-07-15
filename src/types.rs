@@ -3,7 +3,10 @@ use num_traits::FromPrimitive;
 use std::ffi::CStr;
 use std::os::raw::c_char;
 
-#[derive(Debug)]
+pub type UnitType = BWAPI_UnitTypes_Enum_Enum;
+pub type CoordinateType = BWAPI_CoordinateType_Enum;
+
+#[derive(Debug, Copy, Clone)]
 pub enum Color {
     /// <summary>The default color for Player 1.</summary>
     Red = 111,
@@ -43,21 +46,6 @@ pub enum Color {
 }
 
 #[derive(Debug)]
-pub enum CoordinateType {
-    /// <summary>A default value for uninitialized coordinate types.</summary>
-    None = 0,
-
-    /// <summary>Positions::Origin (0,0) corresponds to the top left corner of the <b>screen</b>.</summary>
-    Screen = 1,
-
-    /// <summary>Positions::Origin (0,0) corresponds to the top left corner of the <b>map</b>.</summary>
-    Map = 2,
-
-    /// <summary>Positions::Origin (0,0) corresponds to the location of the <b>mouse cursor</b>.</summary>
-    Mouse = 3,
-}
-
-#[derive(Debug)]
 pub enum TextSize {
     /// <summary>The smallest text size in the game.</summary>
     Small,
@@ -72,24 +60,25 @@ pub enum TextSize {
     Huge,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct Position {
     pub x: i32,
     pub y: i32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct TilePosition {
     pub x: i32,
     pub y: i32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct WalkPosition {
     pub x: i32,
     pub y: i32,
 }
 
+#[derive(Debug, Copy, Clone)]
 pub struct Vector2D {
     pub x: f64,
     pub y: f64,
@@ -156,8 +145,6 @@ impl From<PositionTuple> for Position {
         Self { x: pos.0, y: pos.1 }
     }
 }
-
-pub type UnitType = BWAPI_UnitTypes_Enum_Enum;
 
 pub trait UnitTypeExt {
     fn is_resource_container(&self) -> bool;

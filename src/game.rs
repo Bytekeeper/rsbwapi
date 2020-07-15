@@ -1,18 +1,16 @@
 use crate::aimodule::AiModule;
 use crate::bullet::Bullet;
+use crate::command::Commands;
 use crate::shm::Shm;
 use crate::types::c_str_to_str;
+use crate::types::Position;
 use crate::types::TilePosition;
 use crate::*;
 use bwapi_wrapper::*;
 use core::ptr::NonNull;
 
-use std::ffi::CString;
-
-use crate::types::{Color, Position, TextSize};
-
 use crate::player::Player;
-use crate::unit::{Unit, UnitCommand};
+use crate::unit::Unit;
 
 pub struct Game {
     data: Shm<BWAPI_GameData>,
@@ -22,116 +20,6 @@ pub struct Game {
 pub struct Frame<'a> {
     data: &'a BWAPI_GameData,
     units: Vec<Unit<'a>>,
-}
-
-struct CommandApplier<'a> {
-    data: &'a mut BWAPI_GameData,
-}
-
-impl<'a> CommandApplier<'a> {
-    fn apply_commands(&mut self, commands: &Commands) {
-        for cmd in commands.commands.iter() {
-            use Command::*;
-            match cmd {
-                DrawTextScreen { x, y, string } => {
-                    self.draw_text_screen(*x, *y, string)
-                }
-                UnitCommand(cmd) => self.issue_command(*cmd)
-            }
-        }
-    }
-
-    fn draw_text_screen(&mut self, x: i32, y: i32, string: &str) {
-        let id = self.add_string(string);
-        self.add_shape(
-            BWAPIC_ShapeType_Enum::Text,
-            BWAPI_CoordinateType_Enum::Screen,
-            x,
-            y,
-            0,
-            0,
-            id as i32,
-            TextSize::Default as i32,
-            Color::Black,
-            false,
-        );
-    }
-
-    fn add_string(&mut self, string: &str) -> usize {
-        assert!(self.data.stringCount < BWAPI_GameData_MAX_STRINGS);
-        let string_count = self.data.stringCount as usize;
-        let string = CString::new(string).unwrap();
-        let bytes = string.as_bytes_with_nul();
-        let len = bytes.len();
-        let dst = unsafe {
-            &mut *(&mut self.data.strings[string_count][..len] as *mut [i8] as *mut [u8])
-        };
-        dst.copy_from_slice(bytes);
-        self.data.stringCount += 1;
-        string_count
-    }
-
-    fn add_shape(
-        &mut self,
-        shape_type: BWAPIC_ShapeType_Enum,
-        coordinate_type: BWAPI_CoordinateType_Enum,
-        x1: i32,
-        y1: i32,
-        x2: i32,
-        y2: i32,
-        extra1: i32,
-        extra2: i32,
-        color: Color,
-        is_solid: bool,
-    ) {
-        assert!(self.data.shapeCount < BWAPI_GameData_MAX_SHAPES);
-        let shape = BWAPIC_Shape {
-            type_: shape_type,
-            ctype: coordinate_type,
-            x1,
-            x2,
-            y1,
-            y2,
-            extra1,
-            extra2,
-            color: color as i32,
-            isSolid: is_solid,
-        };
-        let shape_count = self.data.shapeCount as usize;
-        self.data.shapes[shape_count] = shape;
-        self.data.shapeCount += 1;
-    }
-
-    pub fn issue_command(&mut self, cmd: UnitCommand) {
-        let command_count = self.data.unitCommandCount as usize;
-        self.data.unitCommands[command_count] = cmd;
-        self.data.unitCommandCount += 1
-    }
-}
-
-#[derive(Default)]
-pub struct Commands {
-    commands: Vec<Command>,
-}
-
-pub enum Command {
-    DrawTextScreen { x: i32, y: i32, string: String },
-    UnitCommand(UnitCommand)
-}
-
-impl Commands {
-    pub fn draw_text_screen<P: Into<Position>>(&mut self, position: P, string: &str) {
-        let p = position.into();
-        self.commands.push(Command::DrawTextScreen {
-            x: p.x,
-            y: p.y,
-            string: string.to_string(),
-        })
-    }
-
-    pub fn issue_command(&mut self, cmd: UnitCommand) {
-        self.commands.push(Command::UnitCommand(cmd))
-    }
 }
 
 impl<'a> Frame<'a> {
@@ -389,9 +277,6 @@ impl Game {
                 None => {}
             }
         }
-        let mut command_applier = CommandApplier {
-            data: self.data.get_mut(),
-        };
-        command_applier.apply_commands(&commands);
+        commands.commit(self.data.get_mut());
     }
 }
