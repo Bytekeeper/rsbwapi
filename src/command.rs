@@ -44,9 +44,95 @@ impl<'a> CommandApplier<'a> {
                     color,
                     solid,
                 } => self.draw_circle(*ctype, *x, *y, *radius, *color, *solid),
+                DrawEllipse {
+                    x,
+                    y,
+                    xrad,
+                    yrad,
+                    ctype,
+                    color,
+                    solid,
+                } => self.draw_ellipse(*ctype, *x, *y, *xrad, *yrad, *color, *solid),
+                DrawDot {
+                    x,
+                    y,
+                    ctype,
+                    color,
+                    solid,
+                } => self.draw_dot(*ctype, *x, *y, *color, *solid),
+                DrawLine {
+                    a,
+                    b,
+                    ctype,
+                    color,
+                    solid,
+                } => self.draw_line(*ctype, *a, *b, *color, *solid),
+
                 UnitCommand(cmd) => self.issue_command(*cmd),
             }
         }
+    }
+
+    fn draw_line(
+        &mut self,
+        ctype: CoordinateType,
+        a: Position,
+        b: Position,
+        color: Color,
+        solid: bool,
+    ) {
+        self.add_shape(BWAPIC_Shape {
+            type_: BWAPIC_ShapeType_Enum::Dot,
+            ctype,
+            x1: a.x,
+            y1: a.y,
+            x2: b.x,
+            y2: b.y,
+            extra1: 0,
+            extra2: 0,
+            color: color as i32,
+            isSolid: solid,
+        })
+    }
+
+    fn draw_dot(&mut self, ctype: CoordinateType, x: i32, y: i32, color: Color, solid: bool) {
+        self.add_shape(BWAPIC_Shape {
+            type_: BWAPIC_ShapeType_Enum::Dot,
+            ctype,
+            x1: x,
+            y1: y,
+            x2: 0,
+            y2: 0,
+            extra1: 0,
+            extra2: 0,
+            color: color as i32,
+            isSolid: solid,
+        })
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn draw_ellipse(
+        &mut self,
+        ctype: CoordinateType,
+        x: i32,
+        y: i32,
+        xrad: i32,
+        yrad: i32,
+        color: Color,
+        solid: bool,
+    ) {
+        self.add_shape(BWAPIC_Shape {
+            type_: BWAPIC_ShapeType_Enum::Circle,
+            ctype,
+            x1: x,
+            y1: y,
+            x2: 0,
+            y2: 0,
+            extra1: xrad,
+            extra2: yrad,
+            color: color as i32,
+            isSolid: solid,
+        })
     }
 
     fn draw_circle(
@@ -207,6 +293,29 @@ pub enum Command {
         x: i32,
         y: i32,
         radius: i32,
+        color: Color,
+        solid: bool,
+    },
+    DrawEllipse {
+        ctype: CoordinateType,
+        x: i32,
+        y: i32,
+        xrad: i32,
+        yrad: i32,
+        color: Color,
+        solid: bool,
+    },
+    DrawDot {
+        ctype: CoordinateType,
+        x: i32,
+        y: i32,
+        color: Color,
+        solid: bool,
+    },
+    DrawLine {
+        ctype: CoordinateType,
+        a: Position,
+        b: Position,
         color: Color,
         solid: bool,
     },
@@ -393,6 +502,120 @@ impl Commands {
             x: p.x,
             y: p.y,
             radius,
+            color,
+            solid,
+        });
+    }
+
+    pub fn draw_ellipse_screen<P: Into<Position>>(
+        &mut self,
+        p: P,
+        xrad: i32,
+        yrad: i32,
+        color: Color,
+        solid: bool,
+    ) {
+        self.draw_ellipse(CoordinateType::Screen, p, xrad, yrad, color, solid)
+    }
+
+    pub fn draw_ellipse_map<P: Into<Position>>(
+        &mut self,
+        p: P,
+        xrad: i32,
+        yrad: i32,
+        color: Color,
+        solid: bool,
+    ) {
+        self.draw_ellipse(CoordinateType::Map, p, xrad, yrad, color, solid)
+    }
+
+    pub fn draw_ellipse_mouse<P: Into<Position>>(
+        &mut self,
+        p: P,
+        xrad: i32,
+        yrad: i32,
+        color: Color,
+        solid: bool,
+    ) {
+        self.draw_ellipse(CoordinateType::Mouse, p, xrad, yrad, color, solid)
+    }
+
+    pub fn draw_ellipse<P: Into<Position>>(
+        &mut self,
+        ctype: CoordinateType,
+        p: P,
+        xrad: i32,
+        yrad: i32,
+        color: Color,
+        solid: bool,
+    ) {
+        let p = p.into();
+        self.commands.push(Command::DrawEllipse {
+            ctype,
+            x: p.x,
+            y: p.y,
+            xrad,
+            yrad,
+            color,
+            solid,
+        });
+    }
+
+    pub fn draw_dot_screen<P: Into<Position>>(&mut self, p: P, color: Color, solid: bool) {
+        self.draw_dot(CoordinateType::Screen, p, color, solid)
+    }
+
+    pub fn draw_dot_map<P: Into<Position>>(&mut self, p: P, color: Color, solid: bool) {
+        self.draw_dot(CoordinateType::Map, p, color, solid)
+    }
+
+    pub fn draw_dot_mouse<P: Into<Position>>(&mut self, p: P, color: Color, solid: bool) {
+        self.draw_dot(CoordinateType::Mouse, p, color, solid)
+    }
+
+    pub fn draw_dot<P: Into<Position>>(
+        &mut self,
+        ctype: CoordinateType,
+        p: P,
+        color: Color,
+        solid: bool,
+    ) {
+        let p = p.into();
+        self.commands.push(Command::DrawDot {
+            ctype,
+            x: p.x,
+            y: p.y,
+            color,
+            solid,
+        });
+    }
+
+    pub fn draw_line_screen<P: Into<Position>>(&mut self, a: P, b: P, color: Color, solid: bool) {
+        self.draw_line(CoordinateType::Screen, a, b, color, solid)
+    }
+
+    pub fn draw_line_map<P: Into<Position>>(&mut self, a: P, b: P, color: Color, solid: bool) {
+        self.draw_line(CoordinateType::Map, a, b, color, solid)
+    }
+
+    pub fn draw_line_mouse<P: Into<Position>>(&mut self, a: P, b: P, color: Color, solid: bool) {
+        self.draw_line(CoordinateType::Mouse, a, b, color, solid)
+    }
+
+    pub fn draw_line<P: Into<Position>>(
+        &mut self,
+        ctype: CoordinateType,
+        a: P,
+        b: P,
+        color: Color,
+        solid: bool,
+    ) {
+        let a = a.into();
+        let b = b.into();
+        self.commands.push(Command::DrawLine {
+            ctype,
+            a,
+            b,
             color,
             solid,
         });

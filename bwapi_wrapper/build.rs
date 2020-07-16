@@ -20,14 +20,13 @@ fn main() {
     let bindings = bindgen::Builder::default()
         .clang_arg("-xc++")
         .clang_arg("-std=c++14")
-        .clang_arg("-Irepltype")
         .clang_arg("-Ibwapi/bwapi/include")
         .default_enum_style(bindgen::EnumVariation::Rust {
             non_exhaustive: false,
         })
-        .whitelist_type(".*GameData")
-        .whitelist_type(".*GameTable")
-        .whitelist_type(".*Enum")
+        .whitelist_type("BWAPI::.*GameData")
+        .whitelist_type("BWAPI::.*GameTable")
+        .whitelist_type("BWAPI::.*Enum")
         .ignore_methods()
         .ignore_functions()
         .opaque_type("std::.*")

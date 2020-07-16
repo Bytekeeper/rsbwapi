@@ -14,8 +14,6 @@ use crate::aimodule::AiModule;
 
 use super::shm;
 
-const EMPTY_STRING: &str = "";
-
 pub struct Client {
     pipe: File,
     game: Game,
@@ -34,7 +32,7 @@ impl ToStr for [i8] {
                 .to_str()
                 .unwrap()
         } else {
-            EMPTY_STRING
+            ""
         }
     }
 }
