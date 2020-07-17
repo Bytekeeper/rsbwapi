@@ -1,7 +1,7 @@
 use crate::command::Commands;
 use crate::game::Frame;
 use crate::player::Player;
-use crate::types::Position;
+use crate::position::Position;
 use crate::unit::Unit;
 
 pub trait AiModule {

@@ -1,6 +1,6 @@
 use crate::game::Frame;
 use crate::player::Player;
-use crate::types::*;
+use crate::position::*;
 use crate::unit::Unit;
 use bwapi_wrapper::*;
 use core::ptr::NonNull;

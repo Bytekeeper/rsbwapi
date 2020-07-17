@@ -1,10 +1,9 @@
 use crate::aimodule::AiModule;
 use crate::bullet::Bullet;
 use crate::command::Commands;
+use crate::position::*;
 use crate::shm::Shm;
 use crate::types::c_str_to_str;
-use crate::types::Position;
-use crate::types::TilePosition;
 use crate::*;
 use bwapi_wrapper::*;
 use core::ptr::NonNull;
@@ -50,6 +49,66 @@ impl<'a> Frame<'a> {
             .collect()
     }
 
+    pub fn get_selected_units(&self) -> Vec<Unit> {
+        (0..self.data.selectedUnitCount as usize)
+            .map(|u| Unit::new(u, NonNull::from(self), &self.data.units[u]))
+            .collect()
+    }
+
+    pub fn is_multiplayer(&self) -> bool {
+        self.data.isMultiplayer
+    }
+
+    pub fn is_walkable<P: Into<WalkPosition>>(&self, wp: P) -> bool {
+        let p = wp.into();
+        self.data.isWalkable[p.y as usize][p.x as usize]
+    }
+
+    pub fn is_visible<P: Into<TilePosition>>(&self, tp: P) -> bool {
+        let p = tp.into();
+        self.data.isVisible[p.y as usize][p.x as usize]
+    }
+
+    pub fn is_buildable<P: Into<TilePosition>>(&self, tp: P) -> bool {
+        let p = tp.into();
+        self.data.isBuildable[p.y as usize][p.x as usize]
+    }
+
+    pub fn is_explored<P: Into<TilePosition>>(&self, tp: P) -> bool {
+        let p = tp.into();
+        self.data.isExplored[p.y as usize][p.x as usize]
+    }
+
+    pub fn has_creep<P: Into<TilePosition>>(&self, tp: P) -> bool {
+        let p = tp.into();
+        self.data.hasCreep[p.y as usize][p.x as usize]
+    }
+
+    pub fn get_ground_height<P: Into<TilePosition>>(&self, tp: P) -> i32 {
+        let p = tp.into();
+        self.data.getGroundHeight[p.y as usize][p.x as usize]
+    }
+
+    pub fn map_height(&self) -> i32 {
+        self.data.mapHeight
+    }
+
+    pub fn map_width(&self) -> i32 {
+        self.data.mapWidth
+    }
+
+    pub fn map_hash(&self) -> &str {
+        c_str_to_str(&self.data.mapHash)
+    }
+
+    pub fn map_file_name(&self) -> &str {
+        c_str_to_str(&self.data.mapFileName)
+    }
+
+    pub fn map_path_name(&self) -> &str {
+        c_str_to_str(&self.data.mapPathName)
+    }
+
     pub fn map_name(&self) -> &str {
         c_str_to_str(&self.data.mapName)
     }
@@ -88,10 +147,6 @@ impl<'a> Frame<'a> {
             .collect()
     }
 
-    pub fn get_ground_height(&self, tile_x: i32, tile_y: i32) -> i32 {
-        self.data.getGroundHeight[tile_y as usize][tile_x as usize]
-    }
-
     pub fn enemy(&self) -> Option<Player> {
         self.get_player(self.data.enemy)
     }
@@ -116,11 +171,6 @@ impl<'a> Frame<'a> {
             .map(|i| self.data.startLocations[i])
             .map(|p| TilePosition { x: p.x, y: p.y })
             .collect()
-    }
-
-    pub fn has_creep<P: Into<TilePosition>>(&self, pos: P) -> bool {
-        let pos = pos.into();
-        self.data.hasCreep[pos.y as usize][pos.x as usize]
     }
 
     fn event_str(&self, i: usize) -> &str {

@@ -9,6 +9,7 @@ pub mod client;
 pub mod command;
 pub mod game;
 pub mod player;
+pub mod position;
 pub mod types;
 pub mod unit;
 
@@ -16,6 +17,7 @@ pub use aimodule::AiModule;
 pub use command::Command;
 pub use game::Frame;
 pub use player::Player;
+pub use position::*;
 pub use unit::Unit;
 
 pub fn start(mut module: impl AiModule) {

@@ -1,5 +1,6 @@
+use crate::position::Position;
 use crate::types::CoordinateType;
-use crate::types::{Color, Position, TextSize};
+use crate::types::{Color, TextSize};
 use crate::unit::UnitCommand;
 use bwapi_wrapper::*;
 use std::ffi::CString;
@@ -67,10 +68,24 @@ impl<'a> CommandApplier<'a> {
                     color,
                     solid,
                 } => self.draw_line(*ctype, *a, *b, *color, *solid),
-
-                UnitCommand(cmd) => self.issue_command(*cmd),
+                SendText { message, to_allies } => self.send_text(message, *to_allies),
+                UnitCommand(cmd) => self.add_unit_command(*cmd),
+                LeaveGame => self.add_command(BWAPIC_Command {
+                    type_: BWAPIC_CommandType_Enum::LeaveGame,
+                    value1: 0,
+                    value2: 0,
+                }),
             }
         }
+    }
+
+    fn send_text(&mut self, message: &str, to_allies: bool) {
+        let string_index = self.add_string(message);
+        self.add_command(BWAPIC_Command {
+            type_: BWAPIC_CommandType_Enum::SendText,
+            value1: string_index as i32,
+            value2: to_allies as i32,
+        })
     }
 
     fn draw_line(
@@ -248,9 +263,19 @@ impl<'a> CommandApplier<'a> {
         self.data.shapeCount += 1;
     }
 
-    pub fn issue_command(&mut self, cmd: UnitCommand) {
+    fn add_command(&mut self, cmd: BWAPIC_Command) {
         assert!(
-            self.data.unitCommandCount < BWAPI_GameData_MAX_COMMANDS,
+            self.data.commandCount < BWAPI_GameData_MAX_COMMANDS,
+            "Too many commands"
+        );
+        let command_count = self.data.commandCount as usize;
+        self.data.commands[command_count] = cmd;
+        self.data.commandCount += 1;
+    }
+
+    pub fn add_unit_command(&mut self, cmd: UnitCommand) {
+        assert!(
+            self.data.unitCommandCount < BWAPI_GameData_MAX_UNIT_COMMANDS,
             "Too many unit commands"
         );
         let command_count = self.data.unitCommandCount as usize;
@@ -319,10 +344,30 @@ pub enum Command {
         color: Color,
         solid: bool,
     },
+    SendText {
+        message: String,
+        to_allies: bool,
+    },
+    LeaveGame,
     UnitCommand(UnitCommand),
 }
 
 impl Commands {
+    pub fn send_text_ex(&mut self, to_allies: bool, message: &str) {
+        self.commands.push(Command::SendText {
+            to_allies,
+            message: message.to_owned(),
+        });
+    }
+
+    pub fn send_text(&mut self, message: &str) {
+        self.send_text_ex(false, message);
+    }
+
+    pub fn leave_game(&mut self) {
+        self.commands.push(Command::LeaveGame);
+    }
+
     pub fn draw_text_screen<P: Into<Position>>(&mut self, position: P, string: &str) {
         self.draw_text(CoordinateType::Screen, position, string);
     }
