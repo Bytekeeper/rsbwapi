@@ -3,17 +3,16 @@ use crate::player::Player;
 use crate::position::*;
 use crate::unit::Unit;
 use bwapi_wrapper::*;
-use core::ptr::NonNull;
 use num_traits::FromPrimitive;
 
 pub struct Bullet<'a> {
     id: usize,
-    frame: NonNull<Frame<'a>>,
+    frame: &'a Frame<'a>,
     data: &'a BWAPI_BulletData,
 }
 
 impl<'a> Bullet<'a> {
-    pub fn new(id: usize, frame: NonNull<Frame<'a>>, data: &'a BWAPI_BulletData) -> Self {
+    pub fn new(id: usize, frame: &'a Frame<'a>, data: &'a BWAPI_BulletData) -> Self {
         Self { id, frame, data }
     }
 
@@ -21,13 +20,8 @@ impl<'a> Bullet<'a> {
         self.data.exists
     }
 
-    fn f(&self) -> &Frame<'a> {
-        // SAFETY: Frame outlives bullet and cannot be null
-        unsafe { self.frame.as_ref() }
-    }
-
     pub fn get_player(&self) -> Option<Player> {
-        self.f().get_player(self.data.player)
+        self.frame.get_player(self.data.player)
     }
 
     pub fn get_id(&self) -> usize {
@@ -50,11 +44,11 @@ impl<'a> Bullet<'a> {
     }
 
     pub fn get_source(&self) -> Option<Unit> {
-        self.f().get_unit(self.data.source)
+        self.frame.get_unit(self.data.source)
     }
 
     pub fn get_target(&self) -> Option<Unit> {
-        self.f().get_unit(self.data.target)
+        self.frame.get_unit(self.data.target)
     }
 
     pub fn get_target_position(&self) -> Option<Position> {

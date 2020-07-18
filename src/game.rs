@@ -6,7 +6,6 @@ use crate::shm::Shm;
 use crate::types::c_str_to_str;
 use crate::*;
 use bwapi_wrapper::*;
-use core::ptr::NonNull;
 
 use crate::player::Player;
 use crate::unit::Unit;
@@ -36,11 +35,7 @@ impl<'a> Frame<'a> {
         if !(0..10000_i32).contains(&id) {
             None
         } else {
-            Some(Unit::new(
-                id as usize,
-                NonNull::from(self),
-                &self.data.units[id as usize],
-            ))
+            Some(Unit::new(id as usize, self, &self.data.units[id as usize]))
         }
     }
     pub fn get_players(&self) -> Vec<Player> {
@@ -51,7 +46,7 @@ impl<'a> Frame<'a> {
 
     pub fn get_selected_units(&self) -> Vec<Unit> {
         (0..self.data.selectedUnitCount as usize)
-            .map(|u| Unit::new(u, NonNull::from(self), &self.data.units[u]))
+            .map(|u| Unit::new(u, self, &self.data.units[u]))
             .collect()
     }
 
@@ -113,7 +108,7 @@ impl<'a> Frame<'a> {
         c_str_to_str(&self.data.mapName)
     }
 
-    pub fn get_all_units(&self) -> &Vec<Unit> {
+    pub fn get_all_units(&self) -> &Vec<Unit<'a>> {
         &self.units
     }
 
@@ -134,12 +129,12 @@ impl<'a> Frame<'a> {
         self.data
             .bullets
             .iter()
-            .map(|b| Bullet::new(b.id as usize, NonNull::from(self), b))
+            .map(|b| Bullet::new(b.id as usize, self, b))
             .filter(|b| b.exists())
             .collect()
     }
 
-    pub fn get_geysers(&self) -> Vec<Unit> {
+    pub fn get_geysers(&self) -> Vec<Unit<'a>> {
         self.get_all_units()
             .iter()
             .filter(|u| u.get_type() == UnitType::Resource_Vespene_Geyser)
@@ -196,12 +191,15 @@ impl Game {
             data,
             units: vec![],
         };
-        let frame_ptr = NonNull::from(&frame);
-        let units = self
+        // SAFETY: frame will not be move in here, and only references are passed to AIModule which cannot store a reference
+        // to something inside, due to the lifetime being only valid for the callback call.
+        let unmoved_frame = unsafe { &*(&frame as *const Frame) };
+        let units: Vec<Unit> = self
             .unit_ids
             .iter()
-            .map(|&i| Unit::new(i, frame_ptr, &data.units[i]))
+            .map(|&i| Unit::new(i, unmoved_frame, &data.units[i]))
             .collect();
+
         frame.units = units;
         let mut commands = Commands::default();
         for i in 0..data.eventCount {
@@ -223,7 +221,7 @@ impl Game {
                 UnitCreate => {
                     let id = event.v1 as usize;
                     self.unit_ids.push(id);
-                    let unit = Unit::new(id, frame_ptr, &data.units[id]);
+                    let unit = Unit::new(id, unmoved_frame, &data.units[id]);
                     frame.units.push(unit);
                     module.on_unit_create(&frame, &mut commands, unit);
                 }
