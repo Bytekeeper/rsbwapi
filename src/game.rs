@@ -46,7 +46,8 @@ impl<'a> Frame<'a> {
 
     pub fn get_selected_units(&self) -> Vec<Unit> {
         (0..self.data.selectedUnitCount as usize)
-            .map(|u| Unit::new(u, self, &self.data.units[u]))
+            .map(|i| self.data.selectedUnits[i])
+            .map(|i| self.get_unit(i).expect("Selected unit to exist"))
             .collect()
     }
 
