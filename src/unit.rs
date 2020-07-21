@@ -1,5 +1,7 @@
 use crate::player::Player;
 
+use crate::types::Race;
+use crate::types::UnitTypeExt;
 use crate::*;
 use bwapi_wrapper::*;
 
@@ -8,11 +10,39 @@ pub struct Unit<'a> {
     pub id: usize,
     frame: &'a Frame<'a>,
     data: &'a BWAPI_UnitData,
+    info: UnitInfo,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct UnitInfo {
+    pub id: usize,
+    pub initial_hit_points: i32,
+    pub initial_resources: i32,
+}
+
+impl UnitInfo {
+    pub(crate) fn new(id: usize, data: &BWAPI_UnitData) -> Self {
+        Self {
+            id,
+            initial_hit_points: data.hitPoints,
+            initial_resources: data.resources,
+        }
+    }
 }
 
 impl<'a> Unit<'a> {
-    pub(crate) fn new(id: usize, frame: &'a Frame<'a>, data: &'a BWAPI_UnitData) -> Self {
-        Unit { id, frame, data }
+    pub(crate) fn new(
+        id: usize,
+        frame: &'a Frame<'a>,
+        data: &'a BWAPI_UnitData,
+        info: UnitInfo,
+    ) -> Self {
+        Unit {
+            id,
+            frame,
+            data,
+            info,
+        }
     }
 
     pub fn get_closest_unit(&self, pred: impl Fn(&Unit) -> bool) -> Option<&Unit> {
@@ -92,25 +122,45 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_initial_hit_points(&self) -> i32 {
-        unimplemented!()
+        self.info.initial_hit_points
+    }
+
+    pub fn get_initial_resources(&self) -> i32 {
+        self.info.initial_resources
     }
 
     pub fn get_interceptor_count(&self) -> i32 {
         self.data.interceptorCount
     }
 
-    pub fn get_interceptors(&self) -> Vec<&Unit<'a>> {
-        self.frame
-            .get_all_units()
-            .iter()
-            .filter(|&u| {
-                if let Some(carrier) = u.get_carrier() {
-                    carrier == *self
-                } else {
-                    false
-                }
-            })
-            .collect()
+    pub fn get_interceptors(&self) -> Vec<Unit<'a>> {
+        let burrowed_map = self.frame.interceptors.borrow();
+        let interceptors = burrowed_map.get(&self.id);
+        if let Some(interceptors) = interceptors {
+            interceptors
+                .iter()
+                .map(|&i| self.frame.get_unit(i).expect("Interceptor to be present"))
+                .collect()
+        } else {
+            let interceptors: Vec<Unit> = self
+                .frame
+                .get_all_units()
+                .iter()
+                .filter(|u| {
+                    if let Some(carrier) = u.get_carrier() {
+                        carrier == *self
+                    } else {
+                        false
+                    }
+                })
+                .cloned()
+                .collect();
+            self.frame
+                .interceptors
+                .borrow_mut()
+                .insert(self.id, interceptors.iter().map(|u| u.id as i32).collect());
+            interceptors
+        }
     }
 
     pub fn get_irradiate_timer(&self) -> i32 {
@@ -217,6 +267,37 @@ impl<'a> Unit<'a> {
 
     pub fn is_visible(&self, player: &Player) -> bool {
         self.data.isVisible[player.id as usize]
+    }
+
+    pub fn is_being_constructed(&self) -> bool {
+        if self.is_morphing() {
+            return true;
+        }
+        if self.is_completed() {
+            return false;
+        }
+        if self.get_type().get_race() != types::Race::Terran {
+            return true;
+        }
+        self.get_build_unit() != None
+    }
+
+    pub fn is_being_gathered(&self) -> bool {
+        self.data.isBeingGathered
+    }
+
+    pub fn is_being_healed(&self) -> bool {
+        self.get_type().get_race() == Race::Terran
+            && self.is_completed()
+            && self.get_hit_points() > self.data.lastHitPoints
+    }
+
+    pub fn is_completed(&self) -> bool {
+        self.data.isCompleted
+    }
+
+    pub fn is_morphing(&self) -> bool {
+        self.data.isMorphing
     }
 
     pub fn get_player(&self) -> Option<Player> {

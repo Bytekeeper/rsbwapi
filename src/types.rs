@@ -3,8 +3,8 @@ use num_traits::FromPrimitive;
 use std::ffi::CStr;
 use std::os::raw::c_char;
 
-pub type UnitType = BWAPI_UnitTypes_Enum_Enum;
 pub type CoordinateType = BWAPI_CoordinateType_Enum;
+pub type Race = BWAPI_Races_Enum_Enum;
 
 #[derive(Debug, Copy, Clone)]
 pub enum Color {
@@ -60,9 +60,12 @@ pub enum TextSize {
     Huge,
 }
 
+pub type UnitType = BWAPI_UnitTypes_Enum_Enum;
+
 pub trait UnitTypeExt {
     fn is_resource_container(&self) -> bool;
     fn is_mineral_field(&self) -> bool;
+    fn get_race(&self) -> Race;
 }
 
 pub(crate) fn unit_type_from(i: i32) -> UnitType {
@@ -78,6 +81,10 @@ impl UnitTypeExt for BWAPI_UnitTypes_Enum_Enum {
         *self == BWAPI_UnitTypes_Enum_Enum::Resource_Mineral_Field
             || *self == BWAPI_UnitTypes_Enum_Enum::Resource_Mineral_Field_Type_2
             || *self == BWAPI_UnitTypes_Enum_Enum::Resource_Mineral_Field_Type_3
+    }
+
+    fn get_race(&self) -> Race {
+        unimplemented!()
     }
 }
 

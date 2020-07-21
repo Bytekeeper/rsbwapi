@@ -14,7 +14,7 @@ pub mod types;
 pub mod unit;
 
 pub use aimodule::AiModule;
-pub use command::Command;
+pub use command::{Command, Commands};
 pub use game::Frame;
 pub use player::Player;
 pub use position::*;

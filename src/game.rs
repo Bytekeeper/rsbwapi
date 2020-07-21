@@ -4,20 +4,26 @@ use crate::command::Commands;
 use crate::position::*;
 use crate::shm::Shm;
 use crate::types::c_str_to_str;
+use crate::unit::UnitInfo;
 use crate::*;
 use bwapi_wrapper::*;
+use core::cell::RefCell;
+use std::collections::HashMap;
 
 use crate::player::Player;
 use crate::unit::Unit;
 
 pub struct Game {
     data: Shm<BWAPI_GameData>,
-    unit_ids: Vec<usize>,
+    unit_infos: [Option<UnitInfo>; 10000],
+    visible_units: Vec<i32>
 }
 
 pub struct Frame<'a> {
     data: &'a BWAPI_GameData,
     units: Vec<Unit<'a>>,
+    infos: &'a [Option<UnitInfo>; 10000],
+    pub(crate) interceptors: RefCell<HashMap<usize, Vec<i32>>>,
 }
 
 impl<'a> Frame<'a> {
@@ -35,7 +41,13 @@ impl<'a> Frame<'a> {
         if !(0..10000_i32).contains(&id) {
             None
         } else {
-            Some(Unit::new(id as usize, self, &self.data.units[id as usize]))
+            let id = id as usize;
+            Some(Unit::new(
+                id,
+                self,
+                &self.data.units[id],
+                self.infos[id].expect("UnitInfo to exist"),
+            ))
         }
     }
     pub fn get_players(&self) -> Vec<Player> {
@@ -178,7 +190,8 @@ impl Game {
     pub(crate) fn new(data: Shm<BWAPI_GameData>) -> Self {
         Game {
             data,
-            unit_ids: vec![],
+            unit_infos: [None; 10000],
+            visible_units: vec![]
         }
     }
 
@@ -186,143 +199,204 @@ impl Game {
         self.data.get().isInGame
     }
 
-    pub(crate) fn handle_events(&mut self, module: &mut impl AiModule) {
-        let data = self.data.get();
+    fn with_frame(&self, cb: impl FnOnce(&Frame)) {
         let mut frame = Frame {
-            data,
+            data: self.data.get(),
             units: vec![],
+            infos: &self.unit_infos,
+            interceptors: RefCell::new(HashMap::new()),
         };
-        // SAFETY: frame will not be move in here, and only references are passed to AIModule which cannot store a reference
-        // to something inside, due to the lifetime being only valid for the callback call.
-        let unmoved_frame = unsafe { &*(&frame as *const Frame) };
-        let units: Vec<Unit> = self
-            .unit_ids
-            .iter()
-            .map(|&i| Unit::new(i, unmoved_frame, &data.units[i]))
-            .collect();
+        let unmoved_frame = &frame as *const Frame;
+        // SAFETY: Only the infos will be modified here and only a reference of Frame will be made available to cb
+        let unmoved_frame = unsafe { &*unmoved_frame };
+        frame.units = self.visible_units.iter().map(|&i| unmoved_frame.get_unit(i).expect("Unit to exist")).collect();
+        cb(&frame);
+    }
 
-        frame.units = units;
+    fn ensure_unit_info(&mut self, id: usize) {
+        if self.unit_infos[id].is_none() {
+            self.unit_infos[id] = Some(UnitInfo::new(id, &self.data.get().units[id]))
+        }
+    }
+
+    fn unit_invisible(&mut self, id: usize) {
+        let index = self.visible_units.iter().position(|&i| i as usize == id);
+        if let Some(index) = index {
+            self.visible_units.swap_remove(index);
+        }
+    }
+
+    pub(crate) fn handle_events(&mut self, module: &mut impl AiModule) {
         let mut commands = Commands::default();
-        for i in 0..data.eventCount {
-            let event: BWAPIC_Event = data.events[i as usize];
+        for i in 0..self.data.get().eventCount {
+            let event: BWAPIC_Event = self.data.get().events[i as usize];
             use BWAPI_EventType_Enum::*;
             match event.type_ {
                 MatchStart => {
-                    self.unit_ids = (0..data.initialUnitCount as usize)
-                        .filter(|&i| {
-                            data.units[i].exists
-                                && data.units[i].type_ != types::UnitType::Unknown as i32
-                        })
-                        .collect();
-                    module.on_start(&frame);
+                    let data = self.data.get();
+                    self.visible_units = (0..data.initialUnitCount as usize)
+                    .filter(|&i| {
+                        data.units[i].exists
+                            && data.units[i].type_ != types::UnitType::Unknown as i32
+                    }).map(|i| i as i32)
+                    .collect();
+                    for &i in self.visible_units.iter() {
+                        self.unit_infos[i as usize] = Some(UnitInfo::new(i as usize, &data.units[i as usize]));
+                    }
+
+                    self.with_frame(|f| module.on_start(f));
                 }
                 MatchFrame => {
-                    module.on_frame(&frame, &mut commands);
+                    self.with_frame(|f| module.on_frame(f, &mut commands));
                 }
                 UnitCreate => {
                     let id = event.v1 as usize;
-                    self.unit_ids.push(id);
-                    let unit = Unit::new(id, unmoved_frame, &data.units[id]);
-                    frame.units.push(unit);
-                    module.on_unit_create(&frame, &mut commands, unit);
+                    self.ensure_unit_info(id);
+                    self.with_frame(|frame| {
+                        module.on_unit_create(
+                            frame,
+                            &mut commands,
+                            frame.get_unit(id as i32).expect("Created Unit to exist"),
+                        )
+                    });
                 }
                 UnitDestroy => {
-                    let id = event.v1 as usize;
-                    let index = self
-                        .unit_ids
-                        .iter()
-                        .position(|&i| i == id)
-                        .expect("UnitDestroy was called with non-existant unit id");
-                    self.unit_ids.swap_remove(index);
-                    let unit = frame.units.swap_remove(index);
-                    module.on_unit_destroy(&frame, &mut commands, unit);
+                    let id = event.v1;
+                    self.unit_invisible(id as usize);
+                    self.with_frame(|frame| {
+                        module.on_unit_destroy(
+                            frame,
+                            &mut commands,
+                            frame.get_unit(id).expect("Unit to be still available this frame"),
+                        )
+                    });
+                    self.unit_infos[id as usize] = Option::None;
                 }
                 UnitDiscover => {
-                    module.on_unit_discover(
-                        &frame,
-                        &mut commands,
-                        frame
-                            .get_unit(event.v1)
-                            .expect("Unit could not be retrieved"),
-                    );
+                    self.ensure_unit_info(event.v1 as usize);
+                    self.with_frame(|frame| {
+                        module.on_unit_discover(
+                            frame,
+                            &mut commands,
+                            frame
+                                .get_unit(event.v1)
+                                .expect("Unit could not be retrieved"),
+                        )
+                    });
                 }
                 UnitEvade => {
-                    module.on_unit_evade(
-                        &frame,
-                        &mut commands,
-                        frame
-                            .get_unit(event.v1)
-                            .expect("Unit could not be retrieved"),
-                    );
+                    self.with_frame(|frame| {
+                        module.on_unit_evade(
+                            frame,
+                            &mut commands,
+                            frame
+                                .get_unit(event.v1)
+                                .expect("Unit could not be retrieved"),
+                        )
+                    });
                 }
-                UnitShow => module.on_unit_show(
-                    &frame,
-                    &mut commands,
-                    frame
-                        .get_unit(event.v1)
-                        .expect("Unit could not be retrieved"),
-                ),
-                UnitHide => module.on_unit_hide(
-                    &frame,
-                    &mut commands,
-                    frame
-                        .get_unit(event.v1)
-                        .expect("Unit could not be retrieved"),
-                ),
-                UnitMorph => module.on_unit_morph(
-                    &frame,
-                    &mut commands,
-                    frame
-                        .get_unit(event.v1)
-                        .expect("Unit could not be retrieved"),
-                ),
-                UnitRenegade => module.on_unit_renegade(
-                    &frame,
-                    &mut commands,
-                    frame
-                        .get_unit(event.v1)
-                        .expect("Unit could not be retrieved"),
-                ),
-                UnitComplete => module.on_unit_complete(
-                    &frame,
-                    &mut commands,
-                    frame
-                        .get_unit(event.v1)
-                        .expect("Unit could not be retrieved"),
-                ),
-                MatchEnd => {
-                    module.on_end(&frame, event.v1 != 0);
+                UnitShow => {
+                    self.visible_units.push(event.v1);
+                    self.ensure_unit_info(event.v1 as usize);
+                    self.with_frame(|frame| {
+                        module.on_unit_show(
+                            frame,
+                            &mut commands,
+                            frame
+                                .get_unit(event.v1)
+                                .expect("Unit could not be retrieved"),
+                        )
+                    });
                 }
+                UnitHide => {
+                    self.unit_invisible(event.v1 as usize);
+                    self.with_frame(|frame| {
+                        module.on_unit_hide(
+                            frame,
+                            &mut commands,
+                            frame
+                                .get_unit(event.v1)
+                                .expect("Unit could not be retrieved"),
+                        )
+                    });
+                }
+                UnitMorph => {
+                    self.with_frame(|frame| {
+                        module.on_unit_morph(
+                            frame,
+                            &mut commands,
+                            frame
+                                .get_unit(event.v1)
+                                .expect("Unit could not be retrieved"),
+                        )
+                    });
+                }
+                UnitRenegade => {
+                    self.with_frame(|frame| {
+                        module.on_unit_renegade(
+                            frame,
+                            &mut commands,
+                            frame
+                                .get_unit(event.v1)
+                                .expect("Unit could not be retrieved"),
+                        )
+                    });
+                }
+                UnitComplete => {
+                    self.ensure_unit_info(event.v1 as usize);
+                    self.with_frame(|frame| {
+                        module.on_unit_complete(
+                            frame,
+                            &mut commands,
+                            frame
+                                .get_unit(event.v1)
+                                .expect("Unit could not be retrieved"),
+                        )
+                    });
+                }
+                MatchEnd => self.with_frame(|frame| module.on_end(frame, event.v1 != 0)),
                 MenuFrame => {}
-                SendText => {
-                    module.on_send_text(&frame, &mut commands, frame.event_str(event.v1 as usize))
+                SendText => self.with_frame(|frame| {
+                    module.on_send_text(frame, &mut commands, frame.event_str(event.v1 as usize))
+                }),
+                ReceiveText => {
+                    self.with_frame(|frame| {
+                        module.on_receive_text(
+                            frame,
+                            &mut commands,
+                            frame
+                                .get_player(event.v1)
+                                .expect("Player could not be retrieved"),
+                            frame.event_str(event.v2 as usize),
+                        )
+                    });
                 }
-                ReceiveText => module.on_receive_text(
-                    &frame,
-                    &mut commands,
-                    frame
-                        .get_player(event.v1)
-                        .expect("Player could not be retrieved"),
-                    frame.event_str(event.v2 as usize),
-                ),
-                PlayerLeft => module.on_player_left(
-                    &frame,
-                    &mut commands,
-                    frame
-                        .get_player(event.v1)
-                        .expect("Player could not be retrieved"),
-                ),
-                NukeDetect => module.on_nuke_detect(
-                    &frame,
-                    &mut commands,
-                    Position {
-                        x: event.v1,
-                        y: event.v2,
-                    },
-                ),
-                SaveGame => {
-                    module.on_save_game(&frame, &mut commands, frame.event_str(event.v1 as usize))
+                PlayerLeft => {
+                    self.with_frame(|frame| {
+                        module.on_player_left(
+                            frame,
+                            &mut commands,
+                            frame
+                                .get_player(event.v1)
+                                .expect("Player could not be retrieved"),
+                        )
+                    });
                 }
+                NukeDetect => {
+                    self.with_frame(|frame| {
+                        module.on_nuke_detect(
+                            frame,
+                            &mut commands,
+                            Position {
+                                x: event.v1,
+                                y: event.v2,
+                            },
+                        )
+                    });
+                }
+                SaveGame => self.with_frame(|frame| {
+                    module.on_save_game(frame, &mut commands, frame.event_str(event.v1 as usize))
+                }),
                 None => {}
             }
         }
