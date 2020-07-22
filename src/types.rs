@@ -61,15 +61,26 @@ pub enum TextSize {
 }
 
 pub type UnitType = BWAPI_UnitTypes_Enum_Enum;
+pub type TechType = BWAPI_TechTypes_Enum_Enum;
+
+pub trait TypeFrom {
+    fn new(i: i32) -> Self;
+}
 
 pub trait UnitTypeExt {
     fn is_resource_container(&self) -> bool;
     fn is_mineral_field(&self) -> bool;
     fn get_race(&self) -> Race;
+    fn space_provided(&self) -> i32;
+    fn space_required(&self) -> i32;
+    fn tile_width(&self) -> i32;
+    fn tile_height(&self) -> i32;
 }
 
-pub(crate) fn unit_type_from(i: i32) -> UnitType {
-    BWAPI_UnitTypes_Enum_Enum::from_i32(i).unwrap()
+impl<T: FromPrimitive> TypeFrom for T {
+    fn new(i: i32) -> Self {
+        Self::from_i32(i).unwrap()
+    }
 }
 
 impl UnitTypeExt for BWAPI_UnitTypes_Enum_Enum {
@@ -84,6 +95,22 @@ impl UnitTypeExt for BWAPI_UnitTypes_Enum_Enum {
     }
 
     fn get_race(&self) -> Race {
+        unimplemented!()
+    }
+
+    fn space_provided(&self) -> i32 {
+        unimplemented!()
+    }
+
+    fn space_required(&self) -> i32 {
+        unimplemented!()
+    }
+
+    fn tile_width(&self) -> i32 {
+        unimplemented!()
+    }
+
+    fn tile_height(&self) -> i32 {
         unimplemented!()
     }
 }

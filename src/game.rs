@@ -16,7 +16,7 @@ use crate::unit::Unit;
 pub struct Game {
     data: Shm<BWAPI_GameData>,
     unit_infos: [Option<UnitInfo>; 10000],
-    visible_units: Vec<i32>
+    visible_units: Vec<i32>,
 }
 
 pub struct Frame<'a> {
@@ -24,6 +24,7 @@ pub struct Frame<'a> {
     units: Vec<Unit<'a>>,
     infos: &'a [Option<UnitInfo>; 10000],
     pub(crate) interceptors: RefCell<HashMap<usize, Vec<i32>>>,
+    pub(crate) loaded_units: RefCell<HashMap<usize, Vec<i32>>>,
 }
 
 impl<'a> Frame<'a> {
@@ -191,7 +192,7 @@ impl Game {
         Game {
             data,
             unit_infos: [None; 10000],
-            visible_units: vec![]
+            visible_units: vec![],
         }
     }
 
@@ -205,11 +206,16 @@ impl Game {
             units: vec![],
             infos: &self.unit_infos,
             interceptors: RefCell::new(HashMap::new()),
+            loaded_units: RefCell::new(HashMap::new()),
         };
         let unmoved_frame = &frame as *const Frame;
         // SAFETY: Only the infos will be modified here and only a reference of Frame will be made available to cb
         let unmoved_frame = unsafe { &*unmoved_frame };
-        frame.units = self.visible_units.iter().map(|&i| unmoved_frame.get_unit(i).expect("Unit to exist")).collect();
+        frame.units = self
+            .visible_units
+            .iter()
+            .map(|&i| unmoved_frame.get_unit(i).expect("Unit to exist"))
+            .collect();
         cb(&frame);
     }
 
@@ -235,13 +241,15 @@ impl Game {
                 MatchStart => {
                     let data = self.data.get();
                     self.visible_units = (0..data.initialUnitCount as usize)
-                    .filter(|&i| {
-                        data.units[i].exists
-                            && data.units[i].type_ != types::UnitType::Unknown as i32
-                    }).map(|i| i as i32)
-                    .collect();
+                        .filter(|&i| {
+                            data.units[i].exists
+                                && data.units[i].type_ != types::UnitType::Unknown as i32
+                        })
+                        .map(|i| i as i32)
+                        .collect();
                     for &i in self.visible_units.iter() {
-                        self.unit_infos[i as usize] = Some(UnitInfo::new(i as usize, &data.units[i as usize]));
+                        self.unit_infos[i as usize] =
+                            Some(UnitInfo::new(i as usize, &data.units[i as usize]));
                     }
 
                     self.with_frame(|f| module.on_start(f));
@@ -267,7 +275,9 @@ impl Game {
                         module.on_unit_destroy(
                             frame,
                             &mut commands,
-                            frame.get_unit(id).expect("Unit to be still available this frame"),
+                            frame
+                                .get_unit(id)
+                                .expect("Unit to be still available this frame"),
                         )
                     });
                     self.unit_infos[id as usize] = Option::None;

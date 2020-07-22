@@ -1,7 +1,6 @@
 use crate::player::Player;
 
-use crate::types::Race;
-use crate::types::UnitTypeExt;
+use crate::types::{Race, TechType, TypeFrom, UnitTypeExt};
 use crate::*;
 use bwapi_wrapper::*;
 
@@ -50,7 +49,7 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_type(&self) -> UnitType {
-        types::unit_type_from(self.data.type_)
+        UnitType::new(self.data.type_)
     }
 
     pub fn is_accelerating(&self) -> bool {
@@ -82,7 +81,7 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_build_type(&self) -> UnitType {
-        types::unit_type_from(self.data.buildType)
+        UnitType::new(self.data.buildType)
     }
 
     pub fn get_build_unit(&self) -> Option<Unit> {
@@ -175,6 +174,36 @@ impl<'a> Unit<'a> {
         self.frame.get_player(self.data.lastAttackerPlayer)
     }
 
+    pub fn get_loaded_units(&self) -> Vec<Unit> {
+        let map = self.frame.loaded_units.borrow();
+        let loaded_units = map.get(&self.id);
+        if let Some(loaded_units) = loaded_units {
+            loaded_units
+                .iter()
+                .map(|&i| self.frame.get_unit(i).expect("Loaded unit to be present"))
+                .collect()
+        } else {
+            let loaded_units: Vec<Unit> = self
+                .frame
+                .get_all_units()
+                .iter()
+                .filter(|u| {
+                    if let Some(transport) = u.get_transport() {
+                        transport == *self
+                    } else {
+                        false
+                    }
+                })
+                .cloned()
+                .collect();
+            self.frame
+                .loaded_units
+                .borrow_mut()
+                .insert(self.id, loaded_units.iter().map(|u| u.id as i32).collect());
+            loaded_units
+        }
+    }
+
     pub fn get_lockdown_timer(&self) -> i32 {
         self.data.lockdownTimer
     }
@@ -253,8 +282,55 @@ impl<'a> Unit<'a> {
         self.data.shields
     }
 
+    pub fn get_space_remaining(&self) -> i32 {
+        self.get_type().space_provided()
+            - self
+                .get_loaded_units()
+                .iter()
+                .map(|u| u.get_type().space_required())
+                .sum::<i32>()
+    }
+
     pub fn get_spell_cooldown(&self) -> i32 {
         self.data.spellCooldown
+    }
+
+    pub fn get_spider_mine_count(&self) -> i32 {
+        self.data.spiderMineCount
+    }
+
+    pub fn get_stasis_timer(&self) -> i32 {
+        self.data.stasisTimer
+    }
+
+    pub fn get_stim_timer(&self) -> i32 {
+        self.data.stimTimer
+    }
+
+    pub fn get_target(&self) -> Option<Unit> {
+        self.frame.get_unit(self.id as i32)
+    }
+
+    pub fn get_target_position(&self) -> Option<Position> {
+        Position::new(self.data.targetPositionX, self.data.targetPositionY)
+    }
+
+    pub fn get_tech(&self) -> TechType {
+        TechType::new(self.data.tech)
+    }
+
+    pub fn get_tile_position(&self) -> TilePosition {
+        (self.get_position()
+            - Position {
+                x: self.get_type().tile_width(),
+                y: self.get_type().tile_height(),
+            } * 32
+                / 2)
+        .to_tile_position()
+    }
+
+    pub fn get_transport(&self) -> Option<Unit> {
+        self.frame.get_unit(self.id as i32)
     }
 
     pub fn get_id(&self) -> usize {
