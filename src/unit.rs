@@ -1,6 +1,9 @@
 use crate::player::Player;
 
-use crate::types::{Race, TechType, TypeFrom, UnitTypeExt};
+use crate::types::{
+    Flag, Orders, Race, TechType, TypeFrom, UnitType, UnitTypeExt, UpgradeType, WeaponType,
+    WeaponTypeExt,
+};
 use crate::*;
 use bwapi_wrapper::*;
 
@@ -80,6 +83,10 @@ impl<'a> Unit<'a> {
         self.data.angle
     }
 
+    pub fn get_bottom(&self) -> i32 {
+        self.get_position().y + self.get_type().dimension_down()
+    }
+
     pub fn get_build_type(&self) -> UnitType {
         UnitType::new(self.data.buildType)
     }
@@ -98,6 +105,36 @@ impl<'a> Unit<'a> {
 
     pub fn get_defense_matrix_timer(&self) -> i32 {
         self.data.defenseMatrixTimer
+    }
+
+    pub fn get_distance(&self, target: &Unit) -> i32 {
+        if !self.exists() || !target.exists() {
+            return i32::MAX;
+        }
+
+        if self == target {
+            return 0;
+        }
+
+        let left = target.get_left() - 1;
+        let top = target.get_top() - 1;
+        let right = target.get_right() + 1;
+        let bottom = target.get_bottom() + 1;
+
+        let mut x_dist = self.get_left() - right;
+        if x_dist < 0 {
+            x_dist = (left - self.get_right()).max(0);
+        }
+
+        let mut y_dist = self.get_top() - bottom;
+        if y_dist < 0 {
+            y_dist = (top - self.get_bottom()).max(0);
+        }
+
+        ORIGIN.get_approx_distance(Position {
+            x: x_dist,
+            y: y_dist,
+        })
     }
 
     pub fn get_energy(&self) -> i32 {
@@ -174,6 +211,10 @@ impl<'a> Unit<'a> {
         self.frame.get_player(self.data.lastAttackerPlayer)
     }
 
+    pub fn get_left(&self) -> i32 {
+        self.get_position().x - self.get_type().dimension_left()
+    }
+
     pub fn get_loaded_units(&self) -> Vec<Unit> {
         let map = self.frame.loaded_units.borrow();
         let loaded_units = map.get(&self.id);
@@ -214,6 +255,10 @@ impl<'a> Unit<'a> {
 
     pub fn get_nydus_exit(&self) -> Option<Unit> {
         self.frame.get_unit(self.data.nydusExit)
+    }
+
+    pub fn get_order(&self) -> Orders {
+        Orders::new(self.data.order)
     }
 
     pub fn get_order_target(&self) -> Option<Unit> {
@@ -274,6 +319,10 @@ impl<'a> Unit<'a> {
         self.data.resources
     }
 
+    pub fn get_right(&self) -> i32 {
+        self.get_position().x + self.get_type().dimension_right()
+    }
+
     pub fn get_scarab_count(&self) -> i32 {
         self.data.scarabCount
     }
@@ -329,8 +378,223 @@ impl<'a> Unit<'a> {
         .to_tile_position()
     }
 
+    pub fn get_top(&self) -> i32 {
+        self.get_position().y - self.get_type().dimension_up()
+    }
+
+    pub fn get_training_queue(&self) -> Vec<UnitType> {
+        (0..self.data.trainingQueueCount as usize)
+            .map(|i| self.data.trainingQueue[i])
+            .map(UnitType::new)
+            .collect()
+    }
+
     pub fn get_transport(&self) -> Option<Unit> {
         self.frame.get_unit(self.id as i32)
+    }
+
+    pub fn get_upgrade(&self) -> UpgradeType {
+        UpgradeType::new(self.data.upgrade)
+    }
+
+    pub fn get_velocity(&self) -> Vector2D {
+        Vector2D {
+            x: self.data.velocityX,
+            y: self.data.velocityY,
+        }
+    }
+
+    pub fn has_nuke(&self) -> bool {
+        self.data.hasNuke
+    }
+
+    pub fn is_blind(&self) -> bool {
+        self.data.isBlind
+    }
+
+    pub fn is_braking(&self) -> bool {
+        self.data.isBraking
+    }
+
+    pub fn is_burrowed(&self) -> bool {
+        self.data.isBurrowed
+    }
+
+    pub fn is_carrying_gas(&self) -> bool {
+        self.data.carryResourceType == 1
+    }
+
+    pub fn is_carrying_minerals(&self) -> bool {
+        self.data.carryResourceType == 2
+    }
+
+    pub fn is_flying(&self) -> bool {
+        self.get_type().is_flyer() || self.is_lifted()
+    }
+
+    pub fn is_hallucination(&self) -> bool {
+        self.data.isHallucination
+    }
+
+    pub fn is_holding_position(&self) -> bool {
+        self.get_order() == Orders::HoldPosition
+    }
+
+    pub fn is_idle(&self) -> bool {
+        self.data.isIdle
+    }
+
+    pub fn is_interruptible(&self) -> bool {
+        self.data.isInterruptible
+    }
+
+    pub fn is_invincible(&self) -> bool {
+        self.data.isInvincible
+    }
+
+    pub fn is_in_weapon_range(&self, target: &Unit) -> bool {
+        if !self.exists() || !target.exists() || self == target {
+            return false;
+        }
+
+        let this_type = self.get_type();
+
+        let wpn = if target.is_flying() {
+            this_type.air_weapon()
+        } else {
+            this_type.ground_weapon()
+        };
+
+        if wpn == WeaponType::None || wpn == WeaponType::Unknown {
+            return false;
+        }
+
+        let min_range = wpn.min_range();
+        let max_range = wpn.max_range();
+        let distance = self.get_distance(target);
+        (min_range == 0 || min_range < distance) && distance <= max_range
+    }
+
+    pub fn is_irradiated(&self) -> bool {
+        self.data.irradiateTimer != 0
+    }
+
+    pub fn is_lifted(&self) -> bool {
+        self.data.isLifted
+    }
+
+    pub fn is_loaded(&self) -> bool {
+        self.get_transport().is_some()
+    }
+
+    pub fn is_locked_down(&self) -> bool {
+        self.data.lockdownTimer != 0
+    }
+
+    pub fn is_maelstrommed(&self) -> bool {
+        self.data.maelstromTimer != 0
+    }
+
+    pub fn is_parasited(&self) -> bool {
+        self.data.isParasited
+    }
+
+    pub fn is_patrolling(&self) -> bool {
+        self.get_order() == Orders::Patrol
+    }
+
+    pub fn is_plagued(&self) -> bool {
+        self.data.plagueTimer != 0
+    }
+
+    pub fn is_powered(&self) -> bool {
+        self.data.isPowered
+    }
+
+    pub fn is_repairing(&self) -> bool {
+        self.get_order() == Orders::Repair
+    }
+
+    pub fn is_researching(&self) -> bool {
+        self.get_order() == Orders::ResearchTech
+    }
+
+    pub fn is_selected(&self) -> bool {
+        self.data.isSelected
+    }
+
+    pub fn is_sieged(&self) -> bool {
+        match self.get_type() {
+            UnitType::Terran_Siege_Tank_Siege_Mode | UnitType::Hero_Edmund_Duke_Siege_Mode => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_starting_attack(&self) -> bool {
+        self.data.isStartingAttack
+    }
+
+    pub fn is_stasised(&self) -> bool {
+        self.data.stasisTimer != 0
+    }
+
+    pub fn is_stimmed(&self) -> bool {
+        self.data.stimTimer != 0
+    }
+
+    pub fn is_stuck(&self) -> bool {
+        self.data.isStuck
+    }
+
+    pub fn is_targetable(&self) -> bool {
+        if !self.exists() {
+            return false;
+        }
+        if !self.is_visible_to_current_player()
+            && !self.frame.is_flag_enabled(Flag::CompleteMapInformation)
+        {
+            return false;
+        }
+
+        if self.is_completed()
+            && !self.get_type().is_building()
+            && !self.is_morphing()
+            && self.get_type() != UnitType::Protoss_Archon
+            && self.get_type() != UnitType::Protoss_Dark_Archon
+        {
+            return false;
+        }
+        match self.get_type() {
+            UnitType::Spell_Scanner_Sweep
+            | UnitType::Spell_Dark_Swarm
+            | UnitType::Spell_Disruption_Web
+            | UnitType::Special_Map_Revealer => false,
+            _ => true,
+        }
+    }
+
+    pub fn is_training(&self) -> bool {
+        self.data.isTraining
+    }
+
+    pub fn is_under_attack(&self) -> bool {
+        self.data.recentlyAttacked
+    }
+
+    pub fn is_under_dark_swarm(&self) -> bool {
+        self.data.isUnderDarkSwarm
+    }
+
+    pub fn is_under_disruption_web(&self) -> bool {
+        self.data.isUnderDWeb
+    }
+
+    pub fn is_under_storm(&self) -> bool {
+        self.data.isUnderStorm
+    }
+
+    pub fn is_upgrading(&self) -> bool {
+        self.get_order() == Orders::Upgrade
     }
 
     pub fn get_id(&self) -> usize {
@@ -343,6 +607,10 @@ impl<'a> Unit<'a> {
 
     pub fn is_visible(&self, player: &Player) -> bool {
         self.data.isVisible[player.id as usize]
+    }
+
+    pub fn is_visible_to_current_player(&self) -> bool {
+        self.is_visible(&self.frame.self_().unwrap())
     }
 
     pub fn is_being_constructed(&self) -> bool {

@@ -27,6 +27,7 @@ pub struct Vector2D {
 }
 
 type PositionTuple = (i32, i32);
+pub const ORIGIN: Position = Position { x: 0, y: 0 };
 
 impl Position {
     pub fn new(x: i32, y: i32) -> Option<Self> {
@@ -45,6 +46,23 @@ impl Position {
             x: self.x / 8,
             y: self.y / 8,
         }
+    }
+
+    pub fn get_approx_distance<P: Into<Position>>(&self, other: P) -> i32 {
+        let p = other.into();
+        let mut max = (self.x - p.x).abs();
+        let mut min = (self.y - p.y).abs();
+
+        if max < min {
+            core::mem::swap(&mut max, &mut min);
+        }
+
+        if min <= (max >> 2) {
+            return max;
+        }
+
+        let min_calc = (3 * min) >> 3;
+        (min_calc >> 5) + min_calc + max - (max >> 4) - (max >> 6)
     }
 }
 

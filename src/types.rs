@@ -62,15 +62,43 @@ pub enum TextSize {
 
 pub type UnitType = BWAPI_UnitTypes_Enum_Enum;
 pub type TechType = BWAPI_TechTypes_Enum_Enum;
+pub type UpgradeType = BWAPI_UpgradeTypes_Enum_Enum;
+pub type Orders = BWAPI_Orders_Enum_Enum;
+pub type WeaponType = BWAPI_WeaponTypes_Enum_Enum;
+pub type Flag = BWAPI_Flag_Enum;
 
 pub trait TypeFrom {
     fn new(i: i32) -> Self;
 }
 
 pub trait UnitTypeExt {
+    fn air_weapon(&self) -> WeaponType {
+        unimplemented!()
+    }
+    fn dimension_down(&self) -> i32 {
+        unimplemented!()
+    }
+    fn dimension_left(&self) -> i32 {
+        unimplemented!()
+    }
+    fn dimension_right(&self) -> i32 {
+        unimplemented!()
+    }
+    fn dimension_up(&self) -> i32 {
+        unimplemented!()
+    }
+    fn get_race(&self) -> Race;
+    fn ground_weapon(&self) -> WeaponType {
+        unimplemented!()
+    }
+    fn is_building(&self) -> bool {
+        unimplemented!()
+    }
+    fn is_flyer(&self) -> bool {
+        unimplemented!()
+    }
     fn is_resource_container(&self) -> bool;
     fn is_mineral_field(&self) -> bool;
-    fn get_race(&self) -> Race;
     fn space_provided(&self) -> i32;
     fn space_required(&self) -> i32;
     fn tile_width(&self) -> i32;
@@ -123,3 +151,14 @@ pub(crate) fn c_str_to_str(i: &[c_char]) -> &str {
             .unwrap()
     }
 }
+
+pub trait WeaponTypeExt {
+    fn min_range(&self) -> i32 {
+        unimplemented!()
+    }
+    fn max_range(&self) -> i32 {
+        unimplemented!()
+    }
+}
+
+impl WeaponTypeExt for WeaponType {}

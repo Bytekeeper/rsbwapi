@@ -3,7 +3,7 @@ use crate::bullet::Bullet;
 use crate::command::Commands;
 use crate::position::*;
 use crate::shm::Shm;
-use crate::types::c_str_to_str;
+use crate::types::{c_str_to_str, Flag};
 use crate::unit::UnitInfo;
 use crate::*;
 use bwapi_wrapper::*;
@@ -86,6 +86,10 @@ impl<'a> Frame<'a> {
     pub fn is_explored<P: Into<TilePosition>>(&self, tp: P) -> bool {
         let p = tp.into();
         self.data.isExplored[p.y as usize][p.x as usize]
+    }
+
+    pub fn is_flag_enabled(&self, flag: Flag) -> bool {
+        *self.data.flags.get(flag as usize).unwrap_or(&false)
     }
 
     pub fn has_creep<P: Into<TilePosition>>(&self, tp: P) -> bool {
