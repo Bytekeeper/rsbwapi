@@ -13,24 +13,24 @@ impl AiModule for MyModule {
         }
     }
 
-    fn on_unit_create(&self, _frame: &Frame, _cmd: &mut Commands, unit: Unit) {
+    fn on_unit_create(&self, _frame: &Frame, unit: Unit) {
         println!("Created Unit {}", unit.get_id())
     }
 
-    fn on_unit_destroy(&self, _frame: &Frame, _cmd: &mut Commands, unit: Unit) {
+    fn on_unit_destroy(&self, _frame: &Frame, unit: Unit) {
         println!("Destroyed Unit {}", unit.get_id())
     }
 
-    fn on_frame(&mut self, frame: &Frame, cmd: &mut Commands) {
+    fn on_frame(&mut self, frame: &Frame) {
         let names: Vec<String> = frame
             .get_players()
             .iter()
             .map(|p| String::from(p.name()))
             .collect();
         for (i, name) in names.iter().enumerate() {
-            cmd.draw_text_screen((10, (i as i32) * 10 + 20), name);
+//            cmd.draw_text_screen((10, (i as i32) * 10 + 20), name);
         }
-        cmd.draw_text_screen((10, 10), frame.enemy().unwrap().name());
+  //      cmd.draw_text_screen((10, 10), frame.enemy().unwrap().name());
         let units = frame.get_all_units();
         let mineral = units
             .iter()
@@ -43,7 +43,7 @@ impl AiModule for MyModule {
                     .filter(|u| u.get_type() == UnitType::Zerg_Drone)
                     .for_each(|u| {
                         println!("Sending {} to {}", u.id, mineral.id);
-                        cmd.issue_command(u.gather(mineral));
+                        u.gather(mineral);
                     });
             } else {
                 let enemy = units.iter().find(|u| u.get_player() == frame.enemy());
@@ -53,7 +53,7 @@ impl AiModule for MyModule {
                         .filter(|u| u.get_type() == UnitType::Zerg_Drone)
                         .for_each(|u| {
                             println!("Sending {} to attack {:?}", u.id, enemy.get_type());
-                            cmd.issue_command(u.attack(enemy));
+                            u.attack(enemy);
                         });
                 }
             }

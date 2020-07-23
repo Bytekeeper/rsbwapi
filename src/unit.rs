@@ -1,8 +1,8 @@
 use crate::player::Player;
 
 use crate::types::{
-    Flag, Orders, Race, TechType, TypeFrom, UnitType, UnitTypeExt, UpgradeType, WeaponType,
-    WeaponTypeExt,
+    Flag, Orders, Race, TechType, TypeFrom, UnitCommandType, UnitType, UnitTypeExt, UpgradeType,
+    WeaponType, WeaponTypeExt,
 };
 use crate::*;
 use bwapi_wrapper::*;
@@ -648,20 +648,20 @@ impl<'a> Unit<'a> {
         self.frame.get_player(self.data.player)
     }
 
-    pub fn gather(&self, target: &Unit) -> UnitCommand {
-        UnitCommand {
+    pub fn gather(&self, target: &Unit) {
+        self.issue_command(UnitCommand {
             targetIndex: target.id as i32,
-            ..self.command_type(BWAPI_UnitCommandTypes_Enum_Enum::Gather)
-        }
+            ..self.command_type(UnitCommandType::Gather)
+        })
     }
-    pub fn attack(&self, target: &Unit) -> UnitCommand {
-        UnitCommand {
+    pub fn attack(&self, target: &Unit) {
+        self.issue_command(UnitCommand {
             targetIndex: target.id as i32,
-            ..self.command_type(BWAPI_UnitCommandTypes_Enum_Enum::Attack_Unit)
-        }
+            ..self.command_type(UnitCommandType::Attack_Unit)
+        });
     }
 
-    fn command_type(&self, cmd: BWAPI_UnitCommandTypes_Enum_Enum) -> UnitCommand {
+    fn command_type(&self, cmd: UnitCommandType) -> UnitCommand {
         UnitCommand {
             type_: BWAPI_UnitCommandType { _base: cmd as u32 },
             extra: 0,
@@ -670,6 +670,10 @@ impl<'a> Unit<'a> {
             unitIndex: self.id as i32,
             targetIndex: -1,
         }
+    }
+
+    fn issue_command(&self, cmd: UnitCommand) {
+        self.frame.cmd.borrow_mut().issue_command(cmd)
     }
 }
 

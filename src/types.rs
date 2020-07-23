@@ -66,6 +66,7 @@ pub type UpgradeType = BWAPI_UpgradeTypes_Enum_Enum;
 pub type Orders = BWAPI_Orders_Enum_Enum;
 pub type WeaponType = BWAPI_WeaponTypes_Enum_Enum;
 pub type Flag = BWAPI_Flag_Enum;
+pub type UnitCommandType = BWAPI_UnitCommandTypes_Enum_Enum;
 
 pub trait TypeFrom {
     fn new(i: i32) -> Self;
