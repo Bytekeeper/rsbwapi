@@ -1,16 +1,27 @@
 use crate::position::Position;
-use crate::types::CoordinateType;
-use crate::types::{Color, TextSize};
+use crate::types::{Color, CoordinateType, Error, TextSize};
 use crate::unit::UnitCommand;
 use bwapi_wrapper::*;
 use std::ffi::CString;
+use std::path::Path;
 
 struct CommandApplier<'a> {
     data: &'a mut BWAPI_GameData,
 }
 
 impl<'a> CommandApplier<'a> {
-    fn apply_commands(&mut self, commands: &Commands) {
+    fn apply_commands(&mut self, commands: Commands) {
+        let copy_amount = ((BWAPI_GameData_MAX_COMMANDS - self.data.commandCount) as usize)
+            .min(commands.cmd.len());
+        assert!(
+            self.data.commandCount + copy_amount as i32 <= BWAPI_GameData_MAX_COMMANDS,
+            "Too many commands"
+        );
+        let command_count = self.data.commandCount as usize;
+        self.data.commands[command_count..command_count + copy_amount]
+            .copy_from_slice(&commands.cmd);
+        self.data.commandCount += copy_amount as i32;
+
         for cmd in commands.commands.iter() {
             use Command::*;
             match cmd {
@@ -70,13 +81,18 @@ impl<'a> CommandApplier<'a> {
                 } => self.draw_line(*ctype, *a, *b, *color, *solid),
                 SendText { message, to_allies } => self.send_text(message, *to_allies),
                 UnitCommand(cmd) => self.add_unit_command(*cmd),
-                LeaveGame => self.add_command(BWAPIC_Command {
-                    type_: BWAPIC_CommandType_Enum::LeaveGame,
-                    value1: 0,
-                    value2: 0,
-                }),
+                SetMap(map_file_name) => self.set_map(map_file_name),
             }
         }
+    }
+
+    pub fn set_map(&mut self, map_file_name: &str) {
+        let string_index = self.add_string(map_file_name);
+        self.add_command(BWAPIC_Command {
+            type_: BWAPIC_CommandType_Enum::SetMap,
+            value1: string_index as i32,
+            value2: 0,
+        })
     }
 
     fn send_text(&mut self, message: &str, to_allies: bool) {
@@ -287,6 +303,7 @@ impl<'a> CommandApplier<'a> {
 #[derive(Default)]
 pub struct Commands {
     commands: Vec<Command>,
+    pub(crate) cmd: Vec<BWAPIC_Command>,
 }
 
 pub enum Command {
@@ -348,11 +365,23 @@ pub enum Command {
         message: String,
         to_allies: bool,
     },
-    LeaveGame,
+    SetMap(String),
     UnitCommand(UnitCommand),
 }
 
 impl Commands {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn enable_flag(&mut self, flag: i32) {
+        self.cmd.push(BWAPIC_Command {
+            type_: BWAPIC_CommandType_Enum::EnableFlag,
+            value1: flag,
+            value2: 0,
+        });
+    }
+
     pub fn send_text_ex(&mut self, to_allies: bool, message: &str) {
         self.commands.push(Command::SendText {
             to_allies,
@@ -364,8 +393,85 @@ impl Commands {
         self.send_text_ex(false, message);
     }
 
+    pub fn set_frame_skip(&mut self, frame_skip: i32) {
+        if frame_skip > 0 {
+            self.cmd.push(BWAPIC_Command {
+                type_: BWAPIC_CommandType_Enum::SetFrameSkip,
+                value1: frame_skip,
+                value2: 0,
+            });
+        }
+    }
+
+    pub fn set_gui(&mut self, enabled: bool) {
+        self.cmd.push(BWAPIC_Command {
+            type_: BWAPIC_CommandType_Enum::SetGui,
+            value1: enabled as i32,
+            value2: 0,
+        });
+    }
+
+    pub fn set_lat_com(&mut self, enabled: bool) {
+        self.cmd.push(BWAPIC_Command {
+            type_: BWAPIC_CommandType_Enum::SetLatCom,
+            value1: enabled as i32,
+            value2: 0,
+        });
+    }
+
+    pub fn set_local_speed(&mut self, speed: i32) {
+        self.cmd.push(BWAPIC_Command {
+            type_: BWAPIC_CommandType_Enum::SetLocalSpeed,
+            value1: speed,
+            value2: 0,
+        });
+    }
+
+    pub fn set_map(&mut self, map_file_name: &str) -> Result<(), Error> {
+        if map_file_name.len() >= 260 || map_file_name.is_empty() {
+            return Err(Error::Invalid_Parameter);
+        }
+
+        if !Path::new(map_file_name).exists() {
+            return Err(Error::File_Not_Found);
+        }
+
+        self.commands
+            .push(Command::SetMap(map_file_name.to_owned()));
+        Ok(())
+    }
+
     pub fn leave_game(&mut self) {
-        self.commands.push(Command::LeaveGame);
+        self.cmd.push(BWAPIC_Command {
+            type_: BWAPIC_CommandType_Enum::LeaveGame,
+            value1: 0,
+            value2: 0,
+        });
+    }
+
+    pub fn pause_game(&mut self) {
+        self.cmd.push(BWAPIC_Command {
+            type_: BWAPIC_CommandType_Enum::PauseGame,
+            value1: 0,
+            value2: 0,
+        });
+    }
+
+    pub fn ping_minimap<P: Into<Position>>(&mut self, p: P) {
+        let p = p.into();
+        self.cmd.push(BWAPIC_Command {
+            type_: BWAPIC_CommandType_Enum::PingMinimap,
+            value1: p.x,
+            value2: p.y,
+        });
+    }
+
+    pub fn restart_game(&mut self) {
+        self.cmd.push(BWAPIC_Command {
+            type_: BWAPIC_CommandType_Enum::RestartGame,
+            value1: 0,
+            value2: 0,
+        });
     }
 
     pub fn draw_text_screen<P: Into<Position>>(&mut self, position: P, string: &str) {
@@ -670,7 +776,7 @@ impl Commands {
         self.commands.push(Command::UnitCommand(cmd))
     }
 
-    pub(crate) fn commit(&self, to: &mut BWAPI_GameData) {
+    pub(crate) fn commit(self, to: &mut BWAPI_GameData) {
         CommandApplier { data: to }.apply_commands(self);
     }
 }

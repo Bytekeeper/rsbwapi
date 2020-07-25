@@ -1,4 +1,4 @@
-use crate::game::Game;
+use crate::game::GameContext;
 use bwapi_wrapper::*;
 
 use std::ffi::CStr;
@@ -16,7 +16,7 @@ use super::shm;
 
 pub struct Client {
     pipe: File,
-    game: Game,
+    game: GameContext,
 }
 
 pub trait ToStr {
@@ -70,7 +70,7 @@ impl Default for Client {
                         println!("Client version: {}", game_data.get().client_version);
                         break 'outer Client {
                             pipe: file,
-                            game: Game::new(game_data),
+                            game: GameContext::new(game_data),
                         };
                     }
                 }
@@ -98,7 +98,7 @@ impl Client {
         self.game.handle_events(module);
     }
 
-    pub fn get_game(&self) -> &Game {
+    pub fn get_game(&self) -> &GameContext {
         &self.game
     }
 }

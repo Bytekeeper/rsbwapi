@@ -10,7 +10,7 @@ use bwapi_wrapper::*;
 #[derive(Clone, Copy)]
 pub struct Unit<'a> {
     pub id: usize,
-    frame: &'a Frame<'a>,
+    game: &'a Game<'a>,
     data: &'a BWAPI_UnitData,
     info: UnitInfo,
 }
@@ -35,20 +35,20 @@ impl UnitInfo {
 impl<'a> Unit<'a> {
     pub(crate) fn new(
         id: usize,
-        frame: &'a Frame<'a>,
+        game: &'a Game<'a>,
         data: &'a BWAPI_UnitData,
         info: UnitInfo,
     ) -> Self {
         Unit {
             id,
-            frame,
+            game,
             data,
             info,
         }
     }
 
     pub fn get_closest_unit(&self, pred: impl Fn(&Unit) -> bool) -> Option<&Unit> {
-        self.frame.get_all_units().iter().find(|u| pred(u))
+        self.game.get_all_units().iter().find(|u| pred(u))
     }
 
     pub fn get_type(&self) -> UnitType {
@@ -63,7 +63,7 @@ impl<'a> Unit<'a> {
         self.data.isAttacking
     }
 
-    pub fn is_attack_frame(&self) -> bool {
+    pub fn is_attack_game(&self) -> bool {
         self.data.isAttackFrame
     }
 
@@ -72,7 +72,7 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_addon(&self) -> Option<Unit> {
-        self.frame.get_unit(self.data.addon)
+        self.game.get_unit(self.data.addon)
     }
 
     pub fn get_air_weapon_cooldown(&self) -> i32 {
@@ -92,11 +92,11 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_build_unit(&self) -> Option<Unit> {
-        self.frame.get_unit(self.data.buildUnit)
+        self.game.get_unit(self.data.buildUnit)
     }
 
     pub fn get_carrier(&self) -> Option<Unit> {
-        self.frame.get_unit(self.data.carrier)
+        self.game.get_unit(self.data.carrier)
     }
 
     pub fn get_defense_matrix_points(&self) -> i32 {
@@ -150,7 +150,7 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_hatchery(&self) -> Option<Unit> {
-        self.frame.get_unit(self.data.hatchery)
+        self.game.get_unit(self.data.hatchery)
     }
 
     pub fn get_hit_points(&self) -> i32 {
@@ -170,16 +170,16 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_interceptors(&self) -> Vec<Unit<'a>> {
-        let burrowed_map = self.frame.interceptors.borrow();
+        let burrowed_map = self.game.interceptors.borrow();
         let interceptors = burrowed_map.get(&self.id);
         if let Some(interceptors) = interceptors {
             interceptors
                 .iter()
-                .map(|&i| self.frame.get_unit(i).expect("Interceptor to be present"))
+                .map(|&i| self.game.get_unit(i).expect("Interceptor to be present"))
                 .collect()
         } else {
             let interceptors: Vec<Unit> = self
-                .frame
+                .game
                 .get_all_units()
                 .iter()
                 .filter(|u| {
@@ -191,7 +191,7 @@ impl<'a> Unit<'a> {
                 })
                 .cloned()
                 .collect();
-            self.frame
+            self.game
                 .interceptors
                 .borrow_mut()
                 .insert(self.id, interceptors.iter().map(|u| u.id as i32).collect());
@@ -208,7 +208,7 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_last_attacking_player(&self) -> Option<Player> {
-        self.frame.get_player(self.data.lastAttackerPlayer)
+        self.game.get_player(self.data.lastAttackerPlayer)
     }
 
     pub fn get_left(&self) -> i32 {
@@ -216,16 +216,16 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_loaded_units(&self) -> Vec<Unit> {
-        let map = self.frame.loaded_units.borrow();
+        let map = self.game.loaded_units.borrow();
         let loaded_units = map.get(&self.id);
         if let Some(loaded_units) = loaded_units {
             loaded_units
                 .iter()
-                .map(|&i| self.frame.get_unit(i).expect("Loaded unit to be present"))
+                .map(|&i| self.game.get_unit(i).expect("Loaded unit to be present"))
                 .collect()
         } else {
             let loaded_units: Vec<Unit> = self
-                .frame
+                .game
                 .get_all_units()
                 .iter()
                 .filter(|u| {
@@ -237,7 +237,7 @@ impl<'a> Unit<'a> {
                 })
                 .cloned()
                 .collect();
-            self.frame
+            self.game
                 .loaded_units
                 .borrow_mut()
                 .insert(self.id, loaded_units.iter().map(|u| u.id as i32).collect());
@@ -254,7 +254,7 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_nydus_exit(&self) -> Option<Unit> {
-        self.frame.get_unit(self.data.nydusExit)
+        self.game.get_unit(self.data.nydusExit)
     }
 
     pub fn get_order(&self) -> Orders {
@@ -262,7 +262,7 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_order_target(&self) -> Option<Unit> {
-        self.frame.get_unit(self.data.orderTarget)
+        self.game.get_unit(self.data.orderTarget)
     }
 
     pub fn get_plague_timer(&self) -> i32 {
@@ -288,7 +288,7 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_rally_unit(&self) -> Option<Unit> {
-        self.frame.get_unit(self.data.rallyUnit)
+        self.game.get_unit(self.data.rallyUnit)
     }
 
     pub fn get_remaining_build_time(&self) -> i32 {
@@ -357,7 +357,7 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_target(&self) -> Option<Unit> {
-        self.frame.get_unit(self.id as i32)
+        self.game.get_unit(self.id as i32)
     }
 
     pub fn get_target_position(&self) -> Option<Position> {
@@ -390,7 +390,7 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_transport(&self) -> Option<Unit> {
-        self.frame.get_unit(self.id as i32)
+        self.game.get_unit(self.id as i32)
     }
 
     pub fn get_upgrade(&self) -> UpgradeType {
@@ -551,7 +551,7 @@ impl<'a> Unit<'a> {
             return false;
         }
         if !self.is_visible_to_current_player()
-            && !self.frame.is_flag_enabled(Flag::CompleteMapInformation)
+            && !self.game.is_flag_enabled(Flag::CompleteMapInformation)
         {
             return false;
         }
@@ -610,7 +610,7 @@ impl<'a> Unit<'a> {
     }
 
     pub fn is_visible_to_current_player(&self) -> bool {
-        self.is_visible(&self.frame.self_().unwrap())
+        self.is_visible(&self.game.self_().unwrap())
     }
 
     pub fn is_being_constructed(&self) -> bool {
@@ -645,7 +645,7 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_player(&self) -> Option<Player> {
-        self.frame.get_player(self.data.player)
+        self.game.get_player(self.data.player)
     }
 
     pub fn gather(&self, target: &Unit) {
@@ -673,7 +673,7 @@ impl<'a> Unit<'a> {
     }
 
     fn issue_command(&self, cmd: UnitCommand) {
-        self.frame.cmd.borrow_mut().issue_command(cmd)
+        self.game.cmd.borrow_mut().issue_command(cmd)
     }
 }
 

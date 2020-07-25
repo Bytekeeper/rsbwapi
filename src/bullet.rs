@@ -1,4 +1,4 @@
-use crate::game::Frame;
+use crate::game::Game;
 use crate::player::Player;
 use crate::position::*;
 use crate::unit::Unit;
@@ -7,12 +7,12 @@ use num_traits::FromPrimitive;
 
 pub struct Bullet<'a> {
     id: usize,
-    frame: &'a Frame<'a>,
+    frame: &'a Game<'a>,
     data: &'a BWAPI_BulletData,
 }
 
 impl<'a> Bullet<'a> {
-    pub fn new(id: usize, frame: &'a Frame<'a>, data: &'a BWAPI_BulletData) -> Self {
+    pub fn new(id: usize, frame: &'a Game<'a>, data: &'a BWAPI_BulletData) -> Self {
         Self { id, frame, data }
     }
 

@@ -1,25 +1,27 @@
 use crate::aimodule::AiModule;
 use crate::bullet::Bullet;
 use crate::command::Commands;
+use crate::force::Force;
 use crate::position::*;
 use crate::shm::Shm;
-use crate::types::{c_str_to_str, Flag};
+use crate::types::{c_str_to_str, Error, Flag};
 use crate::unit::UnitInfo;
 use crate::*;
 use bwapi_wrapper::*;
 use core::cell::RefCell;
+use core::cell::RefMut;
 use std::collections::HashMap;
 
 use crate::player::Player;
 use crate::unit::Unit;
 
-pub struct Game {
+pub struct GameContext {
     data: Shm<BWAPI_GameData>,
     unit_infos: [Option<UnitInfo>; 10000],
     visible_units: Vec<i32>,
 }
 
-pub struct Frame<'a> {
+pub struct Game<'a> {
     data: &'a BWAPI_GameData,
     units: Vec<Unit<'a>>,
     infos: &'a [Option<UnitInfo>; 10000],
@@ -28,14 +30,43 @@ pub struct Frame<'a> {
     pub(crate) loaded_units: RefCell<HashMap<usize, Vec<i32>>>,
 }
 
-impl<'a> Frame<'a> {
+impl<'a> Game<'a> {
+    pub fn cmd(&self) -> RefMut<Commands> {
+        self.cmd.borrow_mut()
+    }
+
+    pub fn countdown_timer(&self) -> i32 {
+        self.data.countdownTimer
+    }
+
+    pub fn elapsed_time(&self) -> i32 {
+        self.data.elapsedTime
+    }
+
+    pub fn enemies(&self) -> Vec<Player> {
+        let self_ = self.self_();
+        if let Some(self_) = self_ {
+            self.get_players()
+                .iter()
+                .filter(|p| p.is_enemy(&self_))
+                .cloned()
+                .collect()
+        } else {
+            vec![]
+        }
+    }
+
+    pub fn get_average_fps(&self) -> f64 {
+        self.data.averageFPS
+    }
+
     pub fn get_player(&self, i: i32) -> Option<Player> {
         if !(0..self.data.playerCount).contains(&i) {
             None
         } else {
             let i = i as usize;
             let data = self.data.players.get(i)?;
-            Some(Player::new(i, &data))
+            Some(Player::new(i, &self, &data))
         }
     }
 
@@ -54,7 +85,7 @@ impl<'a> Frame<'a> {
     }
     pub fn get_players(&self) -> Vec<Player> {
         (0..self.data.playerCount as usize)
-            .map(|i| Player::new(i, &self.data.players[i as usize]))
+            .map(|i| Player::new(i, &self, &self.data.players[i as usize]))
             .collect()
     }
 
@@ -65,42 +96,94 @@ impl<'a> Frame<'a> {
             .collect()
     }
 
+    pub fn is_battle_net(&self) -> bool {
+        self.data.isBattleNet
+    }
+
+    pub fn is_debug(&self) -> bool {
+        self.data.isDebug
+    }
+
     pub fn is_multiplayer(&self) -> bool {
         self.data.isMultiplayer
     }
 
     pub fn is_walkable<P: Into<WalkPosition>>(&self, wp: P) -> bool {
         let p = wp.into();
-        self.data.isWalkable[p.y as usize][p.x as usize]
+        self.data.isWalkable[p.x as usize][p.y as usize]
     }
 
     pub fn is_visible<P: Into<TilePosition>>(&self, tp: P) -> bool {
         let p = tp.into();
-        self.data.isVisible[p.y as usize][p.x as usize]
+        self.data.isVisible[p.x as usize][p.y as usize]
     }
 
     pub fn is_buildable<P: Into<TilePosition>>(&self, tp: P) -> bool {
         let p = tp.into();
-        self.data.isBuildable[p.y as usize][p.x as usize]
+        self.data.isBuildable[p.x as usize][p.y as usize]
     }
 
     pub fn is_explored<P: Into<TilePosition>>(&self, tp: P) -> bool {
         let p = tp.into();
-        self.data.isExplored[p.y as usize][p.x as usize]
+        self.data.isExplored[p.x as usize][p.y as usize]
+    }
+
+    pub fn is_gui_enabled(&self) -> bool {
+        self.data.hasGUI
     }
 
     pub fn is_flag_enabled(&self, flag: Flag) -> bool {
         *self.data.flags.get(flag as usize).unwrap_or(&false)
     }
 
+    pub fn is_lat_com_enabled(&self) -> bool {
+        self.data.hasLatCom
+    }
+
+    pub fn is_paused(&self) -> bool {
+        self.data.isPaused
+    }
+
+    pub fn is_replay(&self) -> bool {
+        self.data.isReplay
+    }
+
     pub fn has_creep<P: Into<TilePosition>>(&self, tp: P) -> bool {
         let p = tp.into();
-        self.data.hasCreep[p.y as usize][p.x as usize]
+        self.data.hasCreep[p.x as usize][p.y as usize]
     }
 
     pub fn get_ground_height<P: Into<TilePosition>>(&self, tp: P) -> i32 {
         let p = tp.into();
-        self.data.getGroundHeight[p.y as usize][p.x as usize]
+        self.data.getGroundHeight[p.x as usize][p.y as usize]
+    }
+
+    pub fn get_instance_number(&self) -> i32 {
+        self.data.instanceID
+    }
+
+    pub fn get_latency(&self) -> i32 {
+        self.data.latency
+    }
+
+    pub fn get_latency_frames(&self) -> i32 {
+        self.data.latencyFrames
+    }
+
+    pub fn get_latency_time(&self) -> i32 {
+        self.data.latencyTime
+    }
+
+    pub fn get_mouse_position(&self) -> Position {
+        Position {
+            x: self.data.mouseX,
+            y: self.data.mouseY,
+        }
+    }
+
+    pub fn neutral(&self) -> Player {
+        self.get_player(self.data.neutral)
+            .expect("Neutral player to exist")
     }
 
     pub fn map_height(&self) -> i32 {
@@ -127,11 +210,19 @@ impl<'a> Frame<'a> {
         c_str_to_str(&self.data.mapName)
     }
 
+    pub fn observers(&self) -> Vec<Player> {
+        self.get_players()
+            .iter()
+            .filter(|p| p.is_observer())
+            .cloned()
+            .collect()
+    }
+
     pub fn get_all_units(&self) -> &Vec<Unit<'a>> {
         &self.units
     }
 
-    pub fn get_allies(&self) -> Vec<Player> {
+    pub fn allies(&self) -> Vec<Player> {
         let self_ = self.self_();
         if let Some(self_) = self_ {
             self.get_players()
@@ -151,6 +242,43 @@ impl<'a> Frame<'a> {
             .map(|b| Bullet::new(b.id as usize, self, b))
             .filter(|b| b.exists())
             .collect()
+    }
+
+    pub fn get_client_version(&self) -> i32 {
+        self.data.client_version
+    }
+
+    pub fn get_events(&self) -> Vec<BWAPIC_Event> {
+        (0..self.data.eventCount as usize)
+            .map(|i| self.data.events[i])
+            .collect()
+    }
+
+    pub fn get_force(&self, force_id: i32) -> Force {
+        if !(0..self.data.forceCount).contains(&force_id) {
+            panic!(format!("Invalid force id {}", force_id));
+        }
+        let force_players = self
+            .get_players()
+            .iter()
+            .filter(|p| p.force_id() == force_id)
+            .cloned()
+            .collect();
+        Force::new(
+            force_id as usize,
+            &self.data.forces[force_id as usize],
+            force_players,
+        )
+    }
+
+    pub fn get_forces(&self) -> Vec<Force> {
+        (0..self.data.forceCount)
+            .map(|i| self.get_force(i))
+            .collect()
+    }
+
+    pub fn get_fps(&self) -> i32 {
+        self.data.fps
     }
 
     pub fn get_geysers(&self) -> Vec<Unit<'a>> {
@@ -180,6 +308,33 @@ impl<'a> Frame<'a> {
             .collect()
     }
 
+    pub fn get_random_seed(&self) -> u32 {
+        self.data.randomSeed
+    }
+
+    pub fn get_remaining_latency_frames(&self) -> i32 {
+        self.data.remainingLatencyFrames
+    }
+
+    pub fn get_remaining_latency_time(&self) -> i32 {
+        self.data.remainingLatencyTime
+    }
+
+    pub fn get_replay_frame_count(&self) -> i32 {
+        self.data.replayFrameCount
+    }
+
+    pub fn get_revision(&self) -> i32 {
+        self.data.revision
+    }
+
+    pub fn get_screen_position(&self) -> Position {
+        Position {
+            x: self.data.screenX,
+            y: self.data.screenY,
+        }
+    }
+
     pub fn get_start_locations(&self) -> Vec<TilePosition> {
         (0..self.data.startLocationCount as usize)
             .map(|i| self.data.startLocations[i])
@@ -187,14 +342,62 @@ impl<'a> Frame<'a> {
             .collect()
     }
 
+    pub fn set_alliance(&mut self, other: &Player, allied: bool, allied_victory: bool) {
+        if self.is_replay() || other == &self.self_().expect("Self to exist") {
+            return;
+        }
+
+        self.cmd.borrow_mut().cmd.push(BWAPIC_Command {
+            type_: BWAPIC_CommandType_Enum::SetAllies,
+            value1: other.id as i32,
+            value2: if allied {
+                if allied_victory {
+                    2
+                } else {
+                    1
+                }
+            } else {
+                0
+            },
+        });
+    }
+
+    pub fn set_reveal_all(&mut self, reveal: bool) -> Result<(), Error> {
+        if !self.is_replay() {
+            return Err(Error::Invalid_Parameter);
+        }
+
+        self.cmd.borrow_mut().cmd.push(BWAPIC_Command {
+            type_: BWAPIC_CommandType_Enum::SetAllies,
+            value1: reveal as i32,
+            value2: 0,
+        });
+
+        Ok(())
+    }
+
+    pub fn set_vision(&mut self, player: &Player, enabled: bool) -> Result<(), Error> {
+        if !self.is_replay() && self.self_().ok_or(Error::Invalid_Parameter)? == *player {
+            return Err(Error::Invalid_Parameter);
+        }
+
+        self.cmd.borrow_mut().cmd.push(BWAPIC_Command {
+            type_: BWAPIC_CommandType_Enum::SetAllies,
+            value1: player.id as i32,
+            value2: enabled as i32,
+        });
+
+        Ok(())
+    }
+
     fn event_str(&self, i: usize) -> &str {
         c_str_to_str(&self.data.eventStrings[i])
     }
 }
 
-impl Game {
+impl GameContext {
     pub(crate) fn new(data: Shm<BWAPI_GameData>) -> Self {
-        Game {
+        GameContext {
             data,
             unit_infos: [None; 10000],
             visible_units: vec![],
@@ -205,8 +408,8 @@ impl Game {
         self.data.get().isInGame
     }
 
-    fn with_frame(&self, cmd: &RefCell<Commands>, cb: impl FnOnce(&Frame)) {
-        let mut frame = Frame {
+    fn with_frame(&self, cmd: &RefCell<Commands>, cb: impl FnOnce(&Game)) {
+        let mut frame = Game {
             data: self.data.get(),
             units: vec![],
             infos: &self.unit_infos,
@@ -214,7 +417,7 @@ impl Game {
             interceptors: RefCell::new(HashMap::new()),
             loaded_units: RefCell::new(HashMap::new()),
         };
-        let unmoved_frame = &frame as *const Frame;
+        let unmoved_frame = &frame as *const Game;
         // SAFETY: Only the infos will be modified here and only a reference of Frame will be made available to cb
         let unmoved_frame = unsafe { &*unmoved_frame };
         frame.units = self
@@ -239,7 +442,7 @@ impl Game {
     }
 
     pub(crate) fn handle_events(&mut self, module: &mut impl AiModule) {
-        let commands = RefCell::new(Commands::default());
+        let commands = RefCell::new(Commands::new());
         for i in 0..self.data.get().eventCount {
             let event: BWAPIC_Event = self.data.get().events[i as usize];
             use BWAPI_EventType_Enum::*;
@@ -404,6 +607,6 @@ impl Game {
                 None => {}
             }
         }
-        commands.borrow().commit(self.data.get_mut());
+        commands.into_inner().commit(self.data.get_mut());
     }
 }
