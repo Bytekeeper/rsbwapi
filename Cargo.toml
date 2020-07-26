@@ -10,4 +10,4 @@ bwapi_wrapper = { path = "bwapi_wrapper" }
 winapi = { version = "0.3", features = ["winuser", "memoryapi", "handleapi"] }
 memchr = "2.2.0"
 num-traits = "0.2"
-num-derive = "0.2"
+num-derive = "0.3"

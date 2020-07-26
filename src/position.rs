@@ -1,6 +1,4 @@
-use core::ops::Div;
-use core::ops::Mul;
-use core::ops::Sub;
+use core::ops::{Add, Div, Mul, Sub};
 
 #[derive(Debug, Copy, Clone)]
 pub struct Position {
@@ -116,45 +114,62 @@ impl From<PositionTuple> for WalkPosition {
     }
 }
 
-impl Mul<i32> for Position {
-    type Output = Position;
+macro_rules! pos_math_ops {
+    ($($t:ty)*) => ($(
+        impl Mul<i32> for $t {
+            type Output = $t;
 
-    fn mul(self, other: i32) -> Self::Output {
-        Self::Output {
-            x: self.x * other,
-            y: self.y * other,
+            fn mul(self, other: i32) -> Self::Output {
+                Self::Output {
+                    x: self.x * other,
+                    y: self.y * other
+                }
+            }
         }
-    }
+
+        impl Mul<$t> for i32 {
+            type Output = $t;
+
+            fn mul(self, other: $t) -> Self::Output {
+                Self::Output {
+                     x: self * other.x,
+                     y: self * other.y
+                }
+            }
+        }
+
+        impl Div<i32> for $t {
+            type Output = Self;
+            fn div(self, other: i32) -> Self::Output {
+                Self::Output {
+                    x: self.x / other,
+                    y: self.y / other,
+                }
+            }
+        }
+
+        impl Sub<$t> for $t {
+            type Output = Self;
+
+            fn sub(self, other: $t) -> Self::Output {
+                Self::Output {
+                    x: self.x - other.x,
+                    y: self.y - other.y,
+                }
+            }
+        }
+
+        impl Add<$t> for $t {
+            type Output = Self;
+
+            fn add(self, other: $t) -> Self::Output {
+                Self::Output {
+                    x: self.x + other.x,
+                    y: self.y + other.y,
+                }
+            }
+        }
+    )*)
 }
 
-impl Mul<Position> for i32 {
-    type Output = Position;
-
-    fn mul(self, other: Position) -> Self::Output {
-        Self::Output {
-            x: self * other.x,
-            y: self * other.y,
-        }
-    }
-}
-
-impl Div<i32> for Position {
-    type Output = Self;
-    fn div(self, other: i32) -> Self::Output {
-        Self::Output {
-            x: self.x / other,
-            y: self.y / other,
-        }
-    }
-}
-
-impl Sub<Position> for Position {
-    type Output = Self;
-
-    fn sub(self, other: Position) -> Self::Output {
-        Self::Output {
-            x: self.x - other.x,
-            y: self.y - other.y,
-        }
-    }
-}
+pos_math_ops!(Position WalkPosition TilePosition);

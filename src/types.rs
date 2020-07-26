@@ -1,12 +1,23 @@
 use bwapi_wrapper::*;
+use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use std::ffi::CStr;
 use std::os::raw::c_char;
 
 pub type CoordinateType = BWAPI_CoordinateType_Enum;
 pub type Race = BWAPI_Races_Enum_Enum;
+pub type UnitType = BWAPI_UnitTypes_Enum_Enum;
+pub type TechType = BWAPI_TechTypes_Enum_Enum;
+pub type UpgradeType = BWAPI_UpgradeTypes_Enum_Enum;
+pub type Orders = BWAPI_Orders_Enum_Enum;
+pub type WeaponType = BWAPI_WeaponTypes_Enum_Enum;
+pub type Flag = BWAPI_Flag_Enum;
+pub type UnitCommandType = BWAPI_UnitCommandTypes_Enum_Enum;
+pub type Error = BWAPI_Errors_Enum_Enum;
+pub type Key = BWAPI_Key;
+pub type MouseButton = BWAPI_MouseButton;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, FromPrimitive)]
 pub enum Color {
     /// <summary>The default color for Player 1.</summary>
     Red = 111,
@@ -60,15 +71,6 @@ pub enum TextSize {
     Huge,
 }
 
-pub type UnitType = BWAPI_UnitTypes_Enum_Enum;
-pub type TechType = BWAPI_TechTypes_Enum_Enum;
-pub type UpgradeType = BWAPI_UpgradeTypes_Enum_Enum;
-pub type Orders = BWAPI_Orders_Enum_Enum;
-pub type WeaponType = BWAPI_WeaponTypes_Enum_Enum;
-pub type Flag = BWAPI_Flag_Enum;
-pub type UnitCommandType = BWAPI_UnitCommandTypes_Enum_Enum;
-pub type Error = BWAPI_Errors_Enum_Enum;
-
 pub trait TypeFrom {
     fn new(i: i32) -> Self;
 }
@@ -77,6 +79,13 @@ pub trait UnitTypeExt {
     fn air_weapon(&self) -> WeaponType {
         unimplemented!()
     }
+    fn armor(&self) -> i32 {
+        unimplemented!()
+    }
+    fn armor_upgrade(&self) -> UpgradeType {
+        unimplemented!()
+    }
+
     fn dimension_down(&self) -> i32 {
         unimplemented!()
     }
@@ -101,10 +110,19 @@ pub trait UnitTypeExt {
     }
     fn is_resource_container(&self) -> bool;
     fn is_mineral_field(&self) -> bool;
+    fn max_energy(&self) -> i32 {
+        unimplemented!()
+    }
+    fn sight_range(&self) -> i32 {
+        unimplemented!()
+    }
     fn space_provided(&self) -> i32;
     fn space_required(&self) -> i32;
     fn tile_width(&self) -> i32;
     fn tile_height(&self) -> i32;
+    fn top_speed(&self) -> f64 {
+        unimplemented!()
+    }
 }
 
 impl<T: FromPrimitive> TypeFrom for T {
@@ -155,10 +173,30 @@ pub(crate) fn c_str_to_str(i: &[c_char]) -> &str {
 }
 
 pub trait WeaponTypeExt {
+    fn damage_amount(&self) -> i32 {
+        unimplemented!()
+    }
+
+    fn damage_bonus(&self) -> i32 {
+        unimplemented!()
+    }
+
+    fn damage_cooldown(&self) -> i32 {
+        unimplemented!()
+    }
+
+    fn damage_factor(&self) -> i32 {
+        unimplemented!()
+    }
+
     fn min_range(&self) -> i32 {
         unimplemented!()
     }
     fn max_range(&self) -> i32 {
+        unimplemented!()
+    }
+
+    fn upgrade_type(&self) -> UpgradeType {
         unimplemented!()
     }
 }

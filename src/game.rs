@@ -5,6 +5,7 @@ use crate::force::Force;
 use crate::position::*;
 use crate::shm::Shm;
 use crate::types::{c_str_to_str, Error, Flag};
+use crate::types::{Key, MouseButton};
 use crate::unit::UnitInfo;
 use crate::*;
 use bwapi_wrapper::*;
@@ -162,6 +163,10 @@ impl<'a> Game<'a> {
         self.data.instanceID
     }
 
+    pub fn get_key_state(&self, key: Key) -> bool {
+        self.data.keyState[key as usize]
+    }
+
     pub fn get_latency(&self) -> i32 {
         self.data.latency
     }
@@ -179,6 +184,10 @@ impl<'a> Game<'a> {
             x: self.data.mouseX,
             y: self.data.mouseY,
         }
+    }
+
+    pub fn get_mouse_state(&self, button: MouseButton) -> bool {
+        self.data.mouseState[button as usize]
     }
 
     pub fn neutral(&self) -> Player {
