@@ -25,13 +25,21 @@ impl AiModule for MyModule {
         let names: Vec<String> = game
             .get_players()
             .iter()
-            .map(|p| String::from(p.name()))
+            .map(|p| String::from(p.get_name()))
             .collect();
         for (i, name) in names.iter().enumerate() {
-            game.cmd().draw_text_screen((10, (i as i32) * 10 + 20), name);
+            game.cmd()
+                .draw_text_screen((10, (i as i32) * 10 + 20), name);
         }
-        game.cmd().draw_text_screen((10, 10), game.enemy().unwrap().name());
+        game.cmd()
+            .draw_text_screen((10, 10), game.enemy().unwrap().get_name());
         let units = game.get_all_units();
+        if let Some(u) = units
+            .iter()
+            .find(|u| u.get_type() == UnitType::Zerg_Hatchery)
+        {
+            u.train(UnitType::Zerg_Drone)
+        }
         let mineral = units
             .iter()
             .find(|u| u.get_type().is_mineral_field() && u.is_visible(&game.self_().unwrap()));
@@ -65,7 +73,7 @@ impl AiModule for MyModule {
             println!(
                 "Bullet {} of player {:?} of unit {:?}",
                 bullet.get_id(),
-                bullet.get_player().map(|p| p.name().to_string()),
+                bullet.get_player().map(|p| p.get_name().to_string()),
                 bullet.get_source().map(|u| u.get_id())
             );
         }

@@ -4,7 +4,8 @@ use crate::types::c_str_to_str;
 use crate::types::Color;
 use crate::types::Race;
 use crate::types::TechType;
-use crate::types::{TypeFrom, UnitType, UnitTypeExt, UpgradeType, WeaponType, WeaponTypeExt};
+use crate::types::{TypeFrom, UnitType, UpgradeType, WeaponType, WeaponTypeExt};
+use crate::unit_type::UnitTypeExt;
 use bwapi_wrapper::*;
 use num_traits::FromPrimitive;
 

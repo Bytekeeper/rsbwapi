@@ -96,26 +96,14 @@ impl WalkPosition {
     }
 }
 
-impl From<PositionTuple> for TilePosition {
-    fn from(pos: PositionTuple) -> Self {
-        Self { x: pos.0, y: pos.1 }
-    }
-}
-
-impl From<PositionTuple> for Position {
-    fn from(pos: (i32, i32)) -> Self {
-        Self { x: pos.0, y: pos.1 }
-    }
-}
-
-impl From<PositionTuple> for WalkPosition {
-    fn from(pos: PositionTuple) -> Self {
-        Self { x: pos.0, y: pos.1 }
-    }
-}
-
 macro_rules! pos_math_ops {
     ($($t:ty)*) => ($(
+        impl From<PositionTuple> for $t {
+            fn from(pos: PositionTuple) -> Self {
+                Self { x: pos.0, y: pos.1 }
+            }
+        }
+
         impl Mul<i32> for $t {
             type Output = $t;
 

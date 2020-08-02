@@ -1,6 +1,7 @@
 use types::UnitType;
 
 mod shm;
+mod unit_type_container;
 
 pub mod aimodule;
 mod bridge;
@@ -13,6 +14,7 @@ pub mod player;
 pub mod position;
 pub mod types;
 pub mod unit;
+pub mod unit_type;
 
 pub use aimodule::AiModule;
 pub use command::{Command, Commands};

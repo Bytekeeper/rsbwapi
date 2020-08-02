@@ -1,8 +1,9 @@
 use crate::player::Player;
+use crate::unit_type::UnitTypeExt;
 
 use crate::types::{
-    Flag, Orders, Race, TechType, TypeFrom, UnitCommandType, UnitType, UnitTypeExt, UpgradeType,
-    WeaponType, WeaponTypeExt,
+    Flag, Orders, Race, TechType, TypeFrom, UnitCommandType, UnitType, UpgradeType, WeaponType,
+    WeaponTypeExt,
 };
 use crate::*;
 use bwapi_wrapper::*;
@@ -648,23 +649,61 @@ impl<'a> Unit<'a> {
         self.game.get_player(self.data.player)
     }
 
+    pub fn attack<T: AttackUnitOrPosition>(&self, target: &T) {
+        let mut cmd = self.command(false);
+        target.assign_target_and_command(&mut cmd);
+        self.issue_command(cmd);
+    }
+
     pub fn gather(&self, target: &Unit) {
         self.issue_command(UnitCommand {
             targetIndex: target.id as i32,
-            ..self.command_type(UnitCommandType::Gather)
+            ..self.command_type(UnitCommandType::Gather, false)
         })
     }
-    pub fn attack(&self, target: &Unit) {
+
+    pub fn right_click<T: RightClickUnitOrPosition>(&self, target: T) {
+        let mut cmd = self.command(false);
+        target.assign_target_and_command(&mut cmd);
+        self.issue_command(cmd);
+    }
+
+    pub fn build(&self, type_: UnitType, target: TilePosition) {
         self.issue_command(UnitCommand {
-            targetIndex: target.id as i32,
-            ..self.command_type(UnitCommandType::Attack_Unit)
+            x: target.x,
+            y: target.y,
+            extra: type_ as i32,
+            ..self.command_type(UnitCommandType::Build, false)
         });
     }
 
-    fn command_type(&self, cmd: UnitCommandType) -> UnitCommand {
+    pub fn build_addon(&self, type_: UnitType) {
+        self.issue_command(UnitCommand {
+            extra: type_ as i32,
+            ..self.command_type(UnitCommandType::Build, false)
+        });
+    }
+
+    pub fn train(&self, type_: UnitType) {
+        self.issue_command(UnitCommand {
+            extra: type_ as i32,
+            ..self.command_type(UnitCommandType::Train, false)
+        });
+    }
+
+    pub fn morph(&self, type_: UnitType) {
+        self.issue_command(UnitCommand {
+            extra: type_ as i32,
+            ..self.command_type(UnitCommandType::Morph, false)
+        });
+    }
+
+    fn command(&self, shift_queue: bool) -> UnitCommand {
         UnitCommand {
-            type_: BWAPI_UnitCommandType { _base: cmd as u32 },
-            extra: 0,
+            type_: BWAPI_UnitCommandType {
+                _base: UnitCommandType::None as u32,
+            },
+            extra: shift_queue as i32,
             x: 0,
             y: 0,
             unitIndex: self.id as i32,
@@ -672,8 +711,57 @@ impl<'a> Unit<'a> {
         }
     }
 
-    fn issue_command(&self, cmd: UnitCommand) {
+    fn command_type(&self, cmd: UnitCommandType, shift_queue: bool) -> UnitCommand {
+        UnitCommand {
+            type_: BWAPI_UnitCommandType { _base: cmd as u32 },
+            extra: shift_queue as i32,
+            x: 0,
+            y: 0,
+            unitIndex: self.id as i32,
+            targetIndex: -1,
+        }
+    }
+
+    pub fn issue_command(&self, cmd: UnitCommand) {
         self.game.cmd.borrow_mut().issue_command(cmd)
+    }
+}
+
+pub trait AttackUnitOrPosition {
+    fn assign_target_and_command(&self, cmd: &mut UnitCommand);
+}
+
+pub trait RightClickUnitOrPosition {
+    fn assign_target_and_command(&self, cmd: &mut UnitCommand);
+}
+
+impl AttackUnitOrPosition for Unit<'_> {
+    fn assign_target_and_command(&self, cmd: &mut UnitCommand) {
+        cmd.targetIndex = self.id as i32;
+        cmd.type_._base = UnitCommandType::Attack_Unit as u32;
+    }
+}
+
+impl AttackUnitOrPosition for Position {
+    fn assign_target_and_command(&self, cmd: &mut UnitCommand) {
+        cmd.x = self.x;
+        cmd.y = self.y;
+        cmd.type_._base = UnitCommandType::Attack_Move as u32;
+    }
+}
+
+impl RightClickUnitOrPosition for Unit<'_> {
+    fn assign_target_and_command(&self, cmd: &mut UnitCommand) {
+        cmd.targetIndex = self.id as i32;
+        cmd.type_._base = UnitCommandType::Right_Click_Unit as u32;
+    }
+}
+
+impl RightClickUnitOrPosition for Position {
+    fn assign_target_and_command(&self, cmd: &mut UnitCommand) {
+        cmd.x = self.x;
+        cmd.y = self.y;
+        cmd.type_._base = UnitCommandType::Right_Click_Position as u32;
     }
 }
 
