@@ -1,8 +1,7 @@
-use types::UnitType;
-
 mod shm;
-mod unit_type_container;
 
+pub use crate::types::*;
+pub use bwapi_wrapper::prelude::*;
 pub mod aimodule;
 mod bridge;
 pub mod bullet;
@@ -11,17 +10,14 @@ pub mod command;
 pub mod force;
 pub mod game;
 pub mod player;
-pub mod position;
 pub mod types;
 pub mod unit;
-pub mod unit_type;
 
 pub use aimodule::AiModule;
 pub use command::{Command, Commands};
 pub use force::Force;
 pub use game::Game;
 pub use player::Player;
-pub use position::*;
 pub use unit::Unit;
 
 pub fn start(mut module: impl AiModule) {

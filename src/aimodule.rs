@@ -1,7 +1,7 @@
 use crate::game::Game;
 use crate::player::Player;
-use crate::position::Position;
 use crate::unit::Unit;
+use bwapi_wrapper::prelude::Position;
 
 pub trait AiModule {
     fn on_end(&self, _game: &Game, _winner: bool) {}

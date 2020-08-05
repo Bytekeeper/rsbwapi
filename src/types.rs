@@ -1,22 +1,6 @@
-use bwapi_wrapper::*;
 use num_derive::FromPrimitive;
-use num_traits::FromPrimitive;
 use std::ffi::CStr;
 use std::os::raw::c_char;
-
-pub type CoordinateType = BWAPI_CoordinateType_Enum;
-pub use bwapi_wrapper::BWAPI_Races_Enum_Enum as Race;
-pub type UnitType = BWAPI_UnitTypes_Enum_Enum;
-pub type TechType = BWAPI_TechTypes_Enum_Enum;
-pub type UnitSizeType = BWAPI_UnitSizeTypes_Enum_Enum;
-pub use bwapi_wrapper::BWAPI_UpgradeTypes_Enum_Enum as UpgradeType;
-pub type Orders = BWAPI_Orders_Enum_Enum;
-pub type WeaponType = BWAPI_WeaponTypes_Enum_Enum;
-pub type Flag = BWAPI_Flag_Enum;
-pub type UnitCommandType = BWAPI_UnitCommandTypes_Enum_Enum;
-pub type Error = BWAPI_Errors_Enum_Enum;
-pub type Key = BWAPI_Key;
-pub type MouseButton = BWAPI_MouseButton;
 
 #[derive(Debug, Copy, Clone, FromPrimitive)]
 pub enum Color {
@@ -72,16 +56,6 @@ pub enum TextSize {
     Huge,
 }
 
-pub trait TypeFrom {
-    fn new(i: i32) -> Self;
-}
-
-impl<T: FromPrimitive> TypeFrom for T {
-    fn new(i: i32) -> Self {
-        Self::from_i32(i).unwrap()
-    }
-}
-
 pub(crate) fn c_str_to_str(i: &[c_char]) -> &str {
     unsafe {
         let i = &*(i as *const [c_char] as *const [u8]);
@@ -90,34 +64,3 @@ pub(crate) fn c_str_to_str(i: &[c_char]) -> &str {
             .unwrap()
     }
 }
-
-pub trait WeaponTypeExt {
-    fn damage_amount(&self) -> i32 {
-        unimplemented!()
-    }
-
-    fn damage_bonus(&self) -> i32 {
-        unimplemented!()
-    }
-
-    fn damage_cooldown(&self) -> i32 {
-        unimplemented!()
-    }
-
-    fn damage_factor(&self) -> i32 {
-        unimplemented!()
-    }
-
-    fn min_range(&self) -> i32 {
-        unimplemented!()
-    }
-    fn max_range(&self) -> i32 {
-        unimplemented!()
-    }
-
-    fn upgrade_type(&self) -> UpgradeType {
-        unimplemented!()
-    }
-}
-
-impl WeaponTypeExt for WeaponType {}

@@ -2,10 +2,8 @@ use crate::aimodule::AiModule;
 use crate::bullet::Bullet;
 use crate::command::Commands;
 use crate::force::Force;
-use crate::position::*;
 use crate::shm::Shm;
-use crate::types::{c_str_to_str, Error, Flag};
-use crate::types::{Key, MouseButton};
+use crate::types::c_str_to_str;
 use crate::unit::UnitInfo;
 use crate::*;
 use bwapi_wrapper::*;
@@ -460,8 +458,7 @@ impl GameContext {
                     let data = self.data.get();
                     self.visible_units = (0..data.initialUnitCount as usize)
                         .filter(|&i| {
-                            data.units[i].exists
-                                && data.units[i].type_ != types::UnitType::Unknown as i32
+                            data.units[i].exists && data.units[i].type_ != UnitType::Unknown as i32
                         })
                         .map(|i| i as i32)
                         .collect();

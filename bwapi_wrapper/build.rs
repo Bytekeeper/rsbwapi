@@ -25,8 +25,8 @@ fn main() {
             non_exhaustive: false,
         })
         .whitelist_type("BWAPI::.*")
-//        .whitelist_type("BWAPI::.*GameTable")
-  //      .whitelist_type("BWAPI::.*Enum")
+        //        .whitelist_type("BWAPI::.*GameTable")
+        //      .whitelist_type("BWAPI::.*Enum")
         .ignore_methods()
         .ignore_functions()
         .opaque_type("std::.*")
@@ -47,12 +47,8 @@ fn main() {
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     let result = bindings.to_string();
     let mut file = File::create(out_path.join("bindings.rs")).unwrap();
-    let re =
-        Regex::new(r"#\s*\[\s*derive\s*\((?P<d>[^)]+)\)\s*\]\s*pub\s+enum").unwrap();
-    let changed = re.replace_all(
-        &result,
-        "#[derive($d, FromPrimitive)]\npub enum",
-    );
+    let re = Regex::new(r"#\s*\[\s*derive\s*\((?P<d>[^)]+)\)\s*\]\s*pub\s+enum").unwrap();
+    let changed = re.replace_all(&result, "#[derive($d, FromPrimitive)]\npub enum");
     assert_ne!(changed, result, "Could not add FromPrimitive to bindings!");
     file.write_all(changed.as_bytes())
         .expect("Couldn't write bindings!");
@@ -63,29 +59,20 @@ fn should_replace1() {
     let test = "# [ derive ( Debug , Copy , Clone , PartialEq , Eq , Hash ) ] pub enum std_deque__bindgen_ty_1";
 
     // WHEN
-    let re =
-        Regex::new(r"#\s*\[\s*derive\s*\((?P<d>[^)]+)\)\s*\]\s*pub\s+enum").unwrap();
-    let changed = re.replace_all(
-        &test,
-        "#[derive($d, FromPrimitive)]\npub enum",
-    );
+    let re = Regex::new(r"#\s*\[\s*derive\s*\((?P<d>[^)]+)\)\s*\]\s*pub\s+enum").unwrap();
+    let changed = re.replace_all(&test, "#[derive($d, FromPrimitive)]\npub enum");
 
     // THEN
     assert_eq!("#[derive( Debug , Copy , Clone , PartialEq , Eq , Hash , FromPrimitive)]\npub enum std_deque__bindgen_ty_1", changed);
 }
-
 
 fn should_replace2() {
     // GIVEN
     let test = "# [ derive ( Debug , Copy , Clone , PartialEq , Eq , Hash ) ] pub enum BWAPI_Text_Size_Enum # [ derive ( Debug , Copy , Clone , PartialEq , Eq , Hash ) ] pub enum BWAPIC_CommandType_Enum ";
 
     // WHEN
-    let re =
-        Regex::new(r"#\s*\[\s*derive\s*\((?P<d>[^)]+)\)\s*\]\s*pub\s+enum").unwrap();
-    let changed = re.replace_all(
-        &test,
-        "#[derive($d, FromPrimitive)]\npub enum",
-    );
+    let re = Regex::new(r"#\s*\[\s*derive\s*\((?P<d>[^)]+)\)\s*\]\s*pub\s+enum").unwrap();
+    let changed = re.replace_all(&test, "#[derive($d, FromPrimitive)]\npub enum");
 
     // THEN
     assert_eq!("#[derive( Debug , Copy , Clone , PartialEq , Eq , Hash , FromPrimitive)]\npub enum BWAPI_Text_Size_Enum #[derive( Debug , Copy , Clone , PartialEq , Eq , Hash , FromPrimitive)]\npub enum BWAPIC_CommandType_Enum ", changed);

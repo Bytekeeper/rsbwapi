@@ -1,7 +1,5 @@
 use rsbwapi::*;
 
-use rsbwapi::types::{UnitType, UnitTypeExt};
-
 pub struct MyModule {
     called: bool,
 }
@@ -11,6 +9,7 @@ impl AiModule for MyModule {
         for location in game.get_start_locations() {
             println!("{:?}", location);
         }
+
     }
 
     fn on_unit_create(&self, _game: &Game, unit: Unit) {

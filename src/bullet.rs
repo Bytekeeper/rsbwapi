@@ -1,7 +1,7 @@
 use crate::game::Game;
 use crate::player::Player;
-use crate::position::*;
 use crate::unit::Unit;
+use bwapi_wrapper::prelude::*;
 use bwapi_wrapper::*;
 use num_traits::FromPrimitive;
 

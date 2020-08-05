@@ -1,6 +1,6 @@
-use crate::position::Position;
-use crate::types::{Color, CoordinateType, Error, TextSize};
+use crate::types::{Color, TextSize};
 use crate::unit::UnitCommand;
+use bwapi_wrapper::prelude::*;
 use bwapi_wrapper::*;
 use std::ffi::CString;
 use std::path::Path;

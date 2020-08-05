@@ -1,10 +1,5 @@
 use crate::player::Player;
-use crate::unit_type::UnitTypeExt;
 
-use crate::types::{
-    Flag, Orders, Race, TechType, TypeFrom, UnitCommandType, UnitType, UpgradeType, WeaponType,
-    WeaponTypeExt,
-};
 use crate::*;
 use bwapi_wrapper::*;
 
@@ -258,8 +253,8 @@ impl<'a> Unit<'a> {
         self.game.get_unit(self.data.nydusExit)
     }
 
-    pub fn get_order(&self) -> Orders {
-        Orders::new(self.data.order)
+    pub fn get_order(&self) -> Order {
+        Order::new(self.data.order)
     }
 
     pub fn get_order_target(&self) -> Option<Unit> {
@@ -438,7 +433,7 @@ impl<'a> Unit<'a> {
     }
 
     pub fn is_holding_position(&self) -> bool {
-        self.get_order() == Orders::HoldPosition
+        self.get_order() == Order::HoldPosition
     }
 
     pub fn is_idle(&self) -> bool {
@@ -501,7 +496,7 @@ impl<'a> Unit<'a> {
     }
 
     pub fn is_patrolling(&self) -> bool {
-        self.get_order() == Orders::Patrol
+        self.get_order() == Order::Patrol
     }
 
     pub fn is_plagued(&self) -> bool {
@@ -513,11 +508,11 @@ impl<'a> Unit<'a> {
     }
 
     pub fn is_repairing(&self) -> bool {
-        self.get_order() == Orders::Repair
+        self.get_order() == Order::Repair
     }
 
     pub fn is_researching(&self) -> bool {
-        self.get_order() == Orders::ResearchTech
+        self.get_order() == Order::ResearchTech
     }
 
     pub fn is_selected(&self) -> bool {
@@ -595,7 +590,7 @@ impl<'a> Unit<'a> {
     }
 
     pub fn is_upgrading(&self) -> bool {
-        self.get_order() == Orders::Upgrade
+        self.get_order() == Order::Upgrade
     }
 
     pub fn get_id(&self) -> usize {
@@ -621,7 +616,7 @@ impl<'a> Unit<'a> {
         if self.is_completed() {
             return false;
         }
-        if self.get_type().get_race() != types::Race::Terran {
+        if self.get_type().get_race() != Race::Terran {
             return true;
         }
         self.get_build_unit() != None
