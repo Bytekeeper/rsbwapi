@@ -1,8 +1,11 @@
 [package]
 name = "bwapi_wrapper"
 version = "0.1.0"
-authors = ["Bytekeeper <bytekeeper@mailbox.org>"]
+authors = ["Dennis Waldherr <bytekeeper@mailbox.org>"]
 edition = "2018"
+homepage = "https://github.com/Bytekeeper/rsbwapi/"
+repository = "https://github.com/Bytekeeper/rsbwapi/"
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
