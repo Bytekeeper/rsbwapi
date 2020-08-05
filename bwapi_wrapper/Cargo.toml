@@ -6,7 +6,7 @@ edition = "2018"
 homepage = "https://github.com/Bytekeeper/rsbwapi/"
 license = "LGPL-3"
 repository = "https://github.com/Bytekeeper/rsbwapi/"
-description = "Bindings to "
+description = "Bindings to BWAPI"
 
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
