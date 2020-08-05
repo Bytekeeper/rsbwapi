@@ -259,21 +259,19 @@ impl<'a> Player<'a> {
             - self.repaired_minerals()
     }
 
-    pub fn suppy_total(&self, race: Race) -> i32 {
-        let race = if race == Race::None {
-            self.get_race()
-        } else {
-            race
-        };
+    pub fn supply_total(&self) -> i32 {
+        self.suppy_total_for(self.get_race())
+    }
+
+    pub fn suppy_total_for(&self, race: Race) -> i32 {
         self.data.supplyTotal[race as usize]
     }
 
-    pub fn supply_used(&self, race: Race) -> i32 {
-        let race = if race == Race::None {
-            self.get_race()
-        } else {
-            race
-        };
+    pub fn supply_used(&self) -> i32 {
+        self.supply_used_by(self.get_race())
+    }
+
+    pub fn supply_used_by(&self, race: Race) -> i32 {
         self.data.supplyUsed[race as usize]
     }
 
