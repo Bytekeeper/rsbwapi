@@ -7,7 +7,7 @@ homepage = "https://github.com/Bytekeeper/rsbwapi/"
 license = "LGPL-3"
 repository = "https://github.com/Bytekeeper/rsbwapi/"
 description = "Bindings to BWAPI"
-include = ["bwapi/bwapi/include/**", "Cargo.toml", "**/*.rs"]
+include = ["bwapi/**/*.h", "Cargo.toml", "**/*.rs"]
 
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
