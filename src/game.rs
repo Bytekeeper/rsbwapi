@@ -2,6 +2,8 @@ use crate::aimodule::AiModule;
 use crate::bullet::Bullet;
 use crate::command::Commands;
 use crate::force::Force;
+use crate::predicate::IntoPredicate;
+use crate::predicate::Predicate;
 use crate::shm::Shm;
 use crate::types::c_str_to_str;
 use crate::unit::UnitInfo;
@@ -30,6 +32,126 @@ pub struct Game<'a> {
 }
 
 impl<'a> Game<'a> {
+    pub fn can_build_here<P: Into<TilePosition>, B: Into<Option<&'a Unit<'a>>>>(
+        &self,
+        builder: B,
+        position: P,
+        type_: UnitType,
+        check_explored: bool,
+    ) -> bool {
+        let builder = builder.into();
+        let position = if builder.is_some() && type_.is_addon() {
+            position.into() + TilePosition { x: 4, y: 1 }
+        } else {
+            position.into()
+        };
+
+        let lt = position;
+        let rb = lt + type_.tile_size();
+
+        if !lt.is_valid() || !(rb.to_position() - Position { x: 1, y: 1 }).is_valid() {
+            return false;
+        }
+
+        if type_.is_refinery() {
+            return self
+                .get_geysers()
+                .iter()
+                .find(|x| x.get_tile_position() == position)
+                .map_or(false, |x| {
+                    !(x.is_visible() && x.get_type() != UnitType::Resource_Vespene_Geyser)
+                });
+        }
+
+        for x in lt.x..rb.x {
+            for y in lt.y..rb.y {
+                if !self.is_buildable((x, y)) || (check_explored && !self.is_explored((x, y))) {
+                    return false;
+                }
+            }
+        }
+
+        if let Some(builder) = builder {
+            if !builder.get_type().is_building() {
+                if !builder.has_path(lt.to_position() + type_.tile_size().to_position() / 2) {
+                    return false;
+                }
+            } else if !builder.get_type().is_flying_building()
+                && type_ != UnitType::Zerg_Nydus_Canal
+                && !type_.is_flag_beacon()
+            {
+                return false;
+            }
+        }
+
+        if type_ != UnitType::Special_Start_Location {
+            let targ_pos = lt.to_position() + type_.tile_size().to_position() / 2;
+            let collides_with_units = self
+                .get_units_in_rectangle(
+                    lt.to_position(),
+                    rb.to_position(),
+                    !Unit::is_flying.into_predicate()
+                        & !Unit::is_loaded.into_predicate()
+                        & |u: &Unit| {
+                            builder.map_or(true, |b| b != u)
+                                && u.get_left() <= targ_pos.x + type_.dimension_right()
+                                && u.get_top() <= targ_pos.y + type_.dimension_down()
+                                && u.get_right() >= targ_pos.x - type_.dimension_left()
+                                && u.get_bottom() >= targ_pos.y - type_.dimension_up()
+                        },
+                )
+                .iter()
+                .any(|u| !(u.get_type().is_addon() && u.get_type().can_move()));
+            if collides_with_units {
+                return false;
+            }
+
+            let needs_creep = type_.requires_creep();
+            if type_.get_race() != Race::Zerg || needs_creep {
+                for x in lt.x..rb.x {
+                    for y in lt.y..rb.y {
+                        if needs_creep != self.has_creep((x, y)) {
+                            return false;
+                        }
+                    }
+                }
+            }
+
+            if type_.is_resource_depot() {
+                for m in self.get_static_minerals() {
+                    let tp = m.get_initial_tile_position();
+                    if self.is_visible(tp) || self.is_visible((tp.x + 1, tp.y)) && !m.exists() {
+                        continue;
+                    }
+                    if tp.x > lt.x - 5 && tp.y > lt.y - 4 && tp.x < lt.x + 7 && tp.y < lt.y + 6 {
+                        return false;
+                    }
+                }
+                for g in self.get_static_geysers() {
+                    let tp = g.get_initial_tile_position();
+                    if tp.x > lt.x - 7 && tp.y > lt.y - 5 && tp.x < lt.x + 7 && tp.y < lt.y + 6 {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        if let Some(builder) = builder {
+            if builder.get_type().is_addon()
+                && type_.is_addon()
+                && !self.can_build_here(
+                    builder,
+                    lt - TilePosition { x: 4, y: 1 },
+                    builder.get_type(),
+                    check_explored,
+                )
+            {
+                return false;
+            }
+        }
+        true
+    }
+
     pub fn cmd(&self) -> RefMut<Commands> {
         self.cmd.borrow_mut()
     }
@@ -82,6 +204,33 @@ impl<'a> Game<'a> {
             ))
         }
     }
+
+    pub fn get_units_in_rectangle<
+        A: Into<Position>,
+        B: Into<Position>,
+        P: IntoPredicate<Unit<'a>>,
+    >(
+        &self,
+        lt: A,
+        rb: B,
+        pred: P,
+    ) -> Vec<Unit<'a>> {
+        let lt = lt.into();
+        let rb = rb.into();
+        let pred = pred.into_predicate();
+        self.get_all_units()
+            .iter()
+            .filter(|u| {
+                u.get_right() > lt.x
+                    && u.get_left() <= rb.x
+                    && u.get_bottom() > lt.y
+                    && u.get_top() <= rb.y
+                    && pred.test(u)
+            })
+            .cloned()
+            .collect()
+    }
+
     pub fn get_players(&self) -> Vec<Player> {
         (0..self.data.playerCount as usize)
             .map(|i| Player::new(i, &self, &self.data.players[i as usize]))
@@ -93,6 +242,14 @@ impl<'a> Game<'a> {
             .map(|i| self.data.selectedUnits[i])
             .map(|i| self.get_unit(i).expect("Selected unit to exist"))
             .collect()
+    }
+
+    pub fn get_static_geysers(&self) -> &[&Unit] {
+        unimplemented!()
+    }
+
+    pub fn get_static_minerals(&self) -> &[&Unit] {
+        unimplemented!()
     }
 
     pub fn is_battle_net(&self) -> bool {
@@ -437,7 +594,8 @@ impl GameContext {
 
     fn ensure_unit_info(&mut self, id: usize) {
         if self.unit_infos[id].is_none() {
-            self.unit_infos[id] = Some(UnitInfo::new(id, &self.data.get().units[id]))
+            let data = self.data.get();
+            self.unit_infos[id] = Some(UnitInfo::new(id, &data.units[id]));
         }
     }
 

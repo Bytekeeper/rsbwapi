@@ -16,6 +16,8 @@ pub(crate) struct UnitInfo {
     pub id: usize,
     pub initial_hit_points: i32,
     pub initial_resources: i32,
+    pub initial_position: Position,
+    pub initial_type: UnitType,
 }
 
 impl UnitInfo {
@@ -24,6 +26,11 @@ impl UnitInfo {
             id,
             initial_hit_points: data.hitPoints,
             initial_resources: data.resources,
+            initial_position: Position {
+                x: data.positionX,
+                y: data.positionY,
+            },
+            initial_type: UnitType::new(data.type_),
         }
     }
 }
@@ -159,6 +166,11 @@ impl<'a> Unit<'a> {
 
     pub fn get_initial_resources(&self) -> i32 {
         self.info.initial_resources
+    }
+
+    pub fn get_initial_tile_position(&self) -> TilePosition {
+        (self.info.initial_position - self.info.initial_type.tile_size().to_position() / 2)
+            .to_tile_position()
     }
 
     pub fn get_interceptor_count(&self) -> i32 {
@@ -386,7 +398,7 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_transport(&self) -> Option<Unit> {
-        self.game.get_unit(self.id as i32)
+        self.game.get_unit(self.data.transport as i32)
     }
 
     pub fn get_upgrade(&self) -> UpgradeType {
@@ -649,9 +661,7 @@ impl<'a> Unit<'a> {
         if !self.exists() {
             return false;
         }
-        if !self.is_visible_to_current_player()
-            && !self.game.is_flag_enabled(Flag::CompleteMapInformation)
-        {
+        if !self.is_visible() && !self.game.is_flag_enabled(Flag::CompleteMapInformation) {
             return false;
         }
 
@@ -704,12 +714,16 @@ impl<'a> Unit<'a> {
         self.data.exists
     }
 
-    pub fn is_visible(&self, player: &Player) -> bool {
+    pub fn has_path<P: UnitOrPosition>(&self, target: P) -> bool {
+        unimplemented!()
+    }
+
+    pub fn is_visible_to(&self, player: &Player) -> bool {
         self.data.isVisible[player.id as usize]
     }
 
-    pub fn is_visible_to_current_player(&self) -> bool {
-        self.is_visible(&self.game.self_().unwrap())
+    pub fn is_visible(&self) -> bool {
+        self.is_visible_to(&self.game.self_().unwrap())
     }
 
     pub fn is_being_constructed(&self) -> bool {
@@ -747,9 +761,9 @@ impl<'a> Unit<'a> {
         self.game.get_player(self.data.player)
     }
 
-    pub fn attack<T: AttackUnitOrPosition>(&self, target: &T) {
+    pub fn attack<T: UnitOrPosition>(&self, target: &T) {
         let mut cmd = self.command(false);
-        target.assign_target_and_command(&mut cmd);
+        target.assign_attack(&mut cmd);
         self.issue_command(cmd);
     }
 
@@ -760,13 +774,14 @@ impl<'a> Unit<'a> {
         })
     }
 
-    pub fn right_click<T: RightClickUnitOrPosition>(&self, target: T) {
+    pub fn right_click<T: UnitOrPosition>(&self, target: T) {
         let mut cmd = self.command(false);
-        target.assign_target_and_command(&mut cmd);
+        target.assign_right_click(&mut cmd);
         self.issue_command(cmd);
     }
 
-    pub fn build(&self, type_: UnitType, target: TilePosition) {
+    pub fn build<P: Into<TilePosition>>(&self, type_: UnitType, target: P) {
+        let target = target.into();
         self.issue_command(UnitCommand {
             x: target.x,
             y: target.y,
@@ -825,38 +840,29 @@ impl<'a> Unit<'a> {
     }
 }
 
-pub trait AttackUnitOrPosition {
-    fn assign_target_and_command(&self, cmd: &mut UnitCommand);
+pub trait UnitOrPosition {
+    fn assign_right_click(&self, cmd: &mut UnitCommand);
+    fn assign_attack(&self, cmd: &mut UnitCommand);
 }
 
-pub trait RightClickUnitOrPosition {
-    fn assign_target_and_command(&self, cmd: &mut UnitCommand);
-}
-
-impl AttackUnitOrPosition for Unit<'_> {
-    fn assign_target_and_command(&self, cmd: &mut UnitCommand) {
+impl UnitOrPosition for Unit<'_> {
+    fn assign_attack(&self, cmd: &mut UnitCommand) {
         cmd.targetIndex = self.id as i32;
         cmd.type_._base = UnitCommandType::Attack_Unit as u32;
     }
-}
-
-impl AttackUnitOrPosition for Position {
-    fn assign_target_and_command(&self, cmd: &mut UnitCommand) {
-        cmd.x = self.x;
-        cmd.y = self.y;
-        cmd.type_._base = UnitCommandType::Attack_Move as u32;
-    }
-}
-
-impl RightClickUnitOrPosition for Unit<'_> {
-    fn assign_target_and_command(&self, cmd: &mut UnitCommand) {
+    fn assign_right_click(&self, cmd: &mut UnitCommand) {
         cmd.targetIndex = self.id as i32;
         cmd.type_._base = UnitCommandType::Right_Click_Unit as u32;
     }
 }
 
-impl RightClickUnitOrPosition for Position {
-    fn assign_target_and_command(&self, cmd: &mut UnitCommand) {
+impl UnitOrPosition for Position {
+    fn assign_attack(&self, cmd: &mut UnitCommand) {
+        cmd.x = self.x;
+        cmd.y = self.y;
+        cmd.type_._base = UnitCommandType::Attack_Move as u32;
+    }
+    fn assign_right_click(&self, cmd: &mut UnitCommand) {
         cmd.x = self.x;
         cmd.y = self.y;
         cmd.type_._base = UnitCommandType::Right_Click_Position as u32;

@@ -1,24 +1,24 @@
 use core::ops::{Add, Div, Mul, Sub};
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Position {
     pub x: i32,
     pub y: i32,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TilePosition {
     pub x: i32,
     pub y: i32,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct WalkPosition {
     pub x: i32,
     pub y: i32,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Vector2D {
     pub x: f64,
     pub y: f64,
@@ -98,6 +98,12 @@ impl WalkPosition {
 
 macro_rules! pos_math_ops {
     ($($t:ty)*) => ($(
+        impl $t {
+            pub fn is_valid(&self) -> bool {
+                self.x >= 0 && self.y >= 0
+            }
+        }
+
         impl From<PositionTuple> for $t {
             fn from(pos: PositionTuple) -> Self {
                 Self { x: pos.0, y: pos.1 }

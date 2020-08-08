@@ -10,6 +10,7 @@ pub mod command;
 pub mod force;
 pub mod game;
 pub mod player;
+pub mod predicate;
 pub mod types;
 pub mod unit;
 

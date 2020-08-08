@@ -8,6 +8,7 @@ license = "LGPL-3.0-or-later"
 repository = "https://github.com/Bytekeeper/rsbwapi/"
 description = "Bindings to BWAPI"
 exclude = ["bwapi/apps", "bwapi/Documentation", "bwapi/Release_Binary"]
+readme = "README.md"
 
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
