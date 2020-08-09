@@ -215,6 +215,10 @@ impl<'a> Unit<'a> {
         self.data.killCount
     }
 
+    pub fn get_larva(&self) -> Vec<Unit> {
+        unimplemented!()
+    }
+
     pub fn get_last_attacking_player(&self) -> Option<Player> {
         self.game.get_player(self.data.lastAttackerPlayer)
     }
@@ -855,7 +859,7 @@ impl<'a> Unit<'a> {
     }
 
     pub fn issue_command(&self, cmd: UnitCommand) {
-        self.game.cmd.borrow_mut().issue_command(cmd)
+        self.game.issue_command(cmd)
     }
 }
 

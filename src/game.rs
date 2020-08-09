@@ -11,7 +11,6 @@ use crate::unit::UnitInfo;
 use crate::*;
 use bwapi_wrapper::*;
 use core::cell::RefCell;
-use core::cell::RefMut;
 use std::collections::HashMap;
 
 use crate::player::Player;
@@ -156,8 +155,173 @@ impl<'a> Game<'a> {
         true
     }
 
-    pub fn cmd(&self) -> RefMut<Commands> {
-        self.cmd.borrow_mut()
+    pub fn can_command(&self, this_unit: &Unit) -> bool {
+        if this_unit.get_player() != self.self_() {
+            return false;
+        }
+
+        if !this_unit.exists() {
+            return false;
+        }
+
+        if this_unit.is_locked_down()
+            || this_unit.is_maelstrommed()
+            || this_unit.is_stasised()
+            || !this_unit.is_powered()
+            || this_unit.get_order() == Order::ZergBirth
+            || this_unit.is_loaded()
+        {
+            if !this_unit.get_type().produces_larva() {
+                return false;
+            } else {
+                for larva in this_unit.get_larva() {
+                    if self.can_command(&larva) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }
+
+        let u_type = this_unit.get_type();
+        if u_type == UnitType::Protoss_Interceptor
+            || u_type == UnitType::Terran_Vulture_Spider_Mine
+            || u_type == UnitType::Spell_Scanner_Sweep
+            || u_type == UnitType::Special_Map_Revealer
+        {
+            return false;
+        }
+
+        if !this_unit.is_completed() && !u_type.is_building() && !this_unit.is_morphing() {
+            return false;
+        }
+        true
+    }
+
+    pub fn can_make<B: Into<Option<&'a Unit<'a>>>>(&self, builder: B, type_: UnitType) -> bool {
+        if let Some(self_) = self.self_() {
+            if !self_.is_unit_available(type_) {
+                return false;
+            }
+            let builder = builder.into();
+            let required_type = type_.what_builds().0;
+            if let Some(builder) = builder {
+                if builder.get_player() != Some(self_) {
+                    return false;
+                }
+                let builder_type = builder.get_type();
+                if type_ == UnitType::Zerg_Nydus_Canal && builder_type == UnitType::Zerg_Nydus_Canal
+                {
+                    if !builder.is_completed() {
+                        return false;
+                    }
+                    if builder.get_nydus_exit().is_some() {
+                        return false;
+                    }
+                    return true;
+                }
+
+                if required_type == UnitType::Zerg_Larva && builder_type.produces_larva() {
+                    if builder.get_larva().is_empty() {
+                        return false;
+                    }
+                } else if builder_type != required_type {
+                    return false;
+                }
+
+                let mut max_amt: i32;
+                match builder_type {
+                    UnitType::Protoss_Carrier | UnitType::Hero_Gantrithor => {
+                        max_amt = 4;
+                        if self_.get_upgrade_level(UpgradeType::Carrier_Capacity) > 0
+                            || builder_type == UnitType::Hero_Gantrithor
+                        {
+                            max_amt += 4;
+                        }
+
+                        if builder.get_interceptor_count()
+                            + builder.get_training_queue().len() as i32
+                            >= max_amt
+                        {
+                            return false;
+                        }
+                    }
+                    UnitType::Protoss_Reaver | UnitType::Hero_Warbringer => {
+                        max_amt = 5;
+                        if self_.get_upgrade_level(UpgradeType::Reaver_Capacity) > 0
+                            || builder_type == UnitType::Hero_Warbringer
+                        {
+                            max_amt += 5;
+                        }
+
+                        if builder.get_scarab_count() + builder.get_training_queue().len() as i32
+                            >= max_amt
+                        {
+                            return false;
+                        }
+                    }
+                    _ => (),
+                }
+            }
+
+            if self_.minerals() < type_.mineral_price() {
+                return false;
+            }
+
+            if self_.gas() < type_.gas_price() {
+                return false;
+            }
+
+            let type_race = type_.get_race();
+            let supply_required = type_.supply_required()
+                * (if type_.is_two_units_in_one_egg() {
+                    2
+                } else {
+                    1
+                });
+            if supply_required > 0
+                && self_.supply_total_for(type_race)
+                    < self_.supply_used_by(type_race) + supply_required
+                        - (if required_type.get_race() == type_race {
+                            required_type.supply_required()
+                        } else {
+                            0
+                        })
+            {
+                return false;
+            }
+
+            let mut addon = UnitType::None;
+            for it in type_.required_units() {
+                if it.0.is_addon() {
+                    addon = it.0;
+                }
+
+                if !self_.has_unit_type_requirement(it.0, it.1) {
+                    return false;
+                }
+            }
+
+            if type_.required_tech() != TechType::None
+                && !self_.has_researched(type_.required_tech())
+            {
+                return false;
+            }
+
+            if let Some(builder) = builder {
+                if addon != UnitType::None
+                    && addon.what_builds().0 == type_.what_builds().0
+                    && (builder.get_addon().is_none()
+                        || builder.get_addon().map(|a| a.get_type()) == Some(addon))
+                {
+                    return false;
+                }
+            }
+
+            true
+        } else {
+            false
+        }
     }
 
     pub fn countdown_timer(&self) -> i32 {
@@ -576,54 +740,6 @@ impl<'a> Game<'a> {
             .map(|i| self.data.startLocations[i])
             .map(|p| TilePosition { x: p.x, y: p.y })
             .collect()
-    }
-
-    pub fn set_alliance(&mut self, other: &Player, allied: bool, allied_victory: bool) {
-        if self.is_replay() || other == &self.self_().expect("Self to exist") {
-            return;
-        }
-
-        self.cmd.borrow_mut().cmd.push(BWAPIC_Command {
-            type_: BWAPIC_CommandType_Enum::SetAllies,
-            value1: other.id as i32,
-            value2: if allied {
-                if allied_victory {
-                    2
-                } else {
-                    1
-                }
-            } else {
-                0
-            },
-        });
-    }
-
-    pub fn set_reveal_all(&mut self, reveal: bool) -> Result<(), Error> {
-        if !self.is_replay() {
-            return Err(Error::Invalid_Parameter);
-        }
-
-        self.cmd.borrow_mut().cmd.push(BWAPIC_Command {
-            type_: BWAPIC_CommandType_Enum::SetAllies,
-            value1: reveal as i32,
-            value2: 0,
-        });
-
-        Ok(())
-    }
-
-    pub fn set_vision(&mut self, player: &Player, enabled: bool) -> Result<(), Error> {
-        if !self.is_replay() && self.self_().ok_or(Error::Invalid_Parameter)? == *player {
-            return Err(Error::Invalid_Parameter);
-        }
-
-        self.cmd.borrow_mut().cmd.push(BWAPIC_Command {
-            type_: BWAPIC_CommandType_Enum::SetAllies,
-            value1: player.id as i32,
-            value2: enabled as i32,
-        });
-
-        Ok(())
     }
 
     fn event_str(&self, i: usize) -> &str {

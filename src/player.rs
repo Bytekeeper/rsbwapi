@@ -260,10 +260,10 @@ impl<'a> Player<'a> {
     }
 
     pub fn supply_total(&self) -> i32 {
-        self.suppy_total_for(self.get_race())
+        self.supply_total_for(self.get_race())
     }
 
-    pub fn suppy_total_for(&self, race: Race) -> i32 {
+    pub fn supply_total_for(&self, race: Race) -> i32 {
         self.data.supplyTotal[race as usize]
     }
 

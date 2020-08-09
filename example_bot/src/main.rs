@@ -19,29 +19,32 @@ impl AiModule for MyModule {
 
     fn on_frame(&mut self, game: &Game) {
         let self_ = game.self_().unwrap();
-        /* Draw player names
+        /* Draw player names */
         let names: Vec<String> = game
             .get_players()
             .iter()
             .map(|p| String::from(p.get_name()))
             .collect();
         for (i, name) in names.iter().enumerate() {
-            game.cmd()
-                .draw_text_screen((10, (i as i32) * 10 + 20), name);
+            game.draw_text_screen((10, (i as i32) * 10 + 20), name);
         }
-        game.cmd()
-            .draw_text_screen((10, 10), game.enemy().unwrap().get_name());
-        */
+        game.draw_text_screen((10, 10), game.enemy().unwrap().get_name());
         let units = game.get_all_units();
-        /* Draw BW Regions on all units
+
+        /* Draw BW Regions on all units */
         for u in units {
             let region = game.get_region_at(u.get_position());
-            game.cmd().draw_text_map(
+            if region.is_none() {
+                game.draw_text_map(
+                    u.get_position(),
+                    &format!("NO REGION"));
+                } else {
+            game.draw_text_map(
                 u.get_position(),
                 &format!("r#{:?}", region.unwrap().get_id()),
             )
         }
-        */
+        }
         let has_pool = units
             .iter()
             .any(|u| u.get_type() == UnitType::Zerg_Spawning_Pool);
@@ -49,7 +52,7 @@ impl AiModule for MyModule {
             .iter()
             .find(|u| u.get_type() == UnitType::Zerg_Hatchery)
         {
-            if has_pool {
+            if game.can_make(None, UnitType::Zerg_Zergling) {
                 u.train(UnitType::Zerg_Zergling)
             } else {
                 u.train(UnitType::Zerg_Drone)
@@ -64,7 +67,7 @@ impl AiModule for MyModule {
                 larva.train(UnitType::Zerg_Overlord)
             }
         }
-        let builder = if self_.minerals() >= 200 && !has_pool {
+        let builder = if self_.minerals() >= UnitType::Zerg_Spawning_Pool.mineral_price() && !has_pool {
             let mut found = false;
             let builder = units
                 .iter()
@@ -75,7 +78,7 @@ impl AiModule for MyModule {
                     if game.can_build_here(builder, (x, y), UnitType::Zerg_Spawning_Pool, true) {
                         let tl = TilePosition { x, y }.to_position();
                         let br = tl + UnitType::Zerg_Spawning_Pool.tile_size().to_position();
-                        game.cmd().draw_box_map(tl, br, Color::Red, false);
+                        game.draw_box_map(tl, br, Color::Red, false);
                         builder.build(UnitType::Zerg_Spawning_Pool, (x, y));
                         found = true;
                         break 'outer;

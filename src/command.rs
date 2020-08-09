@@ -1,7 +1,9 @@
 use crate::types::{Color, TextSize};
 use crate::unit::UnitCommand;
+use crate::{Game, Player};
 use bwapi_wrapper::prelude::*;
 use bwapi_wrapper::*;
+use core::cell::RefMut;
 use std::ffi::CString;
 use std::path::Path;
 
@@ -10,17 +12,40 @@ struct CommandApplier<'a> {
 }
 
 impl<'a> CommandApplier<'a> {
+    fn add_commands<T: Copy>(
+        limit: i32,
+        count: &mut i32,
+        src: &[T],
+        dst: &mut [T],
+    ) -> Result<(), ()> {
+        let copy_amount = ((limit - *count) as usize).min(src.len());
+        if *count + copy_amount as i32 >= limit {
+            return Err(());
+        }
+        let command_count = *count as usize;
+        dst[command_count..command_count + copy_amount].copy_from_slice(&src);
+        *count += copy_amount as i32;
+        Ok(())
+    }
+
     fn apply_commands(&mut self, commands: Commands) {
-        let copy_amount = ((BWAPI_GameData_MAX_COMMANDS - self.data.commandCount) as usize)
-            .min(commands.cmd.len());
-        assert!(
-            self.data.commandCount + copy_amount as i32 <= BWAPI_GameData_MAX_COMMANDS,
-            "Too many commands"
-        );
-        let command_count = self.data.commandCount as usize;
-        self.data.commands[command_count..command_count + copy_amount]
-            .copy_from_slice(&commands.cmd);
-        self.data.commandCount += copy_amount as i32;
+        CommandApplier::add_commands(
+            BWAPI_GameData_MAX_COMMANDS,
+            &mut self.data.commandCount,
+            &commands.game_commands,
+            &mut self.data.commands,
+        )
+        .map_err(|_| "Too many game commmands")
+        .unwrap();
+
+        CommandApplier::add_commands(
+            BWAPI_GameData_MAX_UNIT_COMMANDS,
+            &mut self.data.unitCommandCount,
+            &commands.unit_commands,
+            &mut self.data.unitCommands,
+        )
+        .map_err(|_| "Too many unit commmands")
+        .unwrap();
 
         for cmd in commands.commands.iter() {
             use Command::*;
@@ -31,56 +56,7 @@ impl<'a> CommandApplier<'a> {
                     y,
                     string,
                 } => self.draw_text(*ctype, *x, *y, &string),
-                DrawBox {
-                    left,
-                    right,
-                    top,
-                    bottom,
-                    ctype,
-                    solid,
-                    color,
-                } => self.draw_box(*ctype, *left, *right, *top, *bottom, *color, *solid),
-                DrawTriangle {
-                    ctype,
-                    a,
-                    b,
-                    c,
-                    color,
-                    solid,
-                } => self.draw_triangle(*ctype, *a, *b, *c, *color, *solid),
-                DrawCircle {
-                    x,
-                    y,
-                    radius,
-                    ctype,
-                    color,
-                    solid,
-                } => self.draw_circle(*ctype, *x, *y, *radius, *color, *solid),
-                DrawEllipse {
-                    x,
-                    y,
-                    xrad,
-                    yrad,
-                    ctype,
-                    color,
-                    solid,
-                } => self.draw_ellipse(*ctype, *x, *y, *xrad, *yrad, *color, *solid),
-                DrawDot {
-                    x,
-                    y,
-                    ctype,
-                    color,
-                    solid,
-                } => self.draw_dot(*ctype, *x, *y, *color, *solid),
-                DrawLine {
-                    a,
-                    b,
-                    ctype,
-                    color,
-                    solid,
-                } => self.draw_line(*ctype, *a, *b, *color, *solid),
                 SendText { message, to_allies } => self.send_text(message, *to_allies),
-                UnitCommand(cmd) => self.add_unit_command(*cmd),
                 SetMap(map_file_name) => self.set_map(map_file_name),
             }
         }
@@ -101,139 +77,6 @@ impl<'a> CommandApplier<'a> {
             type_: BWAPIC_CommandType_Enum::SendText,
             value1: string_index as i32,
             value2: to_allies as i32,
-        })
-    }
-
-    fn draw_line(
-        &mut self,
-        ctype: CoordinateType,
-        a: Position,
-        b: Position,
-        color: Color,
-        solid: bool,
-    ) {
-        self.add_shape(BWAPIC_Shape {
-            type_: BWAPIC_ShapeType_Enum::Dot,
-            ctype,
-            x1: a.x,
-            y1: a.y,
-            x2: b.x,
-            y2: b.y,
-            extra1: 0,
-            extra2: 0,
-            color: color as i32,
-            isSolid: solid,
-        })
-    }
-
-    fn draw_dot(&mut self, ctype: CoordinateType, x: i32, y: i32, color: Color, solid: bool) {
-        self.add_shape(BWAPIC_Shape {
-            type_: BWAPIC_ShapeType_Enum::Dot,
-            ctype,
-            x1: x,
-            y1: y,
-            x2: 0,
-            y2: 0,
-            extra1: 0,
-            extra2: 0,
-            color: color as i32,
-            isSolid: solid,
-        })
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn draw_ellipse(
-        &mut self,
-        ctype: CoordinateType,
-        x: i32,
-        y: i32,
-        xrad: i32,
-        yrad: i32,
-        color: Color,
-        solid: bool,
-    ) {
-        self.add_shape(BWAPIC_Shape {
-            type_: BWAPIC_ShapeType_Enum::Circle,
-            ctype,
-            x1: x,
-            y1: y,
-            x2: 0,
-            y2: 0,
-            extra1: xrad,
-            extra2: yrad,
-            color: color as i32,
-            isSolid: solid,
-        })
-    }
-
-    fn draw_circle(
-        &mut self,
-        ctype: CoordinateType,
-        x: i32,
-        y: i32,
-        radius: i32,
-        color: Color,
-        solid: bool,
-    ) {
-        self.add_shape(BWAPIC_Shape {
-            type_: BWAPIC_ShapeType_Enum::Circle,
-            ctype,
-            x1: x,
-            y1: y,
-            x2: 0,
-            y2: 0,
-            extra1: radius,
-            extra2: 0,
-            color: color as i32,
-            isSolid: solid,
-        })
-    }
-
-    fn draw_triangle(
-        &mut self,
-        ctype: CoordinateType,
-        a: Position,
-        b: Position,
-        c: Position,
-        color: Color,
-        solid: bool,
-    ) {
-        self.add_shape(BWAPIC_Shape {
-            type_: BWAPIC_ShapeType_Enum::Triangle,
-            ctype,
-            x1: a.x,
-            y1: a.y,
-            x2: b.x,
-            y2: b.y,
-            extra1: c.x,
-            extra2: c.y,
-            color: color as i32,
-            isSolid: solid,
-        })
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn draw_box(
-        &mut self,
-        ctype: CoordinateType,
-        left: i32,
-        right: i32,
-        top: i32,
-        bottom: i32,
-        color: Color,
-        solid: bool,
-    ) {
-        self.add_shape(BWAPIC_Shape {
-            type_: BWAPIC_ShapeType_Enum::Box,
-            ctype,
-            x1: left,
-            x2: right,
-            y1: top,
-            y2: bottom,
-            extra1: 0,
-            extra2: 0,
-            color: color as i32,
-            isSolid: solid,
         })
     }
 
@@ -288,22 +131,14 @@ impl<'a> CommandApplier<'a> {
         self.data.commands[command_count] = cmd;
         self.data.commandCount += 1;
     }
-
-    pub fn add_unit_command(&mut self, cmd: UnitCommand) {
-        assert!(
-            self.data.unitCommandCount < BWAPI_GameData_MAX_UNIT_COMMANDS,
-            "Too many unit commands"
-        );
-        let command_count = self.data.unitCommandCount as usize;
-        self.data.unitCommands[command_count] = cmd;
-        self.data.unitCommandCount += 1
-    }
 }
 
 #[derive(Default)]
 pub struct Commands {
     commands: Vec<Command>,
-    pub(crate) cmd: Vec<BWAPIC_Command>,
+    game_commands: Vec<BWAPIC_Command>,
+    unit_commands: Vec<UnitCommand>,
+    shapes: Vec<BWAPIC_Shape>,
 }
 
 pub enum Command {
@@ -313,60 +148,11 @@ pub enum Command {
         y: i32,
         string: String,
     },
-    DrawBox {
-        ctype: CoordinateType,
-        left: i32,
-        right: i32,
-        top: i32,
-        bottom: i32,
-        color: Color,
-        solid: bool,
-    },
-    DrawTriangle {
-        ctype: CoordinateType,
-        a: Position,
-        b: Position,
-        c: Position,
-        color: Color,
-        solid: bool,
-    },
-    DrawCircle {
-        ctype: CoordinateType,
-        x: i32,
-        y: i32,
-        radius: i32,
-        color: Color,
-        solid: bool,
-    },
-    DrawEllipse {
-        ctype: CoordinateType,
-        x: i32,
-        y: i32,
-        xrad: i32,
-        yrad: i32,
-        color: Color,
-        solid: bool,
-    },
-    DrawDot {
-        ctype: CoordinateType,
-        x: i32,
-        y: i32,
-        color: Color,
-        solid: bool,
-    },
-    DrawLine {
-        ctype: CoordinateType,
-        a: Position,
-        b: Position,
-        color: Color,
-        solid: bool,
-    },
     SendText {
         message: String,
         to_allies: bool,
     },
     SetMap(String),
-    UnitCommand(UnitCommand),
 }
 
 impl Commands {
@@ -374,60 +160,28 @@ impl Commands {
         Self::default()
     }
 
-    pub fn enable_flag(&mut self, flag: i32) {
-        self.cmd.push(BWAPIC_Command {
-            type_: BWAPIC_CommandType_Enum::EnableFlag,
-            value1: flag,
-            value2: 0,
-        });
+    pub(crate) fn commit(self, to: &mut BWAPI_GameData) {
+        CommandApplier { data: to }.apply_commands(self);
+    }
+}
+
+impl<'a> Game<'a> {
+    fn cmd(&self) -> RefMut<Commands> {
+        self.cmd.borrow_mut()
     }
 
-    pub fn send_text_ex(&mut self, to_allies: bool, message: &str) {
-        self.commands.push(Command::SendText {
+    pub fn send_text_ex(&self, to_allies: bool, message: &str) {
+        self.cmd().commands.push(Command::SendText {
             to_allies,
             message: message.to_owned(),
         });
     }
 
-    pub fn send_text(&mut self, message: &str) {
+    pub fn send_text(&self, message: &str) {
         self.send_text_ex(false, message);
     }
 
-    pub fn set_frame_skip(&mut self, frame_skip: i32) {
-        if frame_skip > 0 {
-            self.cmd.push(BWAPIC_Command {
-                type_: BWAPIC_CommandType_Enum::SetFrameSkip,
-                value1: frame_skip,
-                value2: 0,
-            });
-        }
-    }
-
-    pub fn set_gui(&mut self, enabled: bool) {
-        self.cmd.push(BWAPIC_Command {
-            type_: BWAPIC_CommandType_Enum::SetGui,
-            value1: enabled as i32,
-            value2: 0,
-        });
-    }
-
-    pub fn set_lat_com(&mut self, enabled: bool) {
-        self.cmd.push(BWAPIC_Command {
-            type_: BWAPIC_CommandType_Enum::SetLatCom,
-            value1: enabled as i32,
-            value2: 0,
-        });
-    }
-
-    pub fn set_local_speed(&mut self, speed: i32) {
-        self.cmd.push(BWAPIC_Command {
-            type_: BWAPIC_CommandType_Enum::SetLocalSpeed,
-            value1: speed,
-            value2: 0,
-        });
-    }
-
-    pub fn set_map(&mut self, map_file_name: &str) -> Result<(), Error> {
+    pub fn set_map(&self, map_file_name: &str) -> Result<(), Error> {
         if map_file_name.len() >= 260 || map_file_name.is_empty() {
             return Err(Error::Invalid_Parameter);
         }
@@ -436,64 +190,27 @@ impl Commands {
             return Err(Error::File_Not_Found);
         }
 
-        self.commands
+        self.cmd()
+            .commands
             .push(Command::SetMap(map_file_name.to_owned()));
         Ok(())
     }
 
-    pub fn leave_game(&mut self) {
-        self.cmd.push(BWAPIC_Command {
-            type_: BWAPIC_CommandType_Enum::LeaveGame,
-            value1: 0,
-            value2: 0,
-        });
-    }
-
-    pub fn pause_game(&mut self) {
-        self.cmd.push(BWAPIC_Command {
-            type_: BWAPIC_CommandType_Enum::PauseGame,
-            value1: 0,
-            value2: 0,
-        });
-    }
-
-    pub fn ping_minimap<P: Into<Position>>(&mut self, p: P) {
-        let p = p.into();
-        self.cmd.push(BWAPIC_Command {
-            type_: BWAPIC_CommandType_Enum::PingMinimap,
-            value1: p.x,
-            value2: p.y,
-        });
-    }
-
-    pub fn restart_game(&mut self) {
-        self.cmd.push(BWAPIC_Command {
-            type_: BWAPIC_CommandType_Enum::RestartGame,
-            value1: 0,
-            value2: 0,
-        });
-    }
-
-    pub fn draw_text_screen<P: Into<Position>>(&mut self, position: P, string: &str) {
+    pub fn draw_text_screen<P: Into<Position>>(&self, position: P, string: &str) {
         self.draw_text(CoordinateType::Screen, position, string);
     }
 
-    pub fn draw_text_map<P: Into<Position>>(&mut self, position: P, string: &str) {
+    pub fn draw_text_map<P: Into<Position>>(&self, position: P, string: &str) {
         self.draw_text(CoordinateType::Map, position, string);
     }
 
-    pub fn draw_text_mouse<P: Into<Position>>(&mut self, position: P, string: &str) {
+    pub fn draw_text_mouse<P: Into<Position>>(&self, position: P, string: &str) {
         self.draw_text(CoordinateType::Mouse, position, string);
     }
 
-    pub fn draw_text<P: Into<Position>>(
-        &mut self,
-        ctype: CoordinateType,
-        position: P,
-        string: &str,
-    ) {
+    pub fn draw_text<P: Into<Position>>(&self, ctype: CoordinateType, position: P, string: &str) {
         let p = position.into();
-        self.commands.push(Command::DrawText {
+        self.cmd().commands.push(Command::DrawText {
             ctype,
             x: p.x,
             y: p.y,
@@ -501,60 +218,54 @@ impl Commands {
         });
     }
 
-    pub fn draw_box_map<P: Into<Position>>(
-        &mut self,
-        top_left: P,
-        bottom_right: P,
-        color: Color,
-        solid: bool,
-    ) {
-        self.draw_box(CoordinateType::Map, top_left, bottom_right, color, solid)
+    pub fn draw_line_screen<P: Into<Position>>(&self, a: P, b: P, color: Color, solid: bool) {
+        self.draw_line(CoordinateType::Screen, a, b, color, solid)
     }
 
-    pub fn draw_box_mouse<P: Into<Position>>(
-        &mut self,
-        top_left: P,
-        bottom_right: P,
-        color: Color,
-        solid: bool,
-    ) {
-        self.draw_box(CoordinateType::Mouse, top_left, bottom_right, color, solid)
+    pub fn draw_line_map<P: Into<Position>>(&self, a: P, b: P, color: Color, solid: bool) {
+        self.draw_line(CoordinateType::Map, a, b, color, solid)
     }
 
-    pub fn draw_box_screen<P: Into<Position>>(
-        &mut self,
-        top_left: P,
-        bottom_right: P,
-        color: Color,
-        solid: bool,
-    ) {
-        self.draw_box(CoordinateType::Screen, top_left, bottom_right, color, solid)
+    pub fn draw_line_mouse<P: Into<Position>>(&self, a: P, b: P, color: Color, solid: bool) {
+        self.draw_line(CoordinateType::Mouse, a, b, color, solid)
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn draw_box<P: Into<Position>>(
-        &mut self,
+    pub fn draw_dot_screen<P: Into<Position>>(&self, p: P, color: Color, solid: bool) {
+        self.draw_dot(CoordinateType::Screen, p, color, solid)
+    }
+
+    pub fn draw_dot_map<P: Into<Position>>(&self, p: P, color: Color, solid: bool) {
+        self.draw_dot(CoordinateType::Map, p, color, solid)
+    }
+
+    pub fn draw_dot_mouse<P: Into<Position>>(&self, p: P, color: Color, solid: bool) {
+        self.draw_dot(CoordinateType::Mouse, p, color, solid)
+    }
+
+    pub fn draw_dot<P: Into<Position>>(
+        &self,
         ctype: CoordinateType,
-        top_left: P,
-        bottom_right: P,
+        p: P,
         color: Color,
         solid: bool,
     ) {
-        let tl = top_left.into();
-        let br = bottom_right.into();
-        self.commands.push(Command::DrawBox {
+        let Position { x, y } = p.into();
+        self.cmd().shapes.push(BWAPIC_Shape {
+            type_: BWAPIC_ShapeType_Enum::Dot,
             ctype,
-            left: tl.x,
-            right: br.x,
-            top: tl.y,
-            bottom: br.y,
-            color,
-            solid,
+            x1: x,
+            y1: y,
+            x2: 0,
+            y2: 0,
+            extra1: 0,
+            extra2: 0,
+            color: color as i32,
+            isSolid: solid,
         })
     }
 
     pub fn draw_triangle_map<P: Into<Position>>(
-        &mut self,
+        &self,
         a: P,
         b: P,
         c: P,
@@ -565,7 +276,7 @@ impl Commands {
     }
 
     pub fn draw_triangle_mouse<P: Into<Position>>(
-        &mut self,
+        &self,
         a: P,
         b: P,
         c: P,
@@ -576,7 +287,7 @@ impl Commands {
     }
 
     pub fn draw_triangle_screen<P: Into<Position>>(
-        &mut self,
+        &self,
         a: P,
         b: P,
         c: P,
@@ -587,7 +298,7 @@ impl Commands {
     }
 
     pub fn draw_triangle<P: Into<Position>>(
-        &mut self,
+        &self,
         ctype: CoordinateType,
         a: P,
         b: P,
@@ -599,28 +310,26 @@ impl Commands {
         let b = b.into();
         let c = c.into();
 
-        self.commands.push(Command::DrawTriangle {
+        self.cmd().shapes.push(BWAPIC_Shape {
+            type_: BWAPIC_ShapeType_Enum::Triangle,
             ctype,
-            a,
-            b,
-            c,
-            color,
-            solid,
+            x1: a.x,
+            y1: a.y,
+            x2: b.x,
+            y2: b.y,
+            extra1: c.x,
+            extra2: c.y,
+            color: color as i32,
+            isSolid: solid,
         })
     }
 
-    pub fn draw_circle_map<P: Into<Position>>(
-        &mut self,
-        p: P,
-        radius: i32,
-        color: Color,
-        solid: bool,
-    ) {
+    pub fn draw_circle_map<P: Into<Position>>(&self, p: P, radius: i32, color: Color, solid: bool) {
         self.draw_circle(CoordinateType::Map, p, radius, color, solid)
     }
 
     pub fn draw_circle_screen<P: Into<Position>>(
-        &mut self,
+        &self,
         p: P,
         radius: i32,
         color: Color,
@@ -630,7 +339,7 @@ impl Commands {
     }
 
     pub fn draw_circle_mouse<P: Into<Position>>(
-        &mut self,
+        &self,
         p: P,
         radius: i32,
         color: Color,
@@ -640,26 +349,30 @@ impl Commands {
     }
 
     pub fn draw_circle<P: Into<Position>>(
-        &mut self,
+        &self,
         ctype: CoordinateType,
         p: P,
         radius: i32,
         color: Color,
         solid: bool,
     ) {
-        let p = p.into();
-        self.commands.push(Command::DrawCircle {
+        let Position { x, y } = p.into();
+        self.cmd().shapes.push(BWAPIC_Shape {
+            type_: BWAPIC_ShapeType_Enum::Circle,
             ctype,
-            x: p.x,
-            y: p.y,
-            radius,
-            color,
-            solid,
+            x1: x,
+            y1: y,
+            x2: 0,
+            y2: 0,
+            extra1: radius,
+            extra2: 0,
+            color: color as i32,
+            isSolid: solid,
         });
     }
 
     pub fn draw_ellipse_screen<P: Into<Position>>(
-        &mut self,
+        &self,
         p: P,
         xrad: i32,
         yrad: i32,
@@ -670,7 +383,7 @@ impl Commands {
     }
 
     pub fn draw_ellipse_map<P: Into<Position>>(
-        &mut self,
+        &self,
         p: P,
         xrad: i32,
         yrad: i32,
@@ -681,7 +394,7 @@ impl Commands {
     }
 
     pub fn draw_ellipse_mouse<P: Into<Position>>(
-        &mut self,
+        &self,
         p: P,
         xrad: i32,
         yrad: i32,
@@ -692,7 +405,7 @@ impl Commands {
     }
 
     pub fn draw_ellipse<P: Into<Position>>(
-        &mut self,
+        &self,
         ctype: CoordinateType,
         p: P,
         xrad: i32,
@@ -700,61 +413,23 @@ impl Commands {
         color: Color,
         solid: bool,
     ) {
-        let p = p.into();
-        self.commands.push(Command::DrawEllipse {
+        let Position { x, y } = p.into();
+        self.cmd().shapes.push(BWAPIC_Shape {
+            type_: BWAPIC_ShapeType_Enum::Circle,
             ctype,
-            x: p.x,
-            y: p.y,
-            xrad,
-            yrad,
-            color,
-            solid,
+            x1: x,
+            y1: y,
+            x2: 0,
+            y2: 0,
+            extra1: xrad,
+            extra2: yrad,
+            color: color as i32,
+            isSolid: solid,
         });
-    }
-
-    pub fn draw_dot_screen<P: Into<Position>>(&mut self, p: P, color: Color, solid: bool) {
-        self.draw_dot(CoordinateType::Screen, p, color, solid)
-    }
-
-    pub fn draw_dot_map<P: Into<Position>>(&mut self, p: P, color: Color, solid: bool) {
-        self.draw_dot(CoordinateType::Map, p, color, solid)
-    }
-
-    pub fn draw_dot_mouse<P: Into<Position>>(&mut self, p: P, color: Color, solid: bool) {
-        self.draw_dot(CoordinateType::Mouse, p, color, solid)
-    }
-
-    pub fn draw_dot<P: Into<Position>>(
-        &mut self,
-        ctype: CoordinateType,
-        p: P,
-        color: Color,
-        solid: bool,
-    ) {
-        let p = p.into();
-        self.commands.push(Command::DrawDot {
-            ctype,
-            x: p.x,
-            y: p.y,
-            color,
-            solid,
-        });
-    }
-
-    pub fn draw_line_screen<P: Into<Position>>(&mut self, a: P, b: P, color: Color, solid: bool) {
-        self.draw_line(CoordinateType::Screen, a, b, color, solid)
-    }
-
-    pub fn draw_line_map<P: Into<Position>>(&mut self, a: P, b: P, color: Color, solid: bool) {
-        self.draw_line(CoordinateType::Map, a, b, color, solid)
-    }
-
-    pub fn draw_line_mouse<P: Into<Position>>(&mut self, a: P, b: P, color: Color, solid: bool) {
-        self.draw_line(CoordinateType::Mouse, a, b, color, solid)
     }
 
     pub fn draw_line<P: Into<Position>>(
-        &mut self,
+        &self,
         ctype: CoordinateType,
         a: P,
         b: P,
@@ -763,20 +438,202 @@ impl Commands {
     ) {
         let a = a.into();
         let b = b.into();
-        self.commands.push(Command::DrawLine {
+        self.cmd().shapes.push(BWAPIC_Shape {
+            type_: BWAPIC_ShapeType_Enum::Dot,
             ctype,
-            a,
-            b,
-            color,
-            solid,
+            x1: a.x,
+            y1: a.y,
+            x2: b.x,
+            y2: b.y,
+            extra1: 0,
+            extra2: 0,
+            color: color as i32,
+            isSolid: solid,
         });
     }
 
-    pub fn issue_command(&mut self, cmd: UnitCommand) {
-        self.commands.push(Command::UnitCommand(cmd))
+    pub fn draw_box_map<P: Into<Position>>(
+        &self,
+        top_left: P,
+        bottom_right: P,
+        color: Color,
+        solid: bool,
+    ) {
+        self.draw_box(CoordinateType::Map, top_left, bottom_right, color, solid)
     }
 
-    pub(crate) fn commit(self, to: &mut BWAPI_GameData) {
-        CommandApplier { data: to }.apply_commands(self);
+    pub fn draw_box_mouse<P: Into<Position>>(
+        &self,
+        top_left: P,
+        bottom_right: P,
+        color: Color,
+        solid: bool,
+    ) {
+        self.draw_box(CoordinateType::Mouse, top_left, bottom_right, color, solid)
+    }
+
+    pub fn draw_box_screen<P: Into<Position>>(
+        &self,
+        top_left: P,
+        bottom_right: P,
+        color: Color,
+        solid: bool,
+    ) {
+        self.draw_box(CoordinateType::Screen, top_left, bottom_right, color, solid)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw_box<P: Into<Position>>(
+        &self,
+        ctype: CoordinateType,
+        top_left: P,
+        bottom_right: P,
+        color: Color,
+        solid: bool,
+    ) {
+        let Position { x: left, y: top } = top_left.into();
+        let Position {
+            x: right,
+            y: bottom,
+        } = bottom_right.into();
+        self.cmd().shapes.push(BWAPIC_Shape {
+            type_: BWAPIC_ShapeType_Enum::Box,
+            ctype,
+            x1: left,
+            x2: right,
+            y1: top,
+            y2: bottom,
+            extra1: 0,
+            extra2: 0,
+            color: color as i32,
+            isSolid: solid,
+        })
+    }
+
+    pub fn issue_command(&self, cmd: UnitCommand) {
+        self.cmd().unit_commands.push(cmd)
+    }
+
+    pub fn set_alliance(&mut self, other: &Player, allied: bool, allied_victory: bool) {
+        if self.is_replay() || other == &self.self_().expect("Self to exist") {
+            return;
+        }
+
+        self.cmd().game_commands.push(BWAPIC_Command {
+            type_: BWAPIC_CommandType_Enum::SetAllies,
+            value1: other.id as i32,
+            value2: if allied {
+                if allied_victory {
+                    2
+                } else {
+                    1
+                }
+            } else {
+                0
+            },
+        });
+    }
+
+    pub fn set_reveal_all(&mut self, reveal: bool) -> Result<(), Error> {
+        if !self.is_replay() {
+            return Err(Error::Invalid_Parameter);
+        }
+
+        self.cmd().game_commands.push(BWAPIC_Command {
+            type_: BWAPIC_CommandType_Enum::SetAllies,
+            value1: reveal as i32,
+            value2: 0,
+        });
+
+        Ok(())
+    }
+
+    pub fn set_vision(&mut self, player: &Player, enabled: bool) -> Result<(), Error> {
+        if !self.is_replay() && self.self_().ok_or(Error::Invalid_Parameter)? == *player {
+            return Err(Error::Invalid_Parameter);
+        }
+
+        self.cmd().game_commands.push(BWAPIC_Command {
+            type_: BWAPIC_CommandType_Enum::SetAllies,
+            value1: player.id as i32,
+            value2: enabled as i32,
+        });
+
+        Ok(())
+    }
+
+    pub fn leave_game(&mut self) {
+        self.cmd().game_commands.push(BWAPIC_Command {
+            type_: BWAPIC_CommandType_Enum::LeaveGame,
+            value1: 0,
+            value2: 0,
+        });
+    }
+
+    pub fn pause_game(&mut self) {
+        self.cmd().game_commands.push(BWAPIC_Command {
+            type_: BWAPIC_CommandType_Enum::PauseGame,
+            value1: 0,
+            value2: 0,
+        });
+    }
+
+    pub fn ping_minimap<P: Into<Position>>(&mut self, p: P) {
+        let p = p.into();
+        self.cmd().game_commands.push(BWAPIC_Command {
+            type_: BWAPIC_CommandType_Enum::PingMinimap,
+            value1: p.x,
+            value2: p.y,
+        });
+    }
+
+    pub fn restart_game(&mut self) {
+        self.cmd().game_commands.push(BWAPIC_Command {
+            type_: BWAPIC_CommandType_Enum::RestartGame,
+            value1: 0,
+            value2: 0,
+        });
+    }
+
+    pub fn enable_flag(&mut self, flag: i32) {
+        self.cmd().game_commands.push(BWAPIC_Command {
+            type_: BWAPIC_CommandType_Enum::EnableFlag,
+            value1: flag,
+            value2: 0,
+        });
+    }
+
+    pub fn set_frame_skip(&mut self, frame_skip: i32) {
+        if frame_skip > 0 {
+            self.cmd().game_commands.push(BWAPIC_Command {
+                type_: BWAPIC_CommandType_Enum::SetFrameSkip,
+                value1: frame_skip,
+                value2: 0,
+            });
+        }
+    }
+
+    pub fn set_gui(&mut self, enabled: bool) {
+        self.cmd().game_commands.push(BWAPIC_Command {
+            type_: BWAPIC_CommandType_Enum::SetGui,
+            value1: enabled as i32,
+            value2: 0,
+        });
+    }
+
+    pub fn set_lat_com(&mut self, enabled: bool) {
+        self.cmd().game_commands.push(BWAPIC_Command {
+            type_: BWAPIC_CommandType_Enum::SetLatCom,
+            value1: enabled as i32,
+            value2: 0,
+        });
+    }
+
+    pub fn set_local_speed(&mut self, speed: i32) {
+        self.cmd().game_commands.push(BWAPIC_Command {
+            type_: BWAPIC_CommandType_Enum::SetLocalSpeed,
+            value1: speed,
+            value2: 0,
+        });
     }
 }
