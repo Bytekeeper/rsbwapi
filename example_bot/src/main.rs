@@ -31,6 +31,13 @@ impl AiModule for MyModule {
         game.cmd()
             .draw_text_screen((10, 10), game.enemy().unwrap().get_name());
         let units = game.get_all_units();
+        for u in units {
+            let region = game.get_region_at(u.get_position());
+            game.cmd().draw_text_map(
+                u.get_position(),
+                &format!("r#{:?}", region.unwrap().get_id()),
+            )
+        }
         let has_pool = units
             .iter()
             .any(|u| u.get_type() == UnitType::Zerg_Spawning_Pool);
