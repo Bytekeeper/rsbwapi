@@ -4,6 +4,7 @@ use crate::command::Commands;
 use crate::force::Force;
 use crate::predicate::IntoPredicate;
 use crate::predicate::Predicate;
+use crate::region::Region;
 use crate::shm::Shm;
 use crate::types::c_str_to_str;
 use crate::unit::UnitInfo;
@@ -19,10 +20,13 @@ use crate::unit::Unit;
 pub struct GameContext {
     data: Shm<BWAPI_GameData>,
     unit_infos: [Option<UnitInfo>; 10000],
-    visible_units: Vec<i32>,
+    visible_units: Vec<usize>,
+    static_minerals: Vec<usize>,
+    static_geysers: Vec<usize>,
 }
 
 pub struct Game<'a> {
+    context: &'a GameContext,
     data: &'a BWAPI_GameData,
     units: Vec<Unit<'a>>,
     infos: &'a [Option<UnitInfo>; 10000],
@@ -191,6 +195,43 @@ impl<'a> Game<'a> {
         }
     }
 
+    pub fn get_region_at<P: Into<Position>>(&self, p: P) -> Option<Region> {
+        let Position { x, y } = p.into();
+
+        let idx = self.data.mapTileRegionId[x as usize / 32][y as usize / 32];
+        let region_code = if idx & 0x2000 != 0 {
+            let minitile_pos_x = (x & 0x1F) / 8;
+            let minitile_pos_y = (y & 0x1F) / 8;
+            let index = (idx & 0x1FFF) as usize;
+            if index >= self.data.mapSplitTilesMiniTileMask.len() {
+                return None;
+            }
+
+            let mini_tile_mask = self.data.mapSplitTilesMiniTileMask[index];
+            if mini_tile_mask as usize >= self.data.mapSplitTilesRegion1.len() {
+                return None;
+            }
+
+            let minitile_shift = minitile_pos_x + minitile_pos_y * 4;
+            if (mini_tile_mask >> minitile_shift) & 1 != 0 {
+                self.data.mapSplitTilesRegion2[index]
+            } else {
+                self.data.mapSplitTilesRegion1[index]
+            }
+        } else {
+            idx
+        };
+        self.get_region(region_code)
+    }
+
+    pub(crate) fn get_region(&self, id: u16) -> Option<Region> {
+        if id >= self.data.regionCount as u16 {
+            None
+        } else {
+            Some(Region::new(id, self, &self.data.regions[id as usize]))
+        }
+    }
+
     pub fn get_unit(&self, id: i32) -> Option<Unit> {
         if !(0..10000_i32).contains(&id) {
             None
@@ -244,12 +285,43 @@ impl<'a> Game<'a> {
             .collect()
     }
 
-    pub fn get_static_geysers(&self) -> &[&Unit] {
-        unimplemented!()
+    pub fn get_static_geysers(&self) -> Vec<Unit> {
+        self.context
+            .static_geysers
+            .iter()
+            .map(|&i| {
+                self.get_unit(i as i32)
+                    .expect("static geyser to have existed")
+            })
+            .collect()
     }
 
-    pub fn get_static_minerals(&self) -> &[&Unit] {
-        unimplemented!()
+    pub fn get_static_minerals(&self) -> Vec<Unit> {
+        self.context
+            .static_minerals
+            .iter()
+            .map(|&i| {
+                self.get_unit(i as i32)
+                    .expect("static mineral to have existed")
+            })
+            .collect()
+    }
+
+    pub fn has_path<S: Into<Position>, D: Into<Position>>(
+        &self,
+        source: S,
+        destination: D,
+    ) -> bool {
+        let source = source.into();
+        let destination = destination.into();
+        if source.is_valid() && destination.is_valid() {
+            let rgn_a = self.get_region_at(source);
+            let rgn_b = self.get_region_at(destination);
+            if let (Some(rgn_a), Some(rgn_b)) = (rgn_a, rgn_b) {
+                return rgn_a.get_region_group_id() == rgn_b.get_region_group_id();
+            }
+        }
+        false
     }
 
     pub fn is_battle_net(&self) -> bool {
@@ -565,6 +637,8 @@ impl GameContext {
             data,
             unit_infos: [None; 10000],
             visible_units: vec![],
+            static_geysers: vec![],
+            static_minerals: vec![],
         }
     }
 
@@ -574,6 +648,7 @@ impl GameContext {
 
     fn with_frame(&self, cmd: &RefCell<Commands>, cb: impl FnOnce(&Game)) {
         let mut frame = Game {
+            context: self,
             data: self.data.get(),
             units: vec![],
             infos: &self.unit_infos,
@@ -587,7 +662,7 @@ impl GameContext {
         frame.units = self
             .visible_units
             .iter()
-            .map(|&i| unmoved_frame.get_unit(i).expect("Unit to exist"))
+            .map(|&i| unmoved_frame.get_unit(i as i32).expect("Unit to exist"))
             .collect();
         cb(&frame);
     }
@@ -618,14 +693,21 @@ impl GameContext {
                         .filter(|&i| {
                             data.units[i].exists && data.units[i].type_ != UnitType::Unknown as i32
                         })
-                        .map(|i| i as i32)
                         .collect();
-                    for &i in self.visible_units.iter() {
-                        self.unit_infos[i as usize] =
-                            Some(UnitInfo::new(i as usize, &data.units[i as usize]));
-                    }
 
+                    for &i in self.visible_units.iter() {
+                        self.unit_infos[i] = Some(UnitInfo::new(i, &data.units[i]));
+                        let ut = UnitType::new(data.units[i].type_);
+                        if ut == UnitType::Resource_Vespene_Geyser {
+                            self.static_geysers.push(i);
+                        }
+                        if ut.is_mineral_field() {
+                            self.static_minerals.push(i);
+                        }
+                    }
                     self.with_frame(&commands, |f| module.on_start(f));
+                    // No longer visible after the start event
+                    self.visible_units.clear();
                 }
                 MatchFrame => {
                     self.with_frame(&commands, |f| module.on_frame(f));
@@ -675,7 +757,7 @@ impl GameContext {
                     });
                 }
                 UnitShow => {
-                    self.visible_units.push(event.v1);
+                    self.visible_units.push(event.v1 as usize);
                     self.ensure_unit_info(event.v1 as usize);
                     self.with_frame(&commands, |frame| {
                         module.on_unit_show(

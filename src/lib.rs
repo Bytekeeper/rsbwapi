@@ -11,6 +11,7 @@ pub mod force;
 pub mod game;
 pub mod player;
 pub mod predicate;
+pub mod region;
 pub mod types;
 pub mod unit;
 

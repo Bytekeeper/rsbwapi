@@ -19,6 +19,7 @@ impl AiModule for MyModule {
 
     fn on_frame(&mut self, game: &Game) {
         let self_ = game.self_().unwrap();
+        /* Draw player names
         let names: Vec<String> = game
             .get_players()
             .iter()
@@ -30,7 +31,9 @@ impl AiModule for MyModule {
         }
         game.cmd()
             .draw_text_screen((10, 10), game.enemy().unwrap().get_name());
+        */
         let units = game.get_all_units();
+        /* Draw BW Regions on all units
         for u in units {
             let region = game.get_region_at(u.get_position());
             game.cmd().draw_text_map(
@@ -38,6 +41,7 @@ impl AiModule for MyModule {
                 &format!("r#{:?}", region.unwrap().get_id()),
             )
         }
+        */
         let has_pool = units
             .iter()
             .any(|u| u.get_type() == UnitType::Zerg_Spawning_Pool);
@@ -60,23 +64,32 @@ impl AiModule for MyModule {
                 larva.train(UnitType::Zerg_Overlord)
             }
         }
-        let builder = units
-            .iter()
-            .find(|u| u.get_type() == UnitType::Zerg_Drone)
-            .unwrap();
-        if self_.minerals() >= 200 && !has_pool {
+        let builder = if self_.minerals() >= 200 && !has_pool {
+            let mut found = false;
+            let builder = units
+                .iter()
+                .find(|u| u.get_type() == UnitType::Zerg_Drone)
+                .expect("drone to build sth");
             'outer: for y in 0..game.map_height() {
                 for x in 0..game.map_width() {
-                    if game.can_build_here(None, (x, y), UnitType::Zerg_Spawning_Pool, true) {
+                    if game.can_build_here(builder, (x, y), UnitType::Zerg_Spawning_Pool, true) {
                         let tl = TilePosition { x, y }.to_position();
                         let br = tl + UnitType::Zerg_Spawning_Pool.tile_size().to_position();
                         game.cmd().draw_box_map(tl, br, Color::Red, false);
                         builder.build(UnitType::Zerg_Spawning_Pool, (x, y));
+                        found = true;
                         break 'outer;
                     }
                 }
             }
-        }
+            if found {
+                Some(builder)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
 
         if let Some(mineral) = mineral {
             units
@@ -84,7 +97,7 @@ impl AiModule for MyModule {
                 .filter(|u| {
                     u.get_type() == UnitType::Zerg_Drone
                         && !u.is_gathering_minerals()
-                        && u != &builder
+                        && Some(*u) != builder
                 })
                 .for_each(|u| {
                     //                  println!("Sending {} to {}", u.id, mineral.id);
@@ -94,7 +107,7 @@ impl AiModule for MyModule {
             if let Some(enemy) = enemy {
                 units
                     .iter()
-                    .filter(|u| u.get_type() == UnitType::Zerg_Drone)
+                    //                    .filter(|u| u.get_type() == UnitType::Zerg_Drone)
                     .for_each(|u| {
                         //                        println!("Sending {} to attack {:?}", u.id, enemy.get_type());
                         u.attack(enemy);

@@ -1,4 +1,3 @@
-use crate::unit::Unit;
 use core::marker::PhantomData;
 use core::ops::{BitAnd, BitOr, BitXor, Not};
 

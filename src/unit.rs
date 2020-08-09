@@ -715,7 +715,26 @@ impl<'a> Unit<'a> {
     }
 
     pub fn has_path<P: UnitOrPosition>(&self, target: P) -> bool {
-        unimplemented!()
+        if let Ok(target) = target.to_position() {
+            self.is_flying()
+                || self.exists()
+                    && target.is_valid()
+                    && (self.game.has_path(self.get_position(), target)
+                        || self
+                            .game
+                            .has_path((self.get_left(), self.get_top()), target)
+                        || self
+                            .game
+                            .has_path((self.get_right(), self.get_top()), target)
+                        || self
+                            .game
+                            .has_path((self.get_left(), self.get_bottom()), target)
+                        || self
+                            .game
+                            .has_path((self.get_right(), self.get_top()), target))
+        } else {
+            false
+        }
     }
 
     pub fn is_visible_to(&self, player: &Player) -> bool {
@@ -840,9 +859,14 @@ impl<'a> Unit<'a> {
     }
 }
 
+pub enum PathErr {
+    UnitNotVisible,
+}
+
 pub trait UnitOrPosition {
     fn assign_right_click(&self, cmd: &mut UnitCommand);
     fn assign_attack(&self, cmd: &mut UnitCommand);
+    fn to_position(&self) -> Result<Position, PathErr>;
 }
 
 impl UnitOrPosition for Unit<'_> {
@@ -853,6 +877,13 @@ impl UnitOrPosition for Unit<'_> {
     fn assign_right_click(&self, cmd: &mut UnitCommand) {
         cmd.targetIndex = self.id as i32;
         cmd.type_._base = UnitCommandType::Right_Click_Unit as u32;
+    }
+    fn to_position(&self) -> Result<Position, PathErr> {
+        if self.exists() {
+            Ok(self.get_position())
+        } else {
+            Err(PathErr::UnitNotVisible)
+        }
     }
 }
 
@@ -866,6 +897,9 @@ impl UnitOrPosition for Position {
         cmd.x = self.x;
         cmd.y = self.y;
         cmd.type_._base = UnitCommandType::Right_Click_Position as u32;
+    }
+    fn to_position(&self) -> Result<Position, PathErr> {
+        Ok(*self)
     }
 }
 
