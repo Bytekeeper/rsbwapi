@@ -11,6 +11,11 @@ use crate::unit::UnitInfo;
 use crate::*;
 use bwapi_wrapper::*;
 use core::cell::RefCell;
+use rstar::primitives::Rectangle;
+use rstar::PointDistance;
+use rstar::RTree;
+use rstar::RTreeObject;
+use rstar::AABB;
 use std::collections::HashMap;
 
 use crate::player::Player;
@@ -24,11 +29,31 @@ pub struct GameContext {
     static_geysers: Vec<usize>,
 }
 
+pub struct UnitLocation {
+    id: usize,
+    location: Rectangle<[i32; 2]>,
+}
+
+impl RTreeObject for UnitLocation {
+    type Envelope = AABB<[i32; 2]>;
+
+    fn envelope(&self) -> Self::Envelope {
+        self.location.envelope()
+    }
+}
+
+impl PointDistance for UnitLocation {
+    fn distance_2(&self, point: &[i32; 2]) -> i32 {
+        self.location.distance_2(point)
+    }
+}
+
 pub struct Game<'a> {
     context: &'a GameContext,
     data: &'a BWAPI_GameData,
     units: Vec<Unit<'a>>,
     infos: &'a [Option<UnitInfo>; 10000],
+    rtree: RTree<UnitLocation>,
     pub(crate) cmd: &'a RefCell<Commands>,
     pub(crate) interceptors: RefCell<HashMap<usize, Vec<i32>>>,
     pub(crate) loaded_units: RefCell<HashMap<usize, Vec<i32>>>,
@@ -415,7 +440,7 @@ impl<'a> Game<'a> {
         B: Into<Position>,
         P: IntoPredicate<Unit<'a>>,
     >(
-        &self,
+        &'a self,
         lt: A,
         rb: B,
         pred: P,
@@ -423,17 +448,37 @@ impl<'a> Game<'a> {
         let lt = lt.into();
         let rb = rb.into();
         let pred = pred.into_predicate();
-        self.get_all_units()
-            .iter()
-            .filter(|u| {
-                u.get_right() > lt.x
-                    && u.get_left() <= rb.x
-                    && u.get_bottom() > lt.y
-                    && u.get_top() <= rb.y
-                    && pred.test(u)
+        self.rtree
+            .locate_in_envelope_intersecting(&AABB::from_corners([lt.x, lt.y], [rb.x, rb.y]))
+            .map(|ul| {
+                self.get_unit(ul.id as i32)
+                    .expect("Unit from RTree to be present")
             })
-            .cloned()
+            .filter(|u| pred.test(u))
             .collect()
+    }
+
+    pub fn get_closest_unit<
+        P: Into<Position>,
+        Pred: IntoPredicate<Unit<'a>>,
+        R: Into<Option<i32>>,
+    >(
+        &'a self,
+        center: P,
+        pred: Pred,
+        radius: R,
+    ) -> Option<Unit<'a>> {
+        let center = center.into();
+        let pred = pred.into_predicate();
+        let radius = radius.into().unwrap_or(32000);
+        let radius_squared = radius * radius;
+        self.rtree
+            .locate_within_distance([center.x, center.y], radius_squared)
+            .map(|ul| {
+                self.get_unit(ul.id as i32)
+                    .expect("Unit from RTree to be present")
+            })
+            .find(|u| pred.test(u))
     }
 
     pub fn get_players(&self) -> Vec<Player> {
@@ -763,14 +808,16 @@ impl GameContext {
     }
 
     fn with_frame(&self, cmd: &RefCell<Commands>, cb: impl FnOnce(&Game)) {
+        let data = self.data.get();
         let mut frame = Game {
             context: self,
-            data: self.data.get(),
+            data,
             units: vec![],
             infos: &self.unit_infos,
             cmd,
             interceptors: RefCell::new(HashMap::new()),
             loaded_units: RefCell::new(HashMap::new()),
+            rtree: RTree::new(),
         };
         let unmoved_frame = &frame as *const Game;
         // SAFETY: Only the infos will be modified here and only a reference of Frame will be made available to cb
@@ -780,6 +827,19 @@ impl GameContext {
             .iter()
             .map(|&i| unmoved_frame.get_unit(i as i32).expect("Unit to exist"))
             .collect();
+        frame.rtree = RTree::bulk_load(
+            frame
+                .units
+                .iter()
+                .map(|&u| UnitLocation {
+                    id: u.id,
+                    location: Rectangle::from_corners(
+                        [u.get_left(), u.get_top()],
+                        [u.get_right(), u.get_bottom()],
+                    ),
+                })
+                .collect(),
+        );
         cb(&frame);
     }
 

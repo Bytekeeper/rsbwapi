@@ -35,15 +35,13 @@ impl AiModule for MyModule {
         for u in units {
             let region = game.get_region_at(u.get_position());
             if region.is_none() {
+                game.draw_text_map(u.get_position(), &format!("NO REGION"));
+            } else {
                 game.draw_text_map(
                     u.get_position(),
-                    &format!("NO REGION"));
-                } else {
-            game.draw_text_map(
-                u.get_position(),
-                &format!("r#{:?}", region.unwrap().get_id()),
-            )
-        }
+                    &format!("r#{:?}", region.unwrap().get_id()),
+                )
+            }
         }
         let has_pool = units
             .iter()
@@ -67,7 +65,9 @@ impl AiModule for MyModule {
                 larva.train(UnitType::Zerg_Overlord)
             }
         }
-        let builder = if self_.minerals() >= UnitType::Zerg_Spawning_Pool.mineral_price() && !has_pool {
+        let builder = if self_.minerals() >= UnitType::Zerg_Spawning_Pool.mineral_price()
+            && !has_pool
+        {
             let mut found = false;
             let builder = units
                 .iter()
@@ -95,17 +95,14 @@ impl AiModule for MyModule {
         };
 
         if let Some(mineral) = mineral {
-            units
-                .iter()
-                .filter(|u| {
-                    u.get_type() == UnitType::Zerg_Drone
-                        && !u.is_gathering_minerals()
-                        && Some(*u) != builder
-                })
-                .for_each(|u| {
-                    //                  println!("Sending {} to {}", u.id, mineral.id);
-                    u.gather(mineral);
-                });
+            if let Some(miner) = game.get_closest_unit(
+                mineral.get_position(),
+                |u: &Unit| u.get_type() == UnitType::Zerg_Drone && !u.is_gathering_minerals() && Some(u) != builder,
+                None,
+            ) {
+                miner.gather(mineral)
+            }
+
             let enemy = units.iter().find(|u| u.get_player() == game.enemy());
             if let Some(enemy) = enemy {
                 units
