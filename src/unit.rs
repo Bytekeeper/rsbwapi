@@ -178,33 +178,31 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_interceptors(&self) -> Vec<Unit<'a>> {
-        let burrowed_map = self.game.interceptors.borrow();
+        if self.get_type() != UnitType::Protoss_Carrier
+            && self.get_type() != UnitType::Hero_Gantrithor
+        {
+            return vec![];
+        }
+        let burrowed_map = self.game.connected_units.borrow();
         let interceptors = burrowed_map.get(&self.id);
         if let Some(interceptors) = interceptors {
-            interceptors
+            return interceptors
                 .iter()
                 .map(|&i| self.game.get_unit(i).expect("Interceptor to be present"))
-                .collect()
-        } else {
-            let interceptors: Vec<Unit> = self
-                .game
-                .get_all_units()
-                .iter()
-                .filter(|u| {
-                    if let Some(carrier) = u.get_carrier() {
-                        carrier == *self
-                    } else {
-                        false
-                    }
-                })
-                .cloned()
                 .collect();
-            self.game
-                .interceptors
-                .borrow_mut()
-                .insert(self.id, interceptors.iter().map(|u| u.id as i32).collect());
-            interceptors
         }
+        let interceptors: Vec<Unit> = self
+            .game
+            .get_all_units()
+            .iter()
+            .filter(|u| u.get_carrier() == Some(*self))
+            .cloned()
+            .collect();
+        self.game
+            .connected_units
+            .borrow_mut()
+            .insert(self.id, interceptors.iter().map(|u| u.id as i32).collect());
+        interceptors
     }
 
     pub fn get_irradiate_timer(&self) -> i32 {
@@ -216,7 +214,27 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_larva(&self) -> Vec<Unit> {
-        unimplemented!()
+        if !self.get_type().produces_larva() {
+            return vec![];
+        }
+        if let Some(larva) = self.game.connected_units.borrow().get(&self.id) {
+            return larva
+                .iter()
+                .map(|&i| self.game.get_unit(i).expect("Larva to be present"))
+                .collect();
+        }
+        let larva: Vec<Unit> = self
+            .game
+            .get_all_units()
+            .iter()
+            .filter(|u| u.get_hatchery() == Some(*self))
+            .cloned()
+            .collect();
+        self.game
+            .connected_units
+            .borrow_mut()
+            .insert(self.id, larva.iter().map(|u| u.id as i32).collect());
+        larva
     }
 
     pub fn get_last_attacking_player(&self) -> Option<Player> {
@@ -275,6 +293,13 @@ impl<'a> Unit<'a> {
 
     pub fn get_order_target(&self) -> Option<Unit> {
         self.game.get_unit(self.data.orderTarget)
+    }
+
+    pub fn get_order_target_position(&self) -> Option<Position> {
+        Position::new(
+            self.data.orderTargetPositionX,
+            self.data.orderTargetPositionY,
+        )
     }
 
     pub fn get_plague_timer(&self) -> i32 {
@@ -783,7 +808,12 @@ impl<'a> Unit<'a> {
     pub fn get_player(&self) -> Option<Player> {
         self.game.get_player(self.data.player)
     }
+}
 
+/***
+ * Unit Commands
+ */
+impl<'a> Unit<'a> {
     pub fn attack<T: UnitOrPosition>(&self, target: &T) {
         let mut cmd = self.command(false);
         target.assign_attack(&mut cmd);
@@ -797,7 +827,7 @@ impl<'a> Unit<'a> {
         })
     }
 
-    pub fn right_click<T: UnitOrPosition>(&self, target: T) {
+    pub fn right_click<T: UnitOrPosition>(&self, target: &T) {
         let mut cmd = self.command(false);
         target.assign_right_click(&mut cmd);
         self.issue_command(cmd);
@@ -831,6 +861,223 @@ impl<'a> Unit<'a> {
         self.issue_command(UnitCommand {
             extra: type_ as i32,
             ..self.command_type(UnitCommandType::Morph, false)
+        });
+    }
+
+    pub fn research(&self, tech: TechType) {
+        self.issue_command(UnitCommand {
+            extra: tech as i32,
+            ..self.command_type(UnitCommandType::Research, false)
+        });
+    }
+
+    pub fn upgrade(&self, upgrade: UpgradeType) {
+        self.issue_command(UnitCommand {
+            extra: upgrade as i32,
+            ..self.command_type(UnitCommandType::Upgrade, false)
+        });
+    }
+
+    pub fn set_rally_point<P: UnitOrPosition>(&self, target: P) {
+        let mut cmd = self.command(false);
+        target.assign_rally_point(&mut cmd);
+        self.issue_command(cmd)
+    }
+
+    pub fn move_<P: Into<Position>>(&self, target: P) {
+        let target = target.into();
+        self.issue_command(UnitCommand {
+            x: target.x,
+            y: target.y,
+            ..self.command_type(UnitCommandType::Move, false)
+        });
+    }
+
+    pub fn patrol<P: Into<Position>>(&self, target: P) {
+        let target = target.into();
+        self.issue_command(UnitCommand {
+            x: target.x,
+            y: target.y,
+            ..self.command_type(UnitCommandType::Patrol, false)
+        });
+    }
+
+    pub fn hold_position(&self) {
+        self.issue_command(UnitCommand {
+            ..self.command_type(UnitCommandType::Hold_Position, false)
+        });
+    }
+
+    pub fn stop(&self) {
+        self.issue_command(UnitCommand {
+            ..self.command_type(UnitCommandType::Stop, false)
+        });
+    }
+
+    pub fn follow(&self, target: &Unit) {
+        self.issue_command(UnitCommand {
+            targetIndex: target.id as i32,
+            ..self.command_type(UnitCommandType::Follow, false)
+        });
+    }
+
+    pub fn return_cargo(&self) {
+        self.issue_command(UnitCommand {
+            ..self.command_type(UnitCommandType::Return_Cargo, false)
+        });
+    }
+
+    pub fn repair(&self, target: &Unit) {
+        self.issue_command(UnitCommand {
+            targetIndex: target.id as i32,
+            ..self.command_type(UnitCommandType::Repair, false)
+        });
+    }
+
+    pub fn burrow(&self) {
+        self.issue_command(UnitCommand {
+            ..self.command_type(UnitCommandType::Burrow, false)
+        });
+    }
+
+    pub fn unburrow(&self) {
+        self.issue_command(UnitCommand {
+            ..self.command_type(UnitCommandType::Unburrow, false)
+        });
+    }
+
+    pub fn cloak(&self) {
+        self.issue_command(UnitCommand {
+            ..self.command_type(UnitCommandType::Cloak, false)
+        });
+    }
+
+    pub fn decloak(&self) {
+        self.issue_command(UnitCommand {
+            ..self.command_type(UnitCommandType::Decloak, false)
+        });
+    }
+
+    pub fn siege(&self) {
+        self.issue_command(UnitCommand {
+            ..self.command_type(UnitCommandType::Siege, false)
+        });
+    }
+
+    pub fn unsiege(&self) {
+        self.issue_command(UnitCommand {
+            ..self.command_type(UnitCommandType::Unsiege, false)
+        });
+    }
+
+    pub fn lift(&self) {
+        self.issue_command(UnitCommand {
+            ..self.command_type(UnitCommandType::Lift, false)
+        });
+    }
+
+    pub fn land<TP: Into<TilePosition>>(&self, target: TP) {
+        let target = target.into();
+        self.issue_command(UnitCommand {
+            x: target.x,
+            y: target.y,
+            ..self.command_type(UnitCommandType::Land, false)
+        });
+    }
+
+    pub fn load(&self, target: &Unit) {
+        self.issue_command(UnitCommand {
+            targetIndex: target.id as i32,
+            ..self.command_type(UnitCommandType::Load, false)
+        });
+    }
+
+    pub fn unload(&self, target: &Unit) {
+        self.issue_command(UnitCommand {
+            targetIndex: target.id as i32,
+            ..self.command_type(UnitCommandType::Unload, false)
+        });
+    }
+
+    pub fn unload_all<P: Into<Position>, OP: Into<Option<P>>>(&self, target: OP) {
+        let target = target.into();
+        if let Some(target) = target {
+            let target = target.into();
+            self.issue_command(UnitCommand {
+                x: target.x,
+                y: target.y,
+                ..self.command_type(UnitCommandType::Unload_All, false)
+            });
+        } else {
+            self.issue_command(UnitCommand {
+                ..self.command_type(UnitCommandType::Unload_All, false)
+            });
+        }
+    }
+
+    pub fn halt_construction(&self) {
+        self.issue_command(UnitCommand {
+            ..self.command_type(UnitCommandType::Halt_Construction, false)
+        });
+    }
+
+    pub fn cancel_construction(&self) {
+        self.issue_command(UnitCommand {
+            ..self.command_type(UnitCommandType::Cancel_Construction, false)
+        });
+    }
+
+    pub fn cancel_addon(&self) {
+        self.issue_command(UnitCommand {
+            ..self.command_type(UnitCommandType::Cancel_Addon, false)
+        });
+    }
+
+    pub fn cancel_train<S: Into<Option<i32>>>(&self, slot: S) {
+        let slot = slot.into();
+        self.issue_command(UnitCommand {
+            extra: slot.unwrap_or(-2),
+            ..self.command_type(UnitCommandType::Cancel_Train, false)
+        });
+    }
+
+    pub fn cancel_morph(&self) {
+        self.issue_command(UnitCommand {
+            ..self.command_type(UnitCommandType::Cancel_Morph, false)
+        });
+    }
+
+    pub fn cancel_research(&self) {
+        self.issue_command(UnitCommand {
+            ..self.command_type(UnitCommandType::Cancel_Research, false)
+        });
+    }
+
+    pub fn cancel_upgrade(&self) {
+        self.issue_command(UnitCommand {
+            ..self.command_type(UnitCommandType::Cancel_Upgrade, false)
+        });
+    }
+
+    pub fn use_tech<T: UnitOrPosition, OT: Into<Option<T>>>(&self, tech: TechType, target: OT) {
+        let mut cmd = self.command(false);
+        if let Some(target) = target.into() {
+            target.assign_use_tech(tech, &mut cmd);
+            self.issue_command(cmd)
+        } else {
+            self.issue_command(UnitCommand {
+                extra: tech as i32,
+                ..self.command_type(UnitCommandType::Use_Tech, false)
+            });
+        }
+    }
+
+    pub fn place_cop<TP: Into<TilePosition>>(&self, target: TP) {
+        let target = target.into();
+        self.issue_command(UnitCommand {
+            x: target.x,
+            y: target.y,
+            ..self.command_type(UnitCommandType::Place_COP, false)
         });
     }
 
@@ -870,6 +1117,8 @@ pub enum PathErr {
 pub trait UnitOrPosition {
     fn assign_right_click(&self, cmd: &mut UnitCommand);
     fn assign_attack(&self, cmd: &mut UnitCommand);
+    fn assign_rally_point(&self, cmd: &mut UnitCommand);
+    fn assign_use_tech(&self, tech: TechType, cmd: &mut UnitCommand);
     fn to_position(&self) -> Result<Position, PathErr>;
 }
 
@@ -881,6 +1130,15 @@ impl UnitOrPosition for Unit<'_> {
     fn assign_right_click(&self, cmd: &mut UnitCommand) {
         cmd.targetIndex = self.id as i32;
         cmd.type_._base = UnitCommandType::Right_Click_Unit as u32;
+    }
+    fn assign_rally_point(&self, cmd: &mut UnitCommand) {
+        cmd.targetIndex = self.id as i32;
+        cmd.type_._base = UnitCommandType::Set_Rally_Unit as u32;
+    }
+    fn assign_use_tech(&self, tech: TechType, cmd: &mut UnitCommand) {
+        cmd.targetIndex = self.id as i32;
+        cmd.extra = tech as i32;
+        cmd.type_._base = UnitCommandType::Use_Tech as u32;
     }
     fn to_position(&self) -> Result<Position, PathErr> {
         if self.exists() {
@@ -902,6 +1160,18 @@ impl UnitOrPosition for Position {
         cmd.y = self.y;
         cmd.type_._base = UnitCommandType::Right_Click_Position as u32;
     }
+    fn assign_rally_point(&self, cmd: &mut UnitCommand) {
+        cmd.x = self.x;
+        cmd.y = self.y;
+        cmd.type_._base = UnitCommandType::Set_Rally_Position as u32;
+    }
+    fn assign_use_tech(&self, tech: TechType, cmd: &mut UnitCommand) {
+        cmd.x = self.x;
+        cmd.y = self.y;
+        cmd.extra = tech as i32;
+        cmd.type_._base = UnitCommandType::Use_Tech as u32;
+    }
+
     fn to_position(&self) -> Result<Position, PathErr> {
         Ok(*self)
     }

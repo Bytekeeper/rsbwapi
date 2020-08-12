@@ -43,6 +43,15 @@ impl AiModule for MyModule {
                 )
             }
         }
+        /** Show larvas of Zerg depots 
+        for hatchery in units.iter().filter(|u| u.get_type().produces_larva()) {
+            println!(
+                "Hatchery {} has {} larva",
+                hatchery.get_id(),
+                hatchery.get_larva().len()
+            );
+        }
+         */
         let has_pool = units
             .iter()
             .any(|u| u.get_type() == UnitType::Zerg_Spawning_Pool);
@@ -50,7 +59,7 @@ impl AiModule for MyModule {
             .iter()
             .find(|u| u.get_type() == UnitType::Zerg_Hatchery)
         {
-            if game.can_make(None, UnitType::Zerg_Zergling) {
+            if game.can_make(None, UnitType::Zerg_Zergling).unwrap_or(false) {
                 u.train(UnitType::Zerg_Zergling)
             } else {
                 u.train(UnitType::Zerg_Drone)
@@ -75,7 +84,7 @@ impl AiModule for MyModule {
                 .expect("drone to build sth");
             'outer: for y in 0..game.map_height() {
                 for x in 0..game.map_width() {
-                    if game.can_build_here(builder, (x, y), UnitType::Zerg_Spawning_Pool, true) {
+                    if game.can_build_here(builder, (x, y), UnitType::Zerg_Spawning_Pool, true).unwrap_or(false) {
                         let tl = TilePosition { x, y }.to_position();
                         let br = tl + UnitType::Zerg_Spawning_Pool.tile_size().to_position();
                         game.draw_box_map(tl, br, Color::Red, false);
@@ -97,7 +106,11 @@ impl AiModule for MyModule {
         if let Some(mineral) = mineral {
             if let Some(miner) = game.get_closest_unit(
                 mineral.get_position(),
-                |u: &Unit| u.get_type() == UnitType::Zerg_Drone && !u.is_gathering_minerals() && Some(u) != builder,
+                |u: &Unit| {
+                    u.get_type() == UnitType::Zerg_Drone
+                        && !u.is_gathering_minerals()
+                        && Some(u) != builder
+                },
                 None,
             ) {
                 miner.gather(mineral)

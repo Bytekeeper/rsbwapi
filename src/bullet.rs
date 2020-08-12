@@ -20,6 +20,10 @@ impl<'a> Bullet<'a> {
         self.data.exists
     }
 
+    pub fn get_angle(&self) -> f64 {
+        self.data.angle
+    }
+
     pub fn get_player(&self) -> Option<Player> {
         self.frame.get_player(self.data.player)
     }
@@ -52,21 +56,15 @@ impl<'a> Bullet<'a> {
     }
 
     pub fn get_target_position(&self) -> Option<Position> {
-        Some(Position {
-            x: self.data.targetPositionX,
-            y: self.data.targetPositionY,
-        })
+        Position::new(self.data.targetPositionX, self.data.targetPositionY)
     }
 
     pub fn get_type(&self) -> BulletType {
         BulletType::from_i32(self.data.type_).unwrap()
     }
 
-    pub fn get_velocity(&self) -> Vector2D {
-        Vector2D {
-            x: self.data.velocityX,
-            y: self.data.velocityY,
-        }
+    pub fn get_velocity(&self) -> Option<Vector2D> {
+        Vector2D::new(self.data.velocityX, self.data.velocityY)
     }
 
     pub fn is_visible(&self, player: &Player) -> bool {

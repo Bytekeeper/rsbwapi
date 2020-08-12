@@ -12,6 +12,7 @@ use crate::*;
 use bwapi_wrapper::*;
 use core::cell::RefCell;
 use rstar::primitives::Rectangle;
+use rstar::Envelope;
 use rstar::PointDistance;
 use rstar::RTree;
 use rstar::RTreeObject;
@@ -55,8 +56,9 @@ pub struct Game<'a> {
     infos: &'a [Option<UnitInfo>; 10000],
     rtree: RTree<UnitLocation>,
     pub(crate) cmd: &'a RefCell<Commands>,
-    pub(crate) interceptors: RefCell<HashMap<usize, Vec<i32>>>,
+    pub(crate) connected_units: RefCell<HashMap<usize, Vec<i32>>>,
     pub(crate) loaded_units: RefCell<HashMap<usize, Vec<i32>>>,
+    pylons: RefCell<Option<Vec<usize>>>,
 }
 
 impl<'a> Game<'a> {
@@ -66,7 +68,7 @@ impl<'a> Game<'a> {
         position: P,
         type_: UnitType,
         check_explored: bool,
-    ) -> bool {
+    ) -> Result<bool, Error> {
         let builder = builder.into();
         let position = if builder.is_some() && type_.is_addon() {
             position.into() + TilePosition { x: 4, y: 1 }
@@ -78,23 +80,23 @@ impl<'a> Game<'a> {
         let rb = lt + type_.tile_size();
 
         if !lt.is_valid() || !(rb.to_position() - Position { x: 1, y: 1 }).is_valid() {
-            return false;
+            return Err(Error::Unbuildable_Location);
         }
 
         if type_.is_refinery() {
-            return self
+            return Ok(self
                 .get_geysers()
                 .iter()
                 .find(|x| x.get_tile_position() == position)
                 .map_or(false, |x| {
                     !(x.is_visible() && x.get_type() != UnitType::Resource_Vespene_Geyser)
-                });
+                }));
         }
 
         for x in lt.x..rb.x {
             for y in lt.y..rb.y {
                 if !self.is_buildable((x, y)) || (check_explored && !self.is_explored((x, y))) {
-                    return false;
+                    return Ok(false);
                 }
             }
         }
@@ -102,13 +104,13 @@ impl<'a> Game<'a> {
         if let Some(builder) = builder {
             if !builder.get_type().is_building() {
                 if !builder.has_path(lt.to_position() + type_.tile_size().to_position() / 2) {
-                    return false;
+                    return Err(Error::Unreachable_Location);
                 }
             } else if !builder.get_type().is_flying_building()
                 && type_ != UnitType::Zerg_Nydus_Canal
                 && !type_.is_flag_beacon()
             {
-                return false;
+                return Ok(false);
             }
         }
 
@@ -131,7 +133,7 @@ impl<'a> Game<'a> {
                 .iter()
                 .any(|u| !(u.get_type().is_addon() && u.get_type().can_move()));
             if collides_with_units {
-                return false;
+                return Ok(false);
             }
 
             let needs_creep = type_.requires_creep();
@@ -139,7 +141,7 @@ impl<'a> Game<'a> {
                 for x in lt.x..rb.x {
                     for y in lt.y..rb.y {
                         if needs_creep != self.has_creep((x, y)) {
-                            return false;
+                            return Ok(false);
                         }
                     }
                 }
@@ -152,13 +154,13 @@ impl<'a> Game<'a> {
                         continue;
                     }
                     if tp.x > lt.x - 5 && tp.y > lt.y - 4 && tp.x < lt.x + 7 && tp.y < lt.y + 6 {
-                        return false;
+                        return Ok(false);
                     }
                 }
                 for g in self.get_static_geysers() {
                     let tp = g.get_initial_tile_position();
                     if tp.x > lt.x - 7 && tp.y > lt.y - 5 && tp.x < lt.x + 7 && tp.y < lt.y + 6 {
-                        return false;
+                        return Ok(false);
                     }
                 }
             }
@@ -172,21 +174,21 @@ impl<'a> Game<'a> {
                     lt - TilePosition { x: 4, y: 1 },
                     builder.get_type(),
                     check_explored,
-                )
+                )?
             {
-                return false;
+                return Ok(false);
             }
         }
-        true
+        Ok(true)
     }
 
-    pub fn can_command(&self, this_unit: &Unit) -> bool {
+    pub fn can_command(&self, this_unit: &Unit) -> Result<bool, Error> {
         if this_unit.get_player() != self.self_() {
-            return false;
+            return Err(Error::Unit_Not_Owned);
         }
 
         if !this_unit.exists() {
-            return false;
+            return Err(Error::Unit_Does_Not_Exist);
         }
 
         if this_unit.is_locked_down()
@@ -197,14 +199,14 @@ impl<'a> Game<'a> {
             || this_unit.is_loaded()
         {
             if !this_unit.get_type().produces_larva() {
-                return false;
+                return Err(Error::Unit_Busy);
             } else {
                 for larva in this_unit.get_larva() {
-                    if self.can_command(&larva) {
-                        return true;
+                    if self.can_command(&larva).unwrap_or(false) {
+                        return Ok(true);
                     }
                 }
-                return false;
+                return Err(Error::Unit_Busy);
             }
         }
 
@@ -214,44 +216,59 @@ impl<'a> Game<'a> {
             || u_type == UnitType::Spell_Scanner_Sweep
             || u_type == UnitType::Special_Map_Revealer
         {
-            return false;
+            return Err(Error::Incompatible_UnitType);
+        }
+
+        if this_unit.is_completed()
+            && (u_type == UnitType::Protoss_Pylon
+                || u_type == UnitType::Terran_Supply_Depot
+                || u_type.is_resource_container()
+                || u_type == UnitType::Protoss_Shield_Battery
+                || u_type.is_powerup()
+                || (u_type.is_special_building() && !u_type.is_flag_beacon()))
+        {
+            return Err(Error::Incompatible_State);
         }
 
         if !this_unit.is_completed() && !u_type.is_building() && !this_unit.is_morphing() {
-            return false;
+            return Err(Error::Incompatible_State);
         }
-        true
+        Ok(true)
     }
 
-    pub fn can_make<B: Into<Option<&'a Unit<'a>>>>(&self, builder: B, type_: UnitType) -> bool {
+    pub fn can_make<B: Into<Option<&'a Unit<'a>>>>(
+        &self,
+        builder: B,
+        type_: UnitType,
+    ) -> Result<bool, Error> {
         if let Some(self_) = self.self_() {
             if !self_.is_unit_available(type_) {
-                return false;
+                return Err(Error::Access_Denied);
             }
             let builder = builder.into();
             let required_type = type_.what_builds().0;
             if let Some(builder) = builder {
                 if builder.get_player() != Some(self_) {
-                    return false;
+                    return Err(Error::Unit_Not_Owned);
                 }
                 let builder_type = builder.get_type();
                 if type_ == UnitType::Zerg_Nydus_Canal && builder_type == UnitType::Zerg_Nydus_Canal
                 {
                     if !builder.is_completed() {
-                        return false;
+                        return Err(Error::Unit_Busy);
                     }
                     if builder.get_nydus_exit().is_some() {
-                        return false;
+                        return Err(Error::Unknown);
                     }
-                    return true;
+                    return Ok(true);
                 }
 
                 if required_type == UnitType::Zerg_Larva && builder_type.produces_larva() {
                     if builder.get_larva().is_empty() {
-                        return false;
+                        return Err(Error::Unit_Does_Not_Exist);
                     }
                 } else if builder_type != required_type {
-                    return false;
+                    return Err(Error::Incompatible_UnitType);
                 }
 
                 let mut max_amt: i32;
@@ -268,7 +285,7 @@ impl<'a> Game<'a> {
                             + builder.get_training_queue().len() as i32
                             >= max_amt
                         {
-                            return false;
+                            return Err(Error::Insufficient_Space);
                         }
                     }
                     UnitType::Protoss_Reaver | UnitType::Hero_Warbringer => {
@@ -282,7 +299,7 @@ impl<'a> Game<'a> {
                         if builder.get_scarab_count() + builder.get_training_queue().len() as i32
                             >= max_amt
                         {
-                            return false;
+                            return Err(Error::Insufficient_Space);
                         }
                     }
                     _ => (),
@@ -290,11 +307,11 @@ impl<'a> Game<'a> {
             }
 
             if self_.minerals() < type_.mineral_price() {
-                return false;
+                return Err(Error::Insufficient_Minerals);
             }
 
             if self_.gas() < type_.gas_price() {
-                return false;
+                return Err(Error::Insufficient_Gas);
             }
 
             let type_race = type_.get_race();
@@ -313,7 +330,7 @@ impl<'a> Game<'a> {
                             0
                         })
             {
-                return false;
+                return Err(Error::Insufficient_Supply);
             }
 
             let mut addon = UnitType::None;
@@ -323,14 +340,14 @@ impl<'a> Game<'a> {
                 }
 
                 if !self_.has_unit_type_requirement(it.0, it.1) {
-                    return false;
+                    return Err(Error::Insufficient_Tech);
                 }
             }
 
             if type_.required_tech() != TechType::None
                 && !self_.has_researched(type_.required_tech())
             {
-                return false;
+                return Err(Error::Insufficient_Tech);
             }
 
             if let Some(builder) = builder {
@@ -339,13 +356,13 @@ impl<'a> Game<'a> {
                     && (builder.get_addon().is_none()
                         || builder.get_addon().map(|a| a.get_type()) == Some(addon))
                 {
-                    return false;
+                    return Err(Error::Insufficient_Tech);
                 }
             }
 
-            true
+            Ok(true)
         } else {
-            false
+            Err(Error::Unit_Not_Owned)
         }
     }
 
@@ -444,7 +461,7 @@ impl<'a> Game<'a> {
         lt: A,
         rb: B,
         pred: P,
-    ) -> Vec<Unit<'a>> {
+    ) -> Vec<Unit> {
         let lt = lt.into();
         let rb = rb.into();
         let pred = pred.into_predicate();
@@ -456,6 +473,20 @@ impl<'a> Game<'a> {
             })
             .filter(|u| pred.test(u))
             .collect()
+    }
+
+    pub fn get_units_on_tile<TP: Into<TilePosition>, P: IntoPredicate<Unit<'a>>>(
+        &'a self,
+        tile: TP,
+        pred: P,
+    ) -> Vec<Unit> {
+        let tile = tile.into();
+        if !tile.is_valid() {
+            vec![]
+        } else {
+            let p = tile.to_position();
+            self.get_units_in_rectangle((p.x, p.y), (p.x + 32, p.y + 32), pred)
+        }
     }
 
     pub fn get_closest_unit<
@@ -473,8 +504,45 @@ impl<'a> Game<'a> {
         let radius = radius.into().unwrap_or(32000);
         let radius_squared = radius * radius;
         self.rtree
-            .locate_within_distance([center.x, center.y], radius_squared)
-            .map(|ul| {
+            .nearest_neighbor_iter_with_distance_2(&[center.x, center.y])
+            .take_while(|&(_, d_2)| d_2 <= radius_squared)
+            .map(|(ul, _)| {
+                self.get_unit(ul.id as i32)
+                    .expect("Unit from RTree to be present")
+            })
+            .find(|u| pred.test(u))
+    }
+
+    pub fn get_closest_unit_in_rectangle<
+        P: Into<Position>,
+        Pred: IntoPredicate<Unit<'a>>,
+        R: Into<crate::Rectangle>,
+    >(
+        &'a self,
+        center: P,
+        pred: Pred,
+        rectangle: R,
+    ) -> Option<Unit<'a>> {
+        let center = center.into();
+        let pred = pred.into_predicate();
+        let rectangle = rectangle.into();
+        let dx = (rectangle.tl.x - center.x)
+            .abs()
+            .max((rectangle.br.x - center.x).abs());
+        let dy = (rectangle.tl.y - center.y)
+            .abs()
+            .max((rectangle.br.y - center.y).abs());
+        let query_envelope = Rectangle::from_corners(
+            [rectangle.tl.x, rectangle.tl.y],
+            [rectangle.br.x, rectangle.br.y],
+        )
+        .envelope();
+        let radius_2 = dx * dx + dy * dy;
+        self.rtree
+            .nearest_neighbor_iter_with_distance_2(&[center.x, center.y])
+            .take_while(|&(_, d_2)| d_2 <= radius_2)
+            .filter(|(ul, _)| ul.location.envelope().intersects(&query_envelope))
+            .map(|(ul, _)| {
                 self.get_unit(ul.id as i32)
                     .expect("Unit from RTree to be present")
             })
@@ -528,6 +596,67 @@ impl<'a> Game<'a> {
             let rgn_b = self.get_region_at(destination);
             if let (Some(rgn_a), Some(rgn_b)) = (rgn_a, rgn_b) {
                 return rgn_a.get_region_group_id() == rgn_b.get_region_group_id();
+            }
+        }
+        false
+    }
+
+    pub fn has_power<TP: Into<TilePosition>, TS: Into<TilePosition>>(
+        &self,
+        position: TP,
+        size: TS,
+    ) -> bool {
+        let position = position.into().to_position() + size.into().to_position() * 16;
+        self.has_power_precise(position)
+    }
+
+    pub fn has_power_precise<P: Into<Position>>(&self, position: P) -> bool {
+        static B_PSI_FIELD_MASK: [[u8; 16]; 10] = [
+            [0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0],
+            [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0],
+            [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+            [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0],
+            [0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0],
+        ];
+
+        let pylons: Vec<Unit> = if let Some(pylons) = self.pylons.borrow().as_ref() {
+            pylons
+                .iter()
+                .map(|&i| self.get_unit(i as i32).expect("Pylon to exst"))
+                .collect()
+        } else {
+            let pylons: Vec<Unit> = self
+                .get_all_units()
+                .iter()
+                .filter(|u| u.get_type() == UnitType::Protoss_Pylon)
+                .cloned()
+                .collect();
+            *self.pylons.borrow_mut() = Some(pylons.iter().map(|u| u.id).collect());
+            pylons
+        };
+        let Position { x, y } = position.into();
+
+        for i in pylons {
+            if !i.exists() || !i.is_completed() {
+                continue;
+            }
+
+            let p = i.get_position();
+            if (p.x - x).abs() >= 256 {
+                continue;
+            }
+
+            if (p.y - y).abs() >= 160 {
+                continue;
+            }
+
+            if B_PSI_FIELD_MASK[(y - p.y + 160) as usize / 32][(x - p.x + 256) as usize / 32] != 0 {
+                return true;
             }
         }
         false
@@ -693,6 +822,59 @@ impl<'a> Game<'a> {
         self.data.client_version
     }
 
+    pub fn get_damage_from<
+        'x,
+        P1: Into<Option<&'x Player<'x>>>,
+        P2: Into<Option<&'x Player<'x>>>,
+    >(
+        &'x self,
+        from_type: UnitType,
+        to_type: UnitType,
+        from_player: P1,
+        to_player: P2,
+    ) -> i32 {
+        static DAMAGE_RATIO: [[i32; UnitSizeType::MAX as usize]; DamageType::MAX as usize] = [
+            // Ind, Sml, Med, Lrg, Non, Unk
+            [0, 0, 0, 0, 0, 0],       // Independent
+            [0, 128, 192, 256, 0, 0], // Explosive
+            [0, 256, 128, 64, 0, 0],  // Concussive
+            [0, 256, 256, 256, 0, 0], // Normal
+            [0, 256, 256, 256, 0, 0], // Ignore_Armor
+            [0, 0, 0, 0, 0, 0],       // None
+            [0, 0, 0, 0, 0, 0],       // Unknown
+        ];
+        let wpn = if to_type.is_flyer() {
+            from_type.air_weapon()
+        } else {
+            from_type.ground_weapon()
+        };
+        if wpn == WeaponType::None || wpn == WeaponType::Unknown {
+            return 0;
+        }
+        let mut dmg = if let Some(from_player) = from_player.into() {
+            from_player.damage(wpn)
+        } else {
+            wpn.damage_amount() * wpn.damage_factor()
+        };
+
+        if wpn.damage_type() != DamageType::Ignore_Armor {
+            if let Some(to_player) = to_player.into() {
+                dmg -= dmg.min(to_player.armor(to_type));
+            }
+        }
+        dmg * DAMAGE_RATIO[wpn.damage_type() as usize][to_type.size() as usize] / 256
+    }
+
+    pub fn get_damage_to<'x, P1: Into<Option<&'x Player<'x>>>, P2: Into<Option<&'x Player<'x>>>>(
+        &'x self,
+        to_type: UnitType,
+        from_type: UnitType,
+        to_player: P2,
+        from_player: P1,
+    ) -> i32 {
+        self.get_damage_from(from_type, to_type, from_player, to_player)
+    }
+
     pub fn get_events(&self) -> Vec<BWAPIC_Event> {
         (0..self.data.eventCount as usize)
             .map(|i| self.data.events[i])
@@ -815,9 +997,10 @@ impl GameContext {
             units: vec![],
             infos: &self.unit_infos,
             cmd,
-            interceptors: RefCell::new(HashMap::new()),
+            connected_units: RefCell::new(HashMap::new()),
             loaded_units: RefCell::new(HashMap::new()),
             rtree: RTree::new(),
+            pylons: RefCell::new(None),
         };
         let unmoved_frame = &frame as *const Game;
         // SAFETY: Only the infos will be modified here and only a reference of Frame will be made available to cb

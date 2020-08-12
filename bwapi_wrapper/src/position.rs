@@ -24,7 +24,7 @@ pub struct Vector2D {
     pub y: f64,
 }
 
-type PositionTuple = (i32, i32);
+pub type PositionTuple = (i32, i32);
 pub const ORIGIN: Position = Position { x: 0, y: 0 };
 
 impl Position {
@@ -92,6 +92,16 @@ impl WalkPosition {
         Position {
             x: self.x * 8,
             y: self.y * 8,
+        }
+    }
+}
+
+impl Vector2D {
+    pub fn new(x: f64, y: f64) -> Option<Self> {
+        if x == 0.0 && y == 0.0 {
+            None
+        } else {
+            Some(Self { x, y })
         }
     }
 }
