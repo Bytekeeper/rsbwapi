@@ -53,7 +53,6 @@ pub struct Game<'a> {
     context: &'a GameContext,
     data: &'a BWAPI_GameData,
     units: Vec<Unit<'a>>,
-    infos: &'a [Option<UnitInfo>; 10000],
     rtree: RTree<UnitLocation>,
     pub(crate) cmd: &'a RefCell<Commands>,
     pub(crate) connected_units: RefCell<HashMap<usize, Vec<i32>>>,
@@ -447,7 +446,7 @@ impl<'a> Game<'a> {
                 id,
                 self,
                 &self.data.units[id],
-                self.infos[id].expect("UnitInfo to exist"),
+                self.context.unit_infos[id].expect("UnitInfo to exist"),
             ))
         }
     }
@@ -792,7 +791,7 @@ impl<'a> Game<'a> {
             .collect()
     }
 
-    pub fn get_all_units(&self) -> &Vec<Unit<'a>> {
+    pub fn get_all_units(&self) -> &[Unit<'a>] {
         &self.units
     }
 
@@ -822,12 +821,8 @@ impl<'a> Game<'a> {
         self.data.client_version
     }
 
-    pub fn get_damage_from<
-        'x,
-        P1: Into<Option<&'x Player<'x>>>,
-        P2: Into<Option<&'x Player<'x>>>,
-    >(
-        &'x self,
+    pub fn get_damage_from<P1: Into<Option<&'a Player<'a>>>, P2: Into<Option<&'a Player<'a>>>>(
+        &self,
         from_type: UnitType,
         to_type: UnitType,
         from_player: P1,
@@ -865,8 +860,8 @@ impl<'a> Game<'a> {
         dmg * DAMAGE_RATIO[wpn.damage_type() as usize][to_type.size() as usize] / 256
     }
 
-    pub fn get_damage_to<'x, P1: Into<Option<&'x Player<'x>>>, P2: Into<Option<&'x Player<'x>>>>(
-        &'x self,
+    pub fn get_damage_to<P1: Into<Option<&'a Player<'a>>>, P2: Into<Option<&'a Player<'a>>>>(
+        &self,
         to_type: UnitType,
         from_type: UnitType,
         to_player: P2,
@@ -995,7 +990,6 @@ impl GameContext {
             context: self,
             data,
             units: vec![],
-            infos: &self.unit_infos,
             cmd,
             connected_units: RefCell::new(HashMap::new()),
             loaded_units: RefCell::new(HashMap::new()),
