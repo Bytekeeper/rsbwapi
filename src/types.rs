@@ -1,8 +1,9 @@
-use bwapi_wrapper::prelude::Position;
-use bwapi_wrapper::prelude::PositionTuple;
+use bwapi_wrapper::prelude::{Error, Position, PositionTuple};
 use num_derive::FromPrimitive;
 use std::ffi::CStr;
 use std::os::raw::c_char;
+
+pub type BWResult<T> = Result<T, Error>;
 
 #[derive(Debug, Copy, Clone, FromPrimitive)]
 pub enum Color {

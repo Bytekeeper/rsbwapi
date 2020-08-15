@@ -1,3 +1,4 @@
+use crate::unit::Unit;
 use crate::force::Force;
 use crate::game::Game;
 use crate::types::c_str_to_str;
@@ -98,6 +99,10 @@ impl<'a> Player<'a> {
 
     pub fn get_race(&self) -> Race {
         Race::new(self.data.race)
+    }
+
+    pub fn get_units(&self) -> Vec<Unit> {
+        self.game.get_all_units().iter().filter(|u| u.get_player() == Some(*self)).cloned().collect()
     }
 
     pub fn get_upgrade_level(&self, upgrade_type: UpgradeType) -> i32 {

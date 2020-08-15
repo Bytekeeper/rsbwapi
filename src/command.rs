@@ -1,5 +1,4 @@
 use crate::types::{Color, TextSize};
-use crate::unit::UnitCommand;
 use crate::{Game, Player};
 use bwapi_wrapper::prelude::*;
 use bwapi_wrapper::*;

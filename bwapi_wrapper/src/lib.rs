@@ -3,6 +3,7 @@
 #![allow(non_snake_case)]
 use num_derive::FromPrimitive;
 
+pub mod command;
 pub mod tech_type;
 pub mod unit_type;
 pub mod upgrade_type;

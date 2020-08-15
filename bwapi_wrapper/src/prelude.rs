@@ -17,3 +17,4 @@ pub type UnitCommandType = BWAPI_UnitCommandTypes_Enum_Enum;
 pub type Error = BWAPI_Errors_Enum_Enum;
 pub type Key = BWAPI_Key;
 pub type MouseButton = BWAPI_MouseButton;
+pub type UnitCommand = BWAPIC_UnitCommand;
