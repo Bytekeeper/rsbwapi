@@ -58,6 +58,14 @@ impl UnitCommand {
         }
     }
 
+    pub fn get_upgrade_type(&self) -> UpgradeType {
+        if self.get_type() == UnitCommandType::Upgrade {
+            UpgradeType::new(self.extra)
+        } else {
+            UpgradeType::None
+        }
+    }
+
     pub fn get_slot(&self) -> Option<i32> {
         if self.get_type() == UnitCommandType::Cancel_Train_Slot {
             Some(self.extra)

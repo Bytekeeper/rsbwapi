@@ -5,6 +5,7 @@ pub use bwapi_wrapper::prelude::*;
 pub mod aimodule;
 mod bridge;
 pub mod bullet;
+pub mod can_do;
 pub mod client;
 pub mod command;
 pub mod force;

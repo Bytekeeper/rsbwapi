@@ -67,7 +67,7 @@ impl<'a> Game<'a> {
         position: P,
         type_: UnitType,
         check_explored: bool,
-    ) -> Result<bool, Error> {
+    ) -> BWResult<bool> {
         let builder = builder.into();
         let position = if builder.is_some() && type_.is_addon() {
             position.into() + TilePosition { x: 4, y: 1 }
@@ -182,7 +182,7 @@ impl<'a> Game<'a> {
     }
 
     pub fn can_command(&self, this_unit: &Unit) -> Result<bool, Error> {
-        if this_unit.get_player() != self.self_() {
+        if Some(this_unit.get_player()) != self.self_() {
             return Err(Error::Unit_Not_Owned);
         }
 
@@ -239,7 +239,7 @@ impl<'a> Game<'a> {
         &self,
         builder: B,
         type_: UnitType,
-    ) -> Result<bool, Error> {
+    ) -> BWResult<bool> {
         if let Some(self_) = self.self_() {
             if !self_.is_unit_available(type_) {
                 return Err(Error::Access_Denied);
@@ -247,7 +247,7 @@ impl<'a> Game<'a> {
             let builder = builder.into();
             let required_type = type_.what_builds().0;
             if let Some(builder) = builder {
-                if builder.get_player() != Some(self_) {
+                if builder.get_player() != self_ {
                     return Err(Error::Unit_Not_Owned);
                 }
                 let builder_type = builder.get_type();

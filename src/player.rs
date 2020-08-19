@@ -1,8 +1,8 @@
-use crate::unit::Unit;
 use crate::force::Force;
 use crate::game::Game;
 use crate::types::c_str_to_str;
 use crate::types::Color;
+use crate::unit::Unit;
 use bwapi_wrapper::prelude::*;
 use bwapi_wrapper::*;
 use num_traits::FromPrimitive;
@@ -102,7 +102,12 @@ impl<'a> Player<'a> {
     }
 
     pub fn get_units(&self) -> Vec<Unit> {
-        self.game.get_all_units().iter().filter(|u| u.get_player() == Some(*self)).cloned().collect()
+        self.game
+            .get_all_units()
+            .iter()
+            .filter(|u| u.get_player() == *self)
+            .cloned()
+            .collect()
     }
 
     pub fn get_upgrade_level(&self, upgrade_type: UpgradeType) -> i32 {
@@ -164,7 +169,7 @@ impl<'a> Player<'a> {
         self.data.isResearchAvailable[tech as usize]
     }
 
-    pub fn is_reseaching(&self, tech: TechType) -> bool {
+    pub fn is_researching(&self, tech: TechType) -> bool {
         self.data.isResearching[tech as usize]
     }
 
