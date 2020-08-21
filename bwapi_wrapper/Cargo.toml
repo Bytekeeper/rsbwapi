@@ -1,6 +1,6 @@
 [package]
 name = "bwapi_wrapper"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Dennis Waldherr <bytekeeper@mailbox.org>"]
 edition = "2018"
 homepage = "https://github.com/Bytekeeper/rsbwapi/"
