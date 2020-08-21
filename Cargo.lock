@@ -78,7 +78,7 @@ checksum = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
 
 [[package]]
 name = "bwapi_wrapper"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bindgen",
  "num-derive",
@@ -344,7 +344,7 @@ checksum = "1132f845907680735a84409c3bebc64d1364a5683ffbce899550cd09d5eaefc1"
 
 [[package]]
 name = "rsbwapi"
-version = "0.0.1"
+version = "0.2.0"
 dependencies = [
  "bwapi_wrapper",
  "memchr",
