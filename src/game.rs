@@ -964,6 +964,25 @@ impl<'a> Game<'a> {
             .collect()
     }
 
+    pub fn get_units_in_radius<P: Into<Position>, Pred: IntoPredicate<Unit<'a>>>(
+        &'a self,
+        position: P,
+        radius: i32,
+        pred: Pred,
+    ) -> Vec<Unit> {
+        let center = position.into();
+        let radius_sq = radius * radius;
+        let pred = pred.into_predicate();
+        self.get_units_in_rectangle(
+            (center.x - radius, center.y - radius),
+            (center.x + radius, center.y + radius),
+            |p: &Unit<'a>| {
+                let d = center - p.get_position();
+                d.x * d.x + d.y * d.y <= radius_sq && pred.test(p)
+            },
+        )
+    }
+
     fn event_str(&self, i: usize) -> &str {
         c_str_to_str(&self.data.eventStrings[i])
     }

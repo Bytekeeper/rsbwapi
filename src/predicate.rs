@@ -130,6 +130,3 @@ impl_pred! {
     (A) NotPredicate<A>,
     (F, T) FnPredicate<F, T>
 }
-//impl<P: IntoPredicate<<Self as Predicate>::Item>> BitAnd<P> for B {
-
-//}

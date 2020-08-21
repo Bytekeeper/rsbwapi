@@ -1,4 +1,40 @@
+//!
+//! Helper traits and impls for the various can_xyz methods.
+//! BWAPI uses multiple overloaded methods, which is emulated using traits. Therefore, traits in here are
+//! usually implemented for `bool` and for one or more tuples. The `bool` in this case is the parameter `checkCommandibility`.
+
 use crate::*;
+
+#[derive(Clone, Copy, Debug)]
+pub struct CanIssueCommandArg {
+    pub c: UnitCommand,
+    pub check_can_use_tech_position_on_positions: bool,
+    pub check_can_use_tech_unit_on_units: bool,
+    pub check_can_build_unit_type: bool,
+    pub check_can_target_unit: bool,
+    pub check_can_issue_command_type: bool,
+    pub check_commandability: bool,
+}
+
+impl CanIssueCommandArg {
+    fn new(c: UnitCommand) -> Self {
+        Self {
+            c,
+            check_can_use_tech_position_on_positions: true,
+            check_can_use_tech_unit_on_units: true,
+            check_can_build_unit_type: true,
+            check_can_target_unit: true,
+            check_can_issue_command_type: true,
+            check_commandability: true,
+        }
+    }
+}
+
+impl From<UnitCommand> for CanIssueCommandArg {
+    fn from(cmd: UnitCommand) -> Self {
+        Self::new(cmd)
+    }
+}
 
 pub trait CanAttackUnit {
     fn can_attack_unit(&self, unit: &Unit) -> BWResult<bool>;
@@ -1490,7 +1526,782 @@ impl CanPlaceCop for (TilePosition, bool, bool) {
     }
 }
 
-impl<'a> Unit<'a> {}
+impl<'a> Unit<'a> {
+    pub fn can_build(&self, checker: impl CanBuild) -> BWResult<bool> {
+        checker.can_build(self)
+    }
+
+    pub fn can_build_addon(&self, checker: impl CanBuildAddon) -> BWResult<bool> {
+        checker.can_build_addon(self)
+    }
+
+    pub fn can_train(&self, checker: impl CanTrain) -> BWResult<bool> {
+        checker.can_train(self)
+    }
+
+    pub fn can_morph(&self, checker: impl CanMorph) -> BWResult<bool> {
+        checker.can_morph(self)
+    }
+
+    pub fn can_attack(&self, checker: impl CanAttack) -> BWResult<bool> {
+        checker.can_attack(self)
+    }
+
+    pub fn can_attack_unit(&self, checker: impl CanAttackUnit) -> BWResult<bool> {
+        checker.can_attack_unit(self)
+    }
+
+    pub fn can_attack_move(&self, check_commandability: bool) -> BWResult<bool> {
+        if check_commandability && !self.can_command()? {
+            return Ok(false);
+        }
+
+        if (self.get_type() != UnitType::Terran_Medic && !self.can_attack_unit(false)?)
+            || !self.can_move(false)?
+        {
+            return Ok(false);
+        }
+        Ok(true)
+    }
+
+    pub fn can_cancel_train(&self, check_commandability: bool) -> BWResult<bool> {
+        if check_commandability && !self.can_command()? {
+            return Ok(false);
+        }
+
+        if !self.is_training() {
+            return Err(Error::Incompatible_State);
+        }
+        Ok(true)
+    }
+
+    pub fn can_cancel_train_slot(&self, checker: impl CanCancelTrainSlot) -> BWResult<bool> {
+        checker.can_cancel_train_slot(self)
+    }
+
+    pub fn can_command(&self) -> Result<bool, Error> {
+        if self.get_player() != self.game.self_().expect("Self to exist") {
+            return Err(Error::Unit_Not_Owned);
+        }
+
+        if !self.exists() {
+            return Err(Error::Unit_Does_Not_Exist);
+        }
+
+        if self.is_locked_down()
+            || self.is_maelstrommed()
+            || self.is_stasised()
+            || !self.is_powered()
+            || self.get_order() == Order::ZergBirth
+            || self.is_loaded()
+        {
+            if !self.get_type().produces_larva() {
+                return Err(Error::Unit_Busy);
+            } else {
+                for larva in self.get_larva() {
+                    if larva.can_command().unwrap_or(false) {
+                        return Ok(true);
+                    }
+                }
+                return Err(Error::Unit_Busy);
+            }
+        }
+
+        let u_type = self.get_type();
+        if u_type == UnitType::Protoss_Interceptor
+            || u_type == UnitType::Terran_Vulture_Spider_Mine
+            || u_type == UnitType::Spell_Scanner_Sweep
+            || u_type == UnitType::Special_Map_Revealer
+        {
+            return Err(Error::Incompatible_UnitType);
+        }
+        if self.is_completed()
+            && (u_type == UnitType::Protoss_Pylon
+                || u_type == UnitType::Terran_Supply_Depot
+                || u_type.is_resource_container()
+                || u_type == UnitType::Protoss_Shield_Battery
+                || u_type == UnitType::Terran_Nuclear_Missile
+                || u_type.is_powerup()
+                || (u_type.is_special_building() && !u_type.is_flag_beacon()))
+        {
+            return Err(Error::Incompatible_State);
+        }
+        if !self.is_completed() && !u_type.is_building() && self.is_morphing() {
+            return Err(Error::Incompatible_State);
+        }
+        Ok(true)
+    }
+
+    pub fn can_follow(&self, checker: impl CanFollow) -> BWResult<bool> {
+        checker.can_follow(self)
+    }
+
+    pub fn can_land(&self, checker: impl CanLand) -> BWResult<bool> {
+        checker.can_land(self)
+    }
+
+    pub fn can_load(&self, checker: impl CanLoad) -> BWResult<bool> {
+        checker.can_load(self)
+    }
+
+    pub fn can_gather(&self, checker: impl CanGather) -> BWResult<bool> {
+        checker.can_gather(self)
+    }
+
+    pub fn can_place_cop(&self, checker: impl CanPlaceCop) -> BWResult<bool> {
+        checker.can_place_cop(self)
+    }
+
+    pub fn can_repair(&self, checker: impl CanRepair) -> BWResult<bool> {
+        checker.can_repair(self)
+    }
+
+    pub fn can_right_click_unit(&self, checker: impl CanRightClickUnit) -> BWResult<bool> {
+        checker.can_right_click_unit(self)
+    }
+
+    pub fn can_set_rally_unit(&self, checker: impl CanSetRallyUnit) -> BWResult<bool> {
+        checker.can_set_rally_unit(self)
+    }
+
+    pub fn can_unload(&self, checker: impl CanUnload) -> BWResult<bool> {
+        checker.can_unload(self)
+    }
+
+    pub fn can_unload_all_position(&self, checker: impl CanUnloadAllPosition) -> BWResult<bool> {
+        checker.can_unload_all_position(self)
+    }
+
+    pub fn can_use_tech(&self, checker: impl CanUseTech) -> BWResult<bool> {
+        checker.can_use_tech(self)
+    }
+
+    pub fn can_use_tech_position(&self, checker: impl CanUseTechPosition) -> BWResult<bool> {
+        checker.can_use_tech_position(self)
+    }
+
+    pub fn can_use_tech_unit(&self, checker: impl CanUseTechUnit) -> BWResult<bool> {
+        checker.can_use_tech_unit(self)
+    }
+
+    pub fn can_use_tech_with_or_without_target(
+        &self,
+        checker: impl CanUseTechWithOrWithoutTarget,
+    ) -> BWResult<bool> {
+        checker.can_use_tech_with_or_without_target(self)
+    }
+
+    pub fn can_use_tech_without_target(
+        &self,
+        tech: TechType,
+        check_can_issue_command_type: bool,
+        check_commandability: bool,
+    ) -> BWResult<bool> {
+        if check_commandability && !self.can_command()? {
+            return Ok(false);
+        }
+
+        if check_can_issue_command_type && !self.can_use_tech_with_or_without_target(false)? {
+            return Ok(false);
+        }
+
+        if !self.can_use_tech_with_or_without_target((tech, false, false))? {
+            return Ok(false);
+        }
+
+        if tech.targets_unit()
+            || tech.targets_position()
+            || tech == TechType::None
+            || tech == TechType::Unknown
+            || tech == TechType::Lurker_Aspect
+        {
+            return Err(Error::Incompatible_TechType);
+        }
+        Ok(true)
+    }
+
+    pub fn can_issue_command<C: Into<CanIssueCommandArg>>(&self, arg: C) -> Result<bool, Error> {
+        let arg: CanIssueCommandArg = arg.into();
+        if arg.check_commandability && !self.can_command()? {
+            return Ok(false);
+        }
+
+        let ct = arg.c.get_type();
+        if !self.can_issue_command_type(ct, false)? {
+            return Ok(false);
+        }
+
+        let target = || {
+            self.game
+                .get_unit(arg.c.targetIndex)
+                .expect("Target to exist")
+        };
+
+        match ct {
+            UnitCommandType::Attack_Move => Ok(true),
+            UnitCommandType::Attack_Unit => {
+                self.can_attack_unit((&target(), arg.check_can_target_unit, false, false))
+            }
+            UnitCommandType::Build => self.can_build((
+                arg.c.get_unit_type(),
+                TilePosition {
+                    x: arg.c.x,
+                    y: arg.c.y,
+                },
+                arg.check_can_build_unit_type,
+                false,
+                false,
+            )),
+            UnitCommandType::Build_Addon => {
+                self.can_build_addon((arg.c.get_unit_type(), false, false))
+            }
+            UnitCommandType::Train => self.can_train((arg.c.get_unit_type(), false, false)),
+            UnitCommandType::Morph => self.can_morph((arg.c.get_unit_type(), false, false)),
+            UnitCommandType::Research => {
+                self.game
+                    .can_research((Some(self), arg.c.get_tech_type(), false))
+            }
+            UnitCommandType::Upgrade => {
+                self.game
+                    .can_upgrade((Some(self), arg.c.get_upgrade_type(), false))
+            }
+            UnitCommandType::Set_Rally_Position => Ok(true),
+            UnitCommandType::Set_Rally_Unit => {
+                self.can_set_rally_unit((&target(), arg.check_can_target_unit, false, false))
+            }
+            UnitCommandType::Move => Ok(true),
+            UnitCommandType::Patrol => Ok(true),
+            UnitCommandType::Hold_Position => Ok(true),
+            UnitCommandType::Stop => Ok(true),
+            UnitCommandType::Follow => {
+                self.can_follow((&target(), arg.check_can_target_unit, false, false))
+            }
+            UnitCommandType::Gather => {
+                self.can_gather((&target(), arg.check_can_target_unit, false, false))
+            }
+            UnitCommandType::Return_Cargo => Ok(true),
+            UnitCommandType::Repair => {
+                self.can_repair((&target(), arg.check_can_target_unit, false, false))
+            }
+            UnitCommandType::Burrow => Ok(true),
+            UnitCommandType::Unburrow => Ok(true),
+            UnitCommandType::Cloak => Ok(true),
+            UnitCommandType::Decloak => Ok(true),
+            UnitCommandType::Siege => Ok(true),
+            UnitCommandType::Unsiege => Ok(true),
+            UnitCommandType::Lift => Ok(true),
+            UnitCommandType::Land => {
+                self.can_land((arg.c.get_target_tile_position(), false, false))
+            }
+            UnitCommandType::Load => {
+                self.can_load((&target(), arg.check_can_target_unit, false, false))
+            }
+            UnitCommandType::Unload => {
+                self.can_unload((&target(), arg.check_can_target_unit, false, false, false))
+            }
+            UnitCommandType::Unload_All => Ok(true),
+            UnitCommandType::Unload_All_Position => {
+                self.can_unload_all_position((arg.c.get_target_position(), false, false))
+            }
+            UnitCommandType::Right_Click_Position => Ok(true),
+            UnitCommandType::Right_Click_Unit => {
+                self.can_right_click_unit((&target(), arg.check_can_target_unit, false, false))
+            }
+            UnitCommandType::Halt_Construction => Ok(true),
+            UnitCommandType::Cancel_Construction => Ok(true),
+            UnitCommandType::Cancel_Addon => Ok(true),
+            UnitCommandType::Cancel_Train => Ok(true),
+            UnitCommandType::Cancel_Train_Slot => {
+                self.can_cancel_train_slot((arg.c.extra, false, false))
+            }
+            UnitCommandType::Cancel_Morph => Ok(true),
+            UnitCommandType::Cancel_Research => Ok(true),
+            UnitCommandType::Cancel_Upgrade => Ok(true),
+            UnitCommandType::Use_Tech => {
+                self.can_use_tech_without_target(arg.c.get_tech_type(), false, false)
+            }
+            UnitCommandType::Use_Tech_Unit => self.can_use_tech_unit((
+                arg.c.get_tech_type(),
+                &target(),
+                arg.check_can_target_unit,
+                arg.check_can_use_tech_unit_on_units,
+                false,
+                false,
+            )),
+            UnitCommandType::Use_Tech_Position => self.can_use_tech_position((
+                arg.c.get_tech_type(),
+                arg.c.get_target_position(),
+                arg.check_can_use_tech_position_on_positions,
+                false,
+                false,
+            )),
+            UnitCommandType::Place_COP => {
+                self.can_place_cop((arg.c.get_target_tile_position(), false, false))
+            }
+            _ => Ok(true),
+        }
+    }
+
+    pub fn can_issue_command_type(
+        &self,
+        ct: UnitCommandType,
+        check_commandability: bool,
+    ) -> BWResult<bool> {
+        if check_commandability && !self.can_command()? {
+            return Ok(false);
+        }
+        match ct {
+            UnitCommandType::Attack_Move => self.can_attack_move(false),
+            UnitCommandType::Attack_Unit => self.can_attack_unit(false),
+            UnitCommandType::Build => self.can_build(false),
+            UnitCommandType::Build_Addon => self.can_build_addon(false),
+            UnitCommandType::Train => self.can_train(false),
+            UnitCommandType::Morph => self.can_morph(false),
+            UnitCommandType::Research => self.game.can_research((self, false)),
+            UnitCommandType::Upgrade => self.game.can_upgrade((self, false)),
+            UnitCommandType::Set_Rally_Position => self.can_set_rally_position(false),
+            UnitCommandType::Set_Rally_Unit => self.can_set_rally_unit(false),
+            UnitCommandType::Move => self.can_move(false),
+            UnitCommandType::Patrol => self.can_patrol(false),
+            UnitCommandType::Hold_Position => self.can_hold_position(false),
+            UnitCommandType::Stop => self.can_stop(false),
+            UnitCommandType::Follow => self.can_follow(false),
+            UnitCommandType::Gather => self.can_gather(false),
+            UnitCommandType::Return_Cargo => self.can_return_cargo(false),
+            UnitCommandType::Repair => self.can_repair(false),
+            UnitCommandType::Burrow => self.can_burrow(false),
+            UnitCommandType::Unburrow => self.can_unburrow(false),
+            UnitCommandType::Cloak => self.can_cloak(false),
+            UnitCommandType::Decloak => self.can_decloak(false),
+            UnitCommandType::Siege => self.can_siege(false),
+            UnitCommandType::Unsiege => self.can_unsiege(false),
+            UnitCommandType::Lift => self.can_lift(false),
+            UnitCommandType::Land => self.can_land(false),
+            UnitCommandType::Load => self.can_load(false),
+            UnitCommandType::Unload => self.can_unload(false),
+            UnitCommandType::Unload_All => self.can_unload_all(false),
+            UnitCommandType::Unload_All_Position => self.can_unload_all_position(false),
+            UnitCommandType::Right_Click_Position => self.can_right_click_position(false),
+            UnitCommandType::Right_Click_Unit => self.can_right_click_unit(false),
+            UnitCommandType::Halt_Construction => self.can_halt_construction(false),
+            UnitCommandType::Cancel_Construction => self.can_cancel_construction(false),
+            UnitCommandType::Cancel_Addon => self.can_cancel_addon(false),
+            UnitCommandType::Cancel_Train => self.can_cancel_train(false),
+            UnitCommandType::Cancel_Train_Slot => self.can_cancel_train_slot(false),
+            UnitCommandType::Cancel_Morph => self.can_cancel_morph(false),
+            UnitCommandType::Cancel_Research => self.can_cancel_research(false),
+            UnitCommandType::Cancel_Upgrade => self.can_cancel_upgrade(false),
+            UnitCommandType::Use_Tech
+            | UnitCommandType::Use_Tech_Unit
+            | UnitCommandType::Use_Tech_Position => self.can_use_tech_with_or_without_target(false),
+            UnitCommandType::Place_COP => self.can_place_cop(false),
+            _ => Ok(true),
+        }
+    }
+
+    pub fn can_set_rally_position(&self, check_commandability: bool) -> BWResult<bool> {
+        if check_commandability && !self.can_command()? {
+            return Ok(false);
+        }
+
+        if !self.get_type().can_produce() || !self.get_type().is_building() {
+            return Err(Error::Incompatible_UnitType);
+        }
+        if self.is_lifted() {
+            return Err(Error::Incompatible_State);
+        }
+        Ok(true)
+    }
+
+    pub fn can_move(&self, check_commandability: bool) -> BWResult<bool> {
+        if check_commandability && !self.can_command()? {
+            return Ok(false);
+        }
+
+        if !self.get_type().is_building() {
+            if !self.is_interruptible() {
+                return Err(Error::Unit_Busy);
+            }
+            if !self.get_type().can_move() {
+                return Err(Error::Incompatible_UnitType);
+            }
+            if self.is_burrowed() {
+                return Err(Error::Incompatible_State);
+            }
+            if self.get_order() == Order::ConstructingBuilding {
+                return Err(Error::Unit_Busy);
+            }
+            if self.get_type() == UnitType::Zerg_Larva {
+                return Err(Error::Incompatible_UnitType);
+            }
+        } else {
+            if !self.get_type().is_flying_building() {
+                return Err(Error::Incompatible_UnitType);
+            }
+            if !self.is_lifted() {
+                return Err(Error::Incompatible_State);
+            }
+        }
+        Ok(true)
+    }
+
+    pub fn can_patrol(&self, check_commandability: bool) -> BWResult<bool> {
+        if check_commandability && !self.can_command()? {
+            return Ok(false);
+        }
+
+        if !self.can_move(false)? {
+            Ok(false)
+        } else {
+            Ok(true)
+        }
+    }
+
+    pub fn can_return_cargo(&self, check_commandability: bool) -> BWResult<bool> {
+        if check_commandability && !self.can_command()? {
+            return Ok(false);
+        }
+
+        if !self.get_type().is_building() && !self.is_interruptible() {
+            return Err(Error::Unit_Busy);
+        }
+        if !self.get_type().is_worker() {
+            return Err(Error::Incompatible_UnitType);
+        }
+        if !self.is_carrying_gas() && !self.is_carrying_minerals() {
+            return Err(Error::Insufficient_Ammo);
+        }
+        if self.is_burrowed() {
+            return Err(Error::Incompatible_State);
+        }
+        if self.get_order() == Order::ConstructingBuilding {
+            return Err(Error::Unit_Busy);
+        }
+        Ok(true)
+    }
+
+    pub fn can_hold_position(&self, check_commandability: bool) -> BWResult<bool> {
+        if check_commandability && !self.can_command()? {
+            return Ok(false);
+        }
+
+        if !self.get_type().is_building() {
+            if !self.get_type().can_move() {
+                return Err(Error::Incompatible_UnitType);
+            }
+            if self.is_burrowed() && self.get_type() != UnitType::Zerg_Lurker {
+                return Err(Error::Incompatible_State);
+            }
+            if self.get_order() == Order::ConstructingBuilding {
+                return Err(Error::Unit_Busy);
+            }
+            if self.get_type() == UnitType::Zerg_Larva {
+                return Err(Error::Incompatible_UnitType);
+            }
+        } else {
+            if !self.get_type().is_flying_building() {
+                return Err(Error::Incompatible_UnitType);
+            }
+            if !self.is_lifted() {
+                return Err(Error::Incompatible_State);
+            }
+        }
+
+        if !self.is_completed() {
+            return Err(Error::Incompatible_State);
+        }
+        Ok(true)
+    }
+
+    pub fn can_stop(&self, check_commandability: bool) -> BWResult<bool> {
+        if check_commandability && !self.can_command()? {
+            return Ok(false);
+        }
+
+        if !self.is_completed() {
+            return Err(Error::Incompatible_State);
+        }
+        if self.is_burrowed() && self.get_type() != UnitType::Zerg_Lurker {
+            return Err(Error::Incompatible_State);
+        }
+        if self.get_type().is_building()
+            && !self.is_lifted()
+            && self.get_type() != UnitType::Protoss_Photon_Cannon
+            && self.get_type() != UnitType::Zerg_Sunken_Colony
+            && self.get_type() != UnitType::Zerg_Spore_Colony
+            && self.get_type() != UnitType::Terran_Missile_Turret
+        {
+            return Err(Error::Incompatible_State);
+        }
+        Ok(true)
+    }
+
+    pub fn can_burrow(&self, check_commandability: bool) -> BWResult<bool> {
+        if check_commandability && !self.can_command()? {
+            return Ok(false);
+        }
+
+        if !self.can_use_tech_without_target(TechType::Burrowing, true, false)? {
+            return Ok(false);
+        }
+        Ok(true)
+    }
+
+    pub fn can_unburrow(&self, check_commandability: bool) -> BWResult<bool> {
+        if check_commandability && !self.can_command()? {
+            return Ok(false);
+        }
+
+        if !self.get_type().is_burrowable() {
+            return Err(Error::Incompatible_UnitType);
+        }
+        if !self.is_burrowed() || self.get_order() == Order::Unburrowing {
+            return Err(Error::Incompatible_State);
+        }
+        Ok(true)
+    }
+
+    pub fn can_cloak(&self, check_commandability: bool) -> BWResult<bool> {
+        if check_commandability && !self.can_command()? {
+            return Ok(false);
+        }
+
+        if self.get_type().cloaking_tech() == TechType::None {
+            return Err(Error::Incompatible_UnitType);
+        }
+        if self.get_secondary_order() != Order::Cloak {
+            return Err(Error::Incompatible_State);
+        }
+        Ok(true)
+    }
+
+    pub fn can_decloak(&self, check_commandability: bool) -> BWResult<bool> {
+        if check_commandability && !self.can_command()? {
+            return Ok(false);
+        }
+
+        if self.get_type().cloaking_tech() == TechType::None {
+            return Err(Error::Incompatible_UnitType);
+        }
+        if self.get_secondary_order() != Order::Cloak {
+            return Err(Error::Incompatible_State);
+        }
+        Ok(true)
+    }
+
+    pub fn can_siege(&self, check_commandability: bool) -> BWResult<bool> {
+        if check_commandability && !self.can_command()? {
+            return Ok(false);
+        }
+
+        if !self.can_use_tech_without_target(TechType::Tank_Siege_Mode, true, false)? {
+            return Ok(false);
+        }
+        Ok(true)
+    }
+
+    pub fn can_unsiege(&self, check_commandability: bool) -> BWResult<bool> {
+        if check_commandability && !self.can_command()? {
+            return Ok(false);
+        }
+
+        if !self.is_sieged() {
+            return Err(Error::Incompatible_State);
+        }
+        if self.get_order() == Order::Sieging || self.get_order() == Order::Unsieging {
+            return Err(Error::Unit_Busy);
+        }
+        if self.is_hallucination() {
+            return Err(Error::Incompatible_UnitType);
+        }
+        Ok(true)
+    }
+
+    pub fn can_lift(&self, check_commandability: bool) -> BWResult<bool> {
+        if check_commandability && !self.can_command()? {
+            return Ok(false);
+        }
+
+        if !self.get_type().is_flying_building() {
+            return Err(Error::Incompatible_UnitType);
+        }
+        if self.is_lifted() {
+            return Err(Error::Incompatible_State);
+        }
+        if !self.is_completed() {
+            return Err(Error::Incompatible_State);
+        }
+        if !self.is_idle() {
+            return Err(Error::Unit_Busy);
+        }
+        Ok(true)
+    }
+
+    pub fn can_unload_with_or_without_target(&self, check_commandability: bool) -> BWResult<bool> {
+        if check_commandability && !self.can_command()? {
+            return Ok(false);
+        }
+
+        if !self.get_type().is_building() && !self.is_interruptible() {
+            return Err(Error::Unit_Busy);
+        }
+        if self.get_loaded_units().is_empty() {
+            return Err(Error::Unit_Does_Not_Exist);
+        }
+        if self.get_type() == UnitType::Zerg_Overlord
+            && self
+                .game
+                .self_()
+                .expect("Player self to exist")
+                .get_upgrade_level(UpgradeType::Ventral_Sacs)
+                == 0
+        {
+            return Err(Error::Insufficient_Tech);
+        }
+        if self.get_type().space_provided() <= 0 {
+            return Err(Error::Incompatible_UnitType);
+        }
+
+        Ok(true)
+    }
+
+    pub fn can_unload_at_position(
+        &self,
+        targ_drop_pos: Position,
+        check_can_issue_command_type: bool,
+        check_commandability: bool,
+    ) -> BWResult<bool> {
+        if check_commandability && !self.can_command()? {
+            return Ok(false);
+        }
+
+        if check_can_issue_command_type && !self.can_unload_with_or_without_target(false)? {
+            return Ok(false);
+        }
+
+        if self.get_type() != UnitType::Terran_Bunker {
+            let wp = targ_drop_pos.to_walk_position();
+            if !wp.is_valid() {
+                return Err(Error::Invalid_Tile_Position);
+            } else if !self.game.is_walkable(wp) {
+                return Err(Error::Unreachable_Location);
+            }
+        }
+        Ok(true)
+    }
+
+    pub fn can_unload_all(&self, check_commandability: bool) -> BWResult<bool> {
+        self.can_unload_at_position(self.get_position(), true, check_commandability)
+    }
+
+    pub fn can_right_click(&self, check_commandability: bool) -> BWResult<bool> {
+        if check_commandability && !self.can_command()? {
+            return Ok(false);
+        }
+
+        if !self.can_right_click_position(false).unwrap_or(false)
+            && !self.can_right_click_unit(false)?
+        {
+            return Ok(false);
+        }
+        Ok(true)
+    }
+
+    pub fn can_right_click_position(&self, check_commandability: bool) -> BWResult<bool> {
+        if check_commandability && !self.can_command()? {
+            return Ok(false);
+        }
+
+        if !self.get_type().is_building() && !self.is_interruptible() {
+            return Err(Error::Unit_Busy);
+        }
+        if !self.can_move(false).unwrap_or(false)
+            && !self.can_set_rally_position(false).unwrap_or(false)
+        {
+            return Err(Error::Incompatible_State);
+        }
+        Ok(true)
+    }
+
+    pub fn can_halt_construction(&self, check_commandability: bool) -> BWResult<bool> {
+        if check_commandability && !self.can_command()? {
+            return Ok(false);
+        }
+
+        if self.get_order() != Order::ConstructingBuilding {
+            return Err(Error::Incompatible_State);
+        }
+
+        Ok(true)
+    }
+
+    pub fn can_cancel_construction(&self, check_commandability: bool) -> BWResult<bool> {
+        if check_commandability && !self.can_command()? {
+            return Ok(false);
+        }
+
+        if self.get_type().is_building() {
+            return Err(Error::Incompatible_UnitType);
+        }
+        if self.is_completed()
+            || (self.get_type() == UnitType::Zerg_Nydus_Canal && self.get_nydus_exit().is_some())
+        {
+            return Err(Error::Incompatible_State);
+        }
+        Ok(true)
+    }
+
+    pub fn can_cancel_addon(&self, check_commandability: bool) -> BWResult<bool> {
+        if check_commandability && !self.can_command()? {
+            return Ok(false);
+        }
+
+        if !self.get_addon().map(|a| a.is_completed()).unwrap_or(false) {
+            return Err(Error::Incompatible_UnitType);
+        }
+        Ok(true)
+    }
+
+    pub fn can_cancel_research(&self, check_commandability: bool) -> BWResult<bool> {
+        if check_commandability && !self.can_command()? {
+            return Ok(false);
+        }
+
+        if self.get_order() == Order::ResearchTech {
+            return Err(Error::Incompatible_State);
+        }
+        Ok(true)
+    }
+
+    pub fn can_cancel_upgrade(&self, check_commandability: bool) -> BWResult<bool> {
+        if check_commandability && !self.can_command()? {
+            return Ok(false);
+        }
+
+        if self.get_order() != Order::Upgrade {
+            return Err(Error::Incompatible_State);
+        }
+        Ok(true)
+    }
+
+    pub fn can_cancel_morph(&self, check_commandability: bool) -> BWResult<bool> {
+        if check_commandability && !self.can_command()? {
+            return Ok(false);
+        }
+
+        if !self.is_morphing()
+            || (!self.is_completed()
+                && self.get_type() == UnitType::Zerg_Nydus_Canal
+                && self.get_nydus_exit().is_some())
+        {
+            return Err(Error::Incompatible_State);
+        }
+        if self.is_hallucination() {
+            return Err(Error::Incompatible_UnitType);
+        }
+        Ok(true)
+    }
+}
 
 pub trait CanResearch {
     fn can_research(&self, game: &Game) -> BWResult<bool>;

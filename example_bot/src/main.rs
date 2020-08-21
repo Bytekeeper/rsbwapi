@@ -44,7 +44,7 @@ impl AiModule for MyModule {
                 )
             }
         }
-        /** Show larvas of Zerg depots 
+        /** Show larvas of Zerg depots
         for hatchery in units.iter().filter(|u| u.get_type().produces_larva()) {
             println!(
                 "Hatchery {} has {} larva",
@@ -60,7 +60,10 @@ impl AiModule for MyModule {
             .iter()
             .find(|u| u.get_type() == UnitType::Zerg_Hatchery)
         {
-            if game.can_make(None, UnitType::Zerg_Zergling).unwrap_or(false) {
+            if game
+                .can_make(None, UnitType::Zerg_Zergling)
+                .unwrap_or(false)
+            {
                 u.train(UnitType::Zerg_Zergling).ok();
             } else {
                 u.train(UnitType::Zerg_Drone).ok();
@@ -71,38 +74,43 @@ impl AiModule for MyModule {
             .find(|u| u.get_type().is_mineral_field() && u.is_visible());
         let self_ = game.self_().unwrap();
         if self_.supply_used() == self_.supply_total() {
-            if let Some(larva) = my_units.iter().find(|u| u.get_type() == UnitType::Zerg_Larva) {
+            if let Some(larva) = my_units
+                .iter()
+                .find(|u| u.get_type() == UnitType::Zerg_Larva)
+            {
                 larva.train(UnitType::Zerg_Overlord).ok();
             }
         }
-        let builder = if self_.minerals() >= UnitType::Zerg_Spawning_Pool.mineral_price()
-            && !has_pool
-        {
-            let mut found = false;
-            let builder = my_units
-                .iter()
-                .find(|u| u.get_type() == UnitType::Zerg_Drone)
-                .expect("drone to build sth");
-            'outer: for y in 0..game.map_height() {
-                for x in 0..game.map_width() {
-                    if game.can_build_here(builder, (x, y), UnitType::Zerg_Spawning_Pool, true).unwrap_or(false) {
-                        let tl = TilePosition { x, y }.to_position();
-                        let br = tl + UnitType::Zerg_Spawning_Pool.tile_size().to_position();
-                        game.draw_box_map(tl, br, Color::Red, false);
-                        builder.build(UnitType::Zerg_Spawning_Pool, (x, y)).ok();
-                        found = true;
-                        break 'outer;
+        let builder =
+            if self_.minerals() >= UnitType::Zerg_Spawning_Pool.mineral_price() && !has_pool {
+                let mut found = false;
+                let builder = my_units
+                    .iter()
+                    .find(|u| u.get_type() == UnitType::Zerg_Drone)
+                    .expect("drone to build sth");
+                'outer: for y in 0..game.map_height() {
+                    for x in 0..game.map_width() {
+                        if game
+                            .can_build_here(builder, (x, y), UnitType::Zerg_Spawning_Pool, true)
+                            .unwrap_or(false)
+                        {
+                            let tl = TilePosition { x, y }.to_position();
+                            let br = tl + UnitType::Zerg_Spawning_Pool.tile_size().to_position();
+                            game.draw_box_map(tl, br, Color::Red, false);
+                            builder.build(UnitType::Zerg_Spawning_Pool, (x, y)).ok();
+                            found = true;
+                            break 'outer;
+                        }
                     }
                 }
-            }
-            if found {
-                Some(builder)
+                if found {
+                    Some(builder)
+                } else {
+                    None
+                }
             } else {
                 None
-            }
-        } else {
-            None
-        };
+            };
 
         if let Some(mineral) = mineral {
             if let Some(miner) = game.get_closest_unit(
@@ -117,15 +125,22 @@ impl AiModule for MyModule {
                 miner.gather(mineral).ok();
             }
 
-            let enemy = units.iter().find(|u| u.get_player() == game.enemy());
+            let enemy = units
+                .iter()
+                .find(|u| u.get_player() == game.enemy().unwrap());
             if let Some(enemy) = enemy {
                 units
                     .iter()
                     //                    .filter(|u| u.get_type() == UnitType::Zerg_Drone)
                     .for_each(|u| {
                         //                        println!("Sending {} to attack {:?}", u.id, enemy.get_type());
-                        if let Err(err) = u.attack(enemy) {
-                            println!("{:?} cannot hit {:?}: {:?}", u.get_type(), enemy.get_type(), err);
+                        if let Err(err) = u.attack(&enemy) {
+                            println!(
+                                "{:?} cannot hit {:?}: {:?}",
+                                u.get_type(),
+                                enemy.get_type(),
+                                err
+                            );
                         }
                     });
             }
