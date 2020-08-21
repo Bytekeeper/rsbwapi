@@ -21,6 +21,7 @@ fn main() {
         .clang_arg("-xc++")
         .clang_arg("-std=c++14")
         .clang_arg("-Ibwapi/bwapi/include")
+        .clang_arg("-I.")
         .default_enum_style(bindgen::EnumVariation::Rust {
             non_exhaustive: false,
         })
