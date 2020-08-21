@@ -1,6 +1,6 @@
 [package]
 name = "bwapi_wrapper"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Dennis Waldherr <bytekeeper@mailbox.org>"]
 edition = "2018"
 homepage = "https://github.com/Bytekeeper/rsbwapi/"
@@ -12,6 +12,9 @@ readme = "README.md"
 
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[package.metadata.docs.rs]
+targets = ["x86_64-pc-windows-msvc"]
 
 [dependencies]
 num-traits = "0.2"
