@@ -2,18 +2,35 @@ use rsbwapi::*;
 
 pub struct MyModule;
 
+impl MyModule {
+    fn draw_unit_regions(&self, game: &Game) {
+        /* Draw BW Regions on all units */
+        for u in game.get_all_units() {
+            let region = game.get_region_at(u.get_position());
+            if region.is_none() {
+                game.draw_text_map(u.get_position(), &"NO REGION".to_string());
+            } else {
+                game.draw_text_map(
+                    u.get_position(),
+                    &format!("r#{:?}", region.unwrap().get_id()),
+                )
+            }
+        }
+    }
+}
+
 impl AiModule for MyModule {
-    fn on_start(&self, game: &Game) {
+    fn on_start(&mut self, game: &Game) {
         for location in game.get_start_locations() {
             println!("{:?}", location);
         }
     }
 
-    fn on_unit_create(&self, _game: &Game, unit: Unit) {
+    fn on_unit_create(&mut self, _game: &Game, unit: Unit) {
         println!("Created Unit {}", unit.get_id())
     }
 
-    fn on_unit_destroy(&self, _game: &Game, unit: Unit) {
+    fn on_unit_destroy(&mut self, _game: &Game, unit: Unit) {
         println!("Destroyed Unit {}", unit.get_id())
     }
 
@@ -32,27 +49,7 @@ impl AiModule for MyModule {
         let units = game.get_all_units();
         let my_units = self_.get_units();
 
-        /* Draw BW Regions on all units */
-        for u in units {
-            let region = game.get_region_at(u.get_position());
-            if region.is_none() {
-                game.draw_text_map(u.get_position(), &"NO REGION".to_string());
-            } else {
-                game.draw_text_map(
-                    u.get_position(),
-                    &format!("r#{:?}", region.unwrap().get_id()),
-                )
-            }
-        }
-        /** Show larvas of Zerg depots
-        for hatchery in units.iter().filter(|u| u.get_type().produces_larva()) {
-            println!(
-                "Hatchery {} has {} larva",
-                hatchery.get_id(),
-                hatchery.get_larva().len()
-            );
-        }
-         */
+        self.draw_unit_regions(game);
         let has_pool = my_units
             .iter()
             .any(|u| u.get_type() == UnitType::Zerg_Spawning_Pool);
@@ -69,9 +66,6 @@ impl AiModule for MyModule {
                 u.train(UnitType::Zerg_Drone).ok();
             }
         }
-        let mineral = units
-            .iter()
-            .find(|u| u.get_type().is_mineral_field() && u.is_visible());
         let self_ = game.self_().unwrap();
         if self_.supply_used() == self_.supply_total() {
             if let Some(larva) = my_units
@@ -112,6 +106,10 @@ impl AiModule for MyModule {
                 None
             };
 
+        let mineral = units
+            .iter()
+            .find(|u| u.get_type().is_mineral_field() && u.is_visible());
+
         if let Some(mineral) = mineral {
             if let Some(miner) = game.get_closest_unit(
                 mineral.get_position(),
@@ -124,28 +122,27 @@ impl AiModule for MyModule {
             ) {
                 miner.gather(mineral).ok();
             }
-
-            let enemy = units
-                .iter()
-                .find(|u| u.get_player() == game.enemy().unwrap());
-            if let Some(enemy) = enemy {
-                units
-                    .iter()
-                    //                    .filter(|u| u.get_type() == UnitType::Zerg_Drone)
-                    .for_each(|u| {
-                        //                        println!("Sending {} to attack {:?}", u.id, enemy.get_type());
-                        if let Err(err) = u.attack(&enemy) {
-                            println!(
-                                "{:?} cannot hit {:?}: {:?}",
-                                u.get_type(),
-                                enemy.get_type(),
-                                err
-                            );
-                        }
-                    });
-            }
         } else {
             println!("No minerals found!");
+        }
+        let enemy = units
+            .iter()
+            .find(|u| u.get_player() == game.enemy().unwrap());
+        if let Some(enemy) = enemy {
+            units
+                .iter()
+                //                    .filter(|u| u.get_type() == UnitType::Zerg_Drone)
+                .for_each(|u| {
+                    //                        println!("Sending {} to attack {:?}", u.id, enemy.get_type());
+                    if let Err(err) = u.attack(&enemy) {
+                        println!(
+                            "{:?} cannot hit {:?}: {:?}",
+                            u.get_type(),
+                            enemy.get_type(),
+                            err
+                        );
+                    }
+                });
         }
 
         //        game.cmd().leave_game();
