@@ -3,14 +3,13 @@ use bwapi_wrapper::*;
 
 #[derive(Clone, Copy)]
 pub struct Region<'a> {
-    pub id: u16,
     game: &'a Game<'a>,
     data: &'a BWAPI_RegionData,
 }
 
 impl<'a> Region<'a> {
-    pub(crate) fn new(id: u16, game: &'a Game<'a>, data: &'a BWAPI_RegionData) -> Self {
-        Self { id, game, data }
+    pub(crate) fn new(game: &'a Game<'a>, data: &'a BWAPI_RegionData) -> Self {
+        Self { game, data }
     }
 
     pub fn get_region_group_id(&self) -> i32 {

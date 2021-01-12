@@ -433,7 +433,7 @@ impl<'a> Game<'a> {
         if id >= self.data.regionCount as u16 {
             None
         } else {
-            Some(Region::new(id, self, &self.data.regions[id as usize]))
+            Some(Region::new(self, &self.data.regions[id as usize]))
         }
     }
 

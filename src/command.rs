@@ -133,14 +133,14 @@ impl<'a> CommandApplier<'a> {
 }
 
 #[derive(Default)]
-pub struct Commands {
+pub(crate) struct Commands {
     commands: Vec<Command>,
     game_commands: Vec<BWAPIC_Command>,
     unit_commands: Vec<UnitCommand>,
     shapes: Vec<BWAPIC_Shape>,
 }
 
-pub enum Command {
+pub(crate) enum Command {
     DrawText {
         ctype: CoordinateType,
         x: i32,
