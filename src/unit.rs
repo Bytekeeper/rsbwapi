@@ -747,10 +747,10 @@ impl<'a> Unit<'a> {
     }
 
     pub fn is_sieged(&self) -> bool {
-        match self.get_type() {
-            UnitType::Terran_Siege_Tank_Siege_Mode | UnitType::Hero_Edmund_Duke_Siege_Mode => true,
-            _ => false,
-        }
+        matches!(
+            self.get_type(),
+            UnitType::Terran_Siege_Tank_Siege_Mode | UnitType::Hero_Edmund_Duke_Siege_Mode
+        )
     }
 
     pub fn is_starting_attack(&self) -> bool {
@@ -785,13 +785,13 @@ impl<'a> Unit<'a> {
         {
             return false;
         }
-        match self.get_type() {
+        matches!(
+            self.get_type(),
             UnitType::Spell_Scanner_Sweep
-            | UnitType::Spell_Dark_Swarm
-            | UnitType::Spell_Disruption_Web
-            | UnitType::Special_Map_Revealer => false,
-            _ => true,
-        }
+                | UnitType::Spell_Dark_Swarm
+                | UnitType::Spell_Disruption_Web
+                | UnitType::Special_Map_Revealer
+        )
     }
 
     pub fn is_training(&self) -> bool {

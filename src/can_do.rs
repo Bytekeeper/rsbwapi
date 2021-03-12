@@ -434,9 +434,10 @@ impl CanMorph for bool {
             {
                 return Ok(true);
             }
-            if unit.get_larva().iter().any(|u| {
+            let larva_available = unit.get_larva().iter().any(|u| {
                 !u.is_constructing() && u.is_completed() && u.can_command().unwrap_or(false)
-            }) {
+            });
+            if larva_available {
                 return Ok(true);
             }
             return Err(Error::Unit_Busy);
