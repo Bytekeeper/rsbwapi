@@ -442,12 +442,7 @@ impl<'a> Game<'a> {
             None
         } else {
             let id = id as usize;
-            Some(Unit::new(
-                id,
-                self,
-                &self.data.units[id],
-                self.context.unit_infos[id].expect("UnitInfo to exist"),
-            ))
+            self.context.unit_infos[id].map(|ui| Unit::new(id, self, &self.data.units[id], ui))
         }
     }
 
@@ -626,7 +621,7 @@ impl<'a> Game<'a> {
         let pylons: Vec<Unit> = if let Some(pylons) = self.pylons.borrow().as_ref() {
             pylons
                 .iter()
-                .map(|&i| self.get_unit(i as i32).expect("Pylon to exst"))
+                .map(|&i| self.get_unit(i as i32).expect("Pylon to exist"))
                 .collect()
         } else {
             let pylons: Vec<Unit> = self

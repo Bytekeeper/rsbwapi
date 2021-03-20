@@ -45,6 +45,10 @@ pub(crate) fn map_memory<T>(name: &str) -> Option<Shm<T>> {
     let lp_name = CString::new(name).unwrap();
     unsafe {
         let handle = OpenFileMappingA(FILE_MAP_READ | FILE_MAP_WRITE, FALSE, lp_name.as_ptr());
+        if handle.is_null() {
+            // BWAPI Server is most likely not running yet
+            return None;
+        }
         let mapped =
             MapViewOfFile(handle, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, memory_size) as *mut T;
         Some(Shm(handle, NonNull::new_unchecked(mapped)))
