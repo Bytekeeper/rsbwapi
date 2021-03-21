@@ -10,9 +10,11 @@ fn main() {
     should_replace1();
     should_replace2();
 
-    // Tell cargo to tell rustc to link the system bzip2
-    // shared library.
-    //    println!("cargo:rustc-link-lib=bz2");
+    let host_target = std::env::var("HOST").unwrap();
+    std::env::set_var(
+        "BINDGEN_EXTRA_CLANG_ARGS",
+        format!("--target={}", host_target),
+    );
 
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
@@ -22,7 +24,6 @@ fn main() {
         .clang_arg("-std=c++14")
         .clang_arg("-Ibwapi/bwapi/include")
         .clang_arg("-I.")
-        .detect_include_paths(true)
         .default_enum_style(bindgen::EnumVariation::Rust {
             non_exhaustive: false,
         })
