@@ -112,11 +112,23 @@ macro_rules! pos_math_ops {
             pub fn is_valid(&self) -> bool {
                 self.x >= 0 && self.y >= 0
             }
+
+            pub fn distance_squared(&self, other: $t) -> u32 {
+                let dx = self.x - other.x;
+                let dy = self.y - other.y;
+                (dx * dx + dy * dy) as u32
+            }
         }
 
         impl From<PositionTuple> for $t {
             fn from(pos: PositionTuple) -> Self {
                 Self { x: pos.0, y: pos.1 }
+            }
+        }
+
+        impl From<$t> for PositionTuple {
+            fn from(pos: $t) -> Self {
+                (pos.x, pos.y)
             }
         }
 
@@ -163,6 +175,17 @@ macro_rules! pos_math_ops {
             }
         }
 
+        impl Sub<PositionTuple> for $t {
+            type Output = Self;
+
+            fn sub(self, other: PositionTuple) -> Self::Output {
+                Self::Output {
+                    x: self.x - other.0,
+                    y: self.y - other.1,
+                }
+            }
+        }
+
         impl Add<$t> for $t {
             type Output = Self;
 
@@ -170,6 +193,17 @@ macro_rules! pos_math_ops {
                 Self::Output {
                     x: self.x + other.x,
                     y: self.y + other.y,
+                }
+            }
+        }
+
+        impl Add<PositionTuple> for $t {
+            type Output = Self;
+
+            fn add(self, other: PositionTuple) -> Self::Output {
+                Self::Output {
+                    x: self.x + other.0,
+                    y: self.y + other.1
                 }
             }
         }

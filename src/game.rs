@@ -510,7 +510,7 @@ impl<'a> Game<'a> {
     pub fn get_closest_unit_in_rectangle<
         P: Into<Position>,
         Pred: IntoPredicate<Unit<'a>>,
-        R: Into<crate::Rectangle>,
+        R: Into<crate::Rectangle<Position>>,
     >(
         &'a self,
         center: P,

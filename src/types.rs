@@ -1,4 +1,4 @@
-use bwapi_wrapper::prelude::{Error, Position, PositionTuple};
+use bwapi_wrapper::prelude::{Error, PositionTuple};
 use num_derive::FromPrimitive;
 use std::ffi::CStr;
 use std::os::raw::c_char;
@@ -70,32 +70,72 @@ pub(crate) fn c_str_to_str(i: &[c_char]) -> &str {
     }
 }
 
-pub struct Rectangle {
-    pub tl: Position,
-    pub br: Position,
+pub struct Rectangle<P> {
+    pub tl: P,
+    pub br: P,
 }
 
-impl Rectangle {
-    pub fn new<P1: Into<Position>, P2: Into<Position>>(corner_a: P1, corner_b: P2) -> Self {
-        let (mut a, mut b) = (corner_a.into(), corner_b.into());
-        if a.x > b.x {
-            core::mem::swap(&mut a.x, &mut b.x);
+impl<P: Into<PositionTuple> + From<PositionTuple>> Rectangle<P> {
+    pub fn new<P1: Into<P>, P2: Into<P>>(corner_a: P1, corner_b: P2) -> Self {
+        let (mut a, mut b) = (corner_a.into().into(), corner_b.into().into());
+        if a.0 > b.0 {
+            core::mem::swap(&mut a.0, &mut b.0);
         }
-        if a.y > b.y {
-            core::mem::swap(&mut a.y, &mut b.y);
+        if a.1 > b.1 {
+            core::mem::swap(&mut a.1, &mut b.1);
         }
-        Rectangle { tl: a, br: b }
+        Rectangle {
+            tl: a.into(),
+            br: b.into(),
+        }
     }
 }
 
-impl From<(i32, i32, i32, i32)> for Rectangle {
+impl<P: From<PositionTuple> + Into<PositionTuple>> From<(i32, i32, i32, i32)> for Rectangle<P> {
     fn from(coords: (i32, i32, i32, i32)) -> Self {
-        Rectangle::new((coords.0, coords.1), (coords.2, coords.3))
+        Rectangle::from(((coords.0, coords.1), (coords.2, coords.3)))
     }
 }
 
-impl From<(PositionTuple, PositionTuple)> for Rectangle {
+impl<P: Into<PositionTuple> + From<PositionTuple>> From<(PositionTuple, PositionTuple)>
+    for Rectangle<P>
+{
     fn from(corners: (PositionTuple, PositionTuple)) -> Self {
-        Rectangle::new(corners.0, corners.1)
+        Rectangle::<P>::new(P::from(corners.0), P::from(corners.1))
+    }
+}
+
+impl<P: Into<PositionTuple> + From<PositionTuple>> std::iter::IntoIterator for Rectangle<P> {
+    type Item = P;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let tl: PositionTuple = self.tl.into();
+        let br: PositionTuple = self.br.into();
+        (tl.1..=br.1)
+            .flat_map(|y| (tl.0..=br.0).map(move |x| (x, y).into()))
+            .collect::<Vec<_>>()
+            .into_iter()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::TilePosition;
+
+    #[test]
+    fn should_return_all_positions_of_rectangle() {
+        let rec: Rectangle<TilePosition> = Rectangle::new((0, 0), (2, 2));
+        let mut iter = rec.into_iter();
+        assert_eq!(Some(TilePosition { x: 0, y: 0 }), iter.next());
+        assert_eq!(Some(TilePosition { x: 1, y: 0 }), iter.next());
+        assert_eq!(Some(TilePosition { x: 2, y: 0 }), iter.next());
+        assert_eq!(Some(TilePosition { x: 0, y: 1 }), iter.next());
+        assert_eq!(Some(TilePosition { x: 1, y: 1 }), iter.next());
+        assert_eq!(Some(TilePosition { x: 2, y: 1 }), iter.next());
+        assert_eq!(Some(TilePosition { x: 0, y: 2 }), iter.next());
+        assert_eq!(Some(TilePosition { x: 1, y: 2 }), iter.next());
+        assert_eq!(Some(TilePosition { x: 2, y: 2 }), iter.next());
     }
 }
