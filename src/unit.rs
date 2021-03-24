@@ -4,9 +4,11 @@ use crate::predicate::{IntoPredicate, Predicate};
 use crate::*;
 use bwapi_wrapper::*;
 
+pub type UnitId = usize;
+
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct UnitInfo {
-    pub id: usize,
+    pub id: UnitId,
     pub initial_hit_points: i32,
     pub initial_resources: i32,
     pub initial_position: Position,
@@ -14,7 +16,7 @@ pub(crate) struct UnitInfo {
 }
 
 impl UnitInfo {
-    pub(crate) fn new(id: usize, data: &BWAPI_UnitData) -> Self {
+    pub(crate) fn new(id: UnitId, data: &BWAPI_UnitData) -> Self {
         Self {
             id,
             initial_hit_points: data.hitPoints,
@@ -30,7 +32,7 @@ impl UnitInfo {
 
 #[derive(Clone, Copy)]
 pub struct Unit<'a> {
-    pub id: usize,
+    pub id: UnitId,
     pub(crate) game: &'a Game<'a>,
     data: &'a BWAPI_UnitData,
     info: UnitInfo,
@@ -38,7 +40,7 @@ pub struct Unit<'a> {
 
 impl<'a> Unit<'a> {
     pub(crate) fn new(
-        id: usize,
+        id: UnitId,
         game: &'a Game<'a>,
         data: &'a BWAPI_UnitData,
         info: UnitInfo,
@@ -80,7 +82,7 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_addon(&self) -> Option<Unit> {
-        self.game.get_unit(self.data.addon)
+        self.game.get_unit(self.data.addon as usize)
     }
 
     pub fn get_air_weapon_cooldown(&self) -> i32 {
@@ -100,11 +102,11 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_build_unit(&self) -> Option<Unit> {
-        self.game.get_unit(self.data.buildUnit)
+        self.game.get_unit(self.data.buildUnit as usize)
     }
 
     pub fn get_carrier(&self) -> Option<Unit> {
-        self.game.get_unit(self.data.carrier)
+        self.game.get_unit(self.data.carrier as usize)
     }
 
     pub fn get_defense_matrix_points(&self) -> i32 {
@@ -158,7 +160,7 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_hatchery(&self) -> Option<Unit> {
-        self.game.get_unit(self.data.hatchery)
+        self.game.get_unit(self.data.hatchery as usize)
     }
 
     pub fn get_hit_points(&self) -> i32 {
@@ -206,7 +208,7 @@ impl<'a> Unit<'a> {
         self.game
             .connected_units
             .borrow_mut()
-            .insert(self.id, interceptors.iter().map(|u| u.id as i32).collect());
+            .insert(self.id, interceptors.iter().map(|u| u.id).collect());
         interceptors
     }
 
@@ -238,7 +240,7 @@ impl<'a> Unit<'a> {
         self.game
             .connected_units
             .borrow_mut()
-            .insert(self.id, larva.iter().map(|u| u.id as i32).collect());
+            .insert(self.id, larva.iter().map(|u| u.id).collect());
         larva
     }
 
@@ -275,7 +277,7 @@ impl<'a> Unit<'a> {
             self.game
                 .loaded_units
                 .borrow_mut()
-                .insert(self.id, loaded_units.iter().map(|u| u.id as i32).collect());
+                .insert(self.id, loaded_units.iter().map(|u| u.id).collect());
             loaded_units
         }
     }
@@ -289,7 +291,7 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_nydus_exit(&self) -> Option<Unit> {
-        self.game.get_unit(self.data.nydusExit)
+        self.game.get_unit(self.data.nydusExit as usize)
     }
 
     pub fn get_order(&self) -> Order {
@@ -297,7 +299,7 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_order_target(&self) -> Option<Unit> {
-        self.game.get_unit(self.data.orderTarget)
+        self.game.get_unit(self.data.orderTarget as usize)
     }
 
     pub fn get_order_target_position(&self) -> Option<Position> {
@@ -319,7 +321,7 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_power_up(&self) -> Option<Unit> {
-        self.game.get_unit(self.data.powerUp)
+        self.game.get_unit(self.data.powerUp as usize)
     }
 
     pub fn get_rally_position(&self) -> Option<Position> {
@@ -334,7 +336,7 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_rally_unit(&self) -> Option<Unit> {
-        self.game.get_unit(self.data.rallyUnit)
+        self.game.get_unit(self.data.rallyUnit as usize)
     }
 
     pub fn get_remaining_build_time(&self) -> i32 {
@@ -407,7 +409,7 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_target(&self) -> Option<Unit> {
-        self.game.get_unit(self.id as i32)
+        self.game.get_unit(self.id)
     }
 
     pub fn get_target_position(&self) -> Option<Position> {
@@ -440,7 +442,7 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_transport(&self) -> Option<Unit> {
-        self.game.get_unit(self.data.transport as i32)
+        self.game.get_unit(self.data.transport as usize)
     }
 
     pub fn get_upgrade(&self) -> UpgradeType {
@@ -818,7 +820,7 @@ impl<'a> Unit<'a> {
         self.get_order() == Order::Upgrade
     }
 
-    pub fn get_id(&self) -> usize {
+    pub fn get_id(&self) -> UnitId {
         self.id
     }
 

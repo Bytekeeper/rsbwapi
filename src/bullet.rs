@@ -48,11 +48,11 @@ impl<'a> Bullet<'a> {
     }
 
     pub fn get_source(&self) -> Option<Unit> {
-        self.frame.get_unit(self.data.source)
+        self.frame.get_unit(self.data.source as usize)
     }
 
     pub fn get_target(&self) -> Option<Unit> {
-        self.frame.get_unit(self.data.target)
+        self.frame.get_unit(self.data.target as usize)
     }
 
     pub fn get_target_position(&self) -> Option<Position> {

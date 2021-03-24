@@ -1734,7 +1734,7 @@ impl<'a> Unit<'a> {
 
         let target = || {
             self.game
-                .get_unit(arg.c.targetIndex)
+                .get_unit(arg.c.targetIndex as usize)
                 .expect("Target to exist")
         };
 

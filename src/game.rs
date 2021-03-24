@@ -7,20 +7,15 @@ use crate::predicate::Predicate;
 use crate::region::Region;
 use crate::shm::Shm;
 use crate::types::c_str_to_str;
-use crate::unit::UnitInfo;
+use crate::unit::{Unit, UnitId, UnitInfo};
 use crate::*;
 use bwapi_wrapper::*;
 use core::cell::RefCell;
 use rstar::primitives::Rectangle;
-use rstar::Envelope;
-use rstar::PointDistance;
-use rstar::RTree;
-use rstar::RTreeObject;
-use rstar::AABB;
+use rstar::{Envelope, PointDistance, RTree, RTreeObject, AABB};
 use std::collections::HashMap;
 
 use crate::player::Player;
-use crate::unit::Unit;
 
 pub struct GameContext {
     data: Shm<BWAPI_GameData>,
@@ -31,7 +26,7 @@ pub struct GameContext {
 }
 
 pub struct UnitLocation {
-    id: usize,
+    id: UnitId,
     location: Rectangle<[i32; 2]>,
 }
 
@@ -55,8 +50,8 @@ pub struct Game<'a> {
     units: Vec<Unit<'a>>,
     rtree: RTree<UnitLocation>,
     pub(crate) cmd: &'a RefCell<Commands>,
-    pub(crate) connected_units: RefCell<HashMap<usize, Vec<i32>>>,
-    pub(crate) loaded_units: RefCell<HashMap<usize, Vec<i32>>>,
+    pub(crate) connected_units: RefCell<HashMap<usize, Vec<usize>>>,
+    pub(crate) loaded_units: RefCell<HashMap<usize, Vec<usize>>>,
     pylons: RefCell<Option<Vec<usize>>>,
 }
 
@@ -437,11 +432,10 @@ impl<'a> Game<'a> {
         }
     }
 
-    pub fn get_unit(&self, id: i32) -> Option<Unit> {
-        if !(0..10000_i32).contains(&id) {
+    pub fn get_unit(&self, id: UnitId) -> Option<Unit> {
+        if !(0..10000).contains(&id) {
             None
         } else {
-            let id = id as usize;
             self.context.unit_infos[id].map(|ui| Unit::new(id, self, &self.data.units[id], ui))
         }
     }
@@ -461,10 +455,7 @@ impl<'a> Game<'a> {
         let pred = pred.into_predicate();
         self.rtree
             .locate_in_envelope_intersecting(&AABB::from_corners([lt.x, lt.y], [rb.x, rb.y]))
-            .map(|ul| {
-                self.get_unit(ul.id as i32)
-                    .expect("Unit from RTree to be present")
-            })
+            .map(|ul| self.get_unit(ul.id).expect("Unit from RTree to be present"))
             .filter(|u| pred.test(u))
             .collect()
     }
@@ -500,10 +491,7 @@ impl<'a> Game<'a> {
         self.rtree
             .nearest_neighbor_iter_with_distance_2(&[center.x, center.y])
             .take_while(|&(_, d_2)| d_2 <= radius_squared)
-            .map(|(ul, _)| {
-                self.get_unit(ul.id as i32)
-                    .expect("Unit from RTree to be present")
-            })
+            .map(|(ul, _)| self.get_unit(ul.id).expect("Unit from RTree to be present"))
             .find(|u| pred.test(u))
     }
 
@@ -536,10 +524,7 @@ impl<'a> Game<'a> {
             .nearest_neighbor_iter_with_distance_2(&[center.x, center.y])
             .take_while(|&(_, d_2)| d_2 <= radius_2)
             .filter(|(ul, _)| ul.location.envelope().intersects(&query_envelope))
-            .map(|(ul, _)| {
-                self.get_unit(ul.id as i32)
-                    .expect("Unit from RTree to be present")
-            })
+            .map(|(ul, _)| self.get_unit(ul.id).expect("Unit from RTree to be present"))
             .find(|u| pred.test(u))
     }
 
@@ -551,8 +536,10 @@ impl<'a> Game<'a> {
 
     pub fn get_selected_units(&self) -> Vec<Unit> {
         (0..self.data.selectedUnitCount as usize)
-            .map(|i| self.data.selectedUnits[i])
-            .map(|i| self.get_unit(i).expect("Selected unit to exist"))
+            .map(|i| {
+                self.get_unit(self.data.selectedUnits[i] as usize)
+                    .expect("Selected unit to exist")
+            })
             .collect()
     }
 
@@ -560,10 +547,7 @@ impl<'a> Game<'a> {
         self.context
             .static_geysers
             .iter()
-            .map(|&i| {
-                self.get_unit(i as i32)
-                    .expect("static geyser to have existed")
-            })
+            .map(|&i| self.get_unit(i).expect("static geyser to have existed"))
             .collect()
     }
 
@@ -571,10 +555,7 @@ impl<'a> Game<'a> {
         self.context
             .static_minerals
             .iter()
-            .map(|&i| {
-                self.get_unit(i as i32)
-                    .expect("static mineral to have existed")
-            })
+            .map(|&i| self.get_unit(i).expect("static mineral to have existed"))
             .collect()
     }
 
@@ -621,7 +602,7 @@ impl<'a> Game<'a> {
         let pylons: Vec<Unit> = if let Some(pylons) = self.pylons.borrow().as_ref() {
             pylons
                 .iter()
-                .map(|&i| self.get_unit(i as i32).expect("Pylon to exist"))
+                .map(|&i| self.get_unit(i).expect("Pylon to exist"))
                 .collect()
         } else {
             let pylons: Vec<Unit> = self
@@ -1016,7 +997,7 @@ impl GameContext {
         frame.units = self
             .visible_units
             .iter()
-            .map(|&i| unmoved_frame.get_unit(i as i32).expect("Unit to exist"))
+            .map(|&i| unmoved_frame.get_unit(i).expect("Unit to exist"))
             .collect();
         frame.rtree = RTree::bulk_load(
             frame
@@ -1034,14 +1015,14 @@ impl GameContext {
         cb(&frame);
     }
 
-    fn ensure_unit_info(&mut self, id: usize) {
+    fn ensure_unit_info(&mut self, id: UnitId) {
         if self.unit_infos[id].is_none() {
             let data = self.data.get();
             self.unit_infos[id] = Some(UnitInfo::new(id, &data.units[id]));
         }
     }
 
-    fn unit_invisible(&mut self, id: usize) {
+    fn unit_invisible(&mut self, id: UnitId) {
         let index = self.visible_units.iter().position(|&i| i as usize == id);
         if let Some(index) = index {
             self.visible_units.swap_remove(index);
@@ -1085,13 +1066,13 @@ impl GameContext {
                     self.with_frame(&commands, |frame| {
                         module.on_unit_create(
                             frame,
-                            frame.get_unit(id as i32).expect("Created Unit to exist"),
+                            frame.get_unit(id).expect("Created Unit to exist"),
                         )
                     });
                 }
                 UnitDestroy => {
-                    let id = event.v1;
-                    self.unit_invisible(id as usize);
+                    let id = event.v1 as usize;
+                    self.unit_invisible(id);
                     self.with_frame(&commands, |frame| {
                         module.on_unit_destroy(
                             frame,
@@ -1103,13 +1084,12 @@ impl GameContext {
                     self.unit_infos[id as usize] = Option::None;
                 }
                 UnitDiscover => {
-                    self.ensure_unit_info(event.v1 as usize);
+                    let id = event.v1 as usize;
+                    self.ensure_unit_info(id);
                     self.with_frame(&commands, |frame| {
                         module.on_unit_discover(
                             frame,
-                            frame
-                                .get_unit(event.v1)
-                                .expect("Unit could not be retrieved"),
+                            frame.get_unit(id).expect("Unit could not be retrieved"),
                         )
                     });
                 }
@@ -1118,31 +1098,29 @@ impl GameContext {
                         module.on_unit_evade(
                             frame,
                             frame
-                                .get_unit(event.v1)
+                                .get_unit(event.v1 as usize)
                                 .expect("Unit could not be retrieved"),
                         )
                     });
                 }
                 UnitShow => {
-                    self.visible_units.push(event.v1 as usize);
-                    self.ensure_unit_info(event.v1 as usize);
+                    let id = event.v1 as usize;
+                    self.visible_units.push(id);
+                    self.ensure_unit_info(id);
                     self.with_frame(&commands, |frame| {
                         module.on_unit_show(
                             frame,
-                            frame
-                                .get_unit(event.v1)
-                                .expect("Unit could not be retrieved"),
+                            frame.get_unit(id).expect("Unit could not be retrieved"),
                         )
                     });
                 }
                 UnitHide => {
-                    self.unit_invisible(event.v1 as usize);
+                    let id = event.v1 as usize;
+                    self.unit_invisible(id);
                     self.with_frame(&commands, |frame| {
                         module.on_unit_hide(
                             frame,
-                            frame
-                                .get_unit(event.v1)
-                                .expect("Unit could not be retrieved"),
+                            frame.get_unit(id).expect("Unit could not be retrieved"),
                         )
                     });
                 }
@@ -1151,7 +1129,7 @@ impl GameContext {
                         module.on_unit_morph(
                             frame,
                             frame
-                                .get_unit(event.v1)
+                                .get_unit(event.v1 as usize)
                                 .expect("Unit could not be retrieved"),
                         )
                     });
@@ -1161,19 +1139,18 @@ impl GameContext {
                         module.on_unit_renegade(
                             frame,
                             frame
-                                .get_unit(event.v1)
+                                .get_unit(event.v1 as usize)
                                 .expect("Unit could not be retrieved"),
                         )
                     });
                 }
                 UnitComplete => {
-                    self.ensure_unit_info(event.v1 as usize);
+                    let id = event.v1 as usize;
+                    self.ensure_unit_info(id);
                     self.with_frame(&commands, |frame| {
                         module.on_unit_complete(
                             frame,
-                            frame
-                                .get_unit(event.v1)
-                                .expect("Unit could not be retrieved"),
+                            frame.get_unit(id).expect("Unit could not be retrieved"),
                         )
                     });
                 }
