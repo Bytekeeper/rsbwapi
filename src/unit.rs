@@ -57,8 +57,13 @@ impl<'a> Unit<'a> {
         self.data.buttonset
     }
 
-    pub fn get_closest_unit(&self, pred: impl Fn(&Unit) -> bool) -> Option<Unit> {
-        self.game.get_closest_unit(self.get_position(), pred, None)
+    pub fn get_closest_unit<R: Into<Option<u32>>>(
+        &self,
+        pred: impl Fn(&Unit) -> bool,
+        radius: R,
+    ) -> Option<Unit> {
+        self.game
+            .get_closest_unit(self.get_position(), pred, radius)
     }
 
     pub fn get_type(&self) -> UnitType {

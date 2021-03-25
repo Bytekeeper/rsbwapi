@@ -477,7 +477,7 @@ impl<'a> Game<'a> {
     pub fn get_closest_unit<
         P: Into<Position>,
         Pred: IntoPredicate<Unit<'a>>,
-        R: Into<Option<i32>>,
+        R: Into<Option<u32>>,
     >(
         &'a self,
         center: P,
@@ -490,7 +490,7 @@ impl<'a> Game<'a> {
         let radius_squared = radius * radius;
         self.rtree
             .nearest_neighbor_iter_with_distance_2(&[center.x, center.y])
-            .take_while(|&(_, d_2)| d_2 <= radius_squared)
+            .take_while(|&(_, d_2)| d_2 <= radius_squared as i32)
             .map(|(ul, _)| self.get_unit(ul.id).expect("Unit from RTree to be present"))
             .find(|u| pred.test(u))
     }
