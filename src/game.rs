@@ -611,7 +611,7 @@ impl<'a> Game<'a> {
                 .filter(|u| u.get_type() == UnitType::Protoss_Pylon)
                 .cloned()
                 .collect();
-            *self.pylons.borrow_mut() = Some(pylons.iter().map(|u| u.id).collect());
+            *self.pylons.borrow_mut() = Some(pylons.iter().map(|u| u.get_id()).collect());
             pylons
         };
         let Position { x, y } = position.into();
@@ -1004,7 +1004,7 @@ impl GameContext {
                 .units
                 .iter()
                 .map(|&u| UnitLocation {
-                    id: u.id,
+                    id: u.get_id(),
                     location: Rectangle::from_corners(
                         [u.get_left(), u.get_top()],
                         [u.get_right(), u.get_bottom()],

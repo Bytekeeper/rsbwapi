@@ -32,7 +32,7 @@ impl UnitInfo {
 
 #[derive(Clone, Copy)]
 pub struct Unit<'a> {
-    pub id: UnitId,
+    id: UnitId,
     pub(crate) game: &'a Game<'a>,
     data: &'a BWAPI_UnitData,
     info: UnitInfo,
@@ -901,7 +901,7 @@ impl<'a> Unit<'a> {
  * Unit Commands
  */
 impl<'a> Unit<'a> {
-    pub fn attack<T: UnitOrPosition>(&self, target: &T) -> BWResult<bool> {
+    pub fn attack<T: UnitOrPosition>(&self, target: T) -> BWResult<bool> {
         let mut cmd = self.command(false);
         target.assign_attack(&mut cmd);
         self.issue_command(cmd)
@@ -914,7 +914,7 @@ impl<'a> Unit<'a> {
         })
     }
 
-    pub fn right_click<T: UnitOrPosition>(&self, target: &T) -> BWResult<bool> {
+    pub fn right_click<T: UnitOrPosition>(&self, target: T) -> BWResult<bool> {
         let mut cmd = self.command(false);
         target.assign_right_click(&mut cmd);
         self.issue_command(cmd)
