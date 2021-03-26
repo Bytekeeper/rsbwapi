@@ -25,7 +25,7 @@ pub trait ToStr {
 
 impl ToStr for [i8] {
     fn to_str(&self) -> &str {
-        let as_u8 = unsafe { &*(&self[..] as *const [i8] as *const [u8]) };
+        let as_u8 = unsafe { &*(self as *const [i8] as *const [u8]) };
         let nul_pos = memchr::memchr(0, as_u8);
         if let Some(nul_pos) = nul_pos {
             unsafe { CStr::from_bytes_with_nul_unchecked(&as_u8[0..nul_pos + 1]) }

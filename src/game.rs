@@ -62,7 +62,7 @@ impl<'a> Game<'a> {
         position: P,
         type_: UnitType,
         check_explored: bool,
-    ) -> BWResult<bool> {
+    ) -> BwResult<bool> {
         let builder = builder.into();
         let position = if builder.is_some() && type_.is_addon() {
             position.into() + TilePosition { x: 4, y: 1 }
@@ -234,7 +234,7 @@ impl<'a> Game<'a> {
         &self,
         builder: B,
         type_: UnitType,
-    ) -> BWResult<bool> {
+    ) -> BwResult<bool> {
         if let Some(self_) = self.self_() {
             if !self_.is_unit_available(type_) {
                 return Err(Error::Access_Denied);
@@ -854,7 +854,7 @@ impl<'a> Game<'a> {
 
     pub fn get_force(&self, force_id: i32) -> Force {
         if !(0..self.data.forceCount).contains(&force_id) {
-            panic!(format!("Invalid force id {}", force_id));
+            panic!("Invalid force id {}", force_id);
         }
         let force_players = self
             .get_players()

@@ -37,15 +37,15 @@ impl From<UnitCommand> for CanIssueCommandArg {
 }
 
 pub trait CanAttackUnit {
-    fn can_attack_unit(&self, unit: &Unit) -> BWResult<bool>;
+    fn can_attack_unit(&self, unit: &Unit) -> BwResult<bool>;
 }
 
 pub trait CanAttack {
-    fn can_attack(&self, unit: &Unit) -> BWResult<bool>;
+    fn can_attack(&self, unit: &Unit) -> BwResult<bool>;
 }
 
 impl CanAttack for bool {
-    fn can_attack(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_attack(&self, unit: &Unit) -> BwResult<bool> {
         if *self && !unit.can_command()? {
             return Ok(false);
         }
@@ -57,7 +57,7 @@ impl CanAttack for bool {
     }
 }
 impl CanAttackUnit for bool {
-    fn can_attack_unit(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_attack_unit(&self, unit: &Unit) -> BwResult<bool> {
         if *self && !unit.can_command()? {
             return Ok(false);
         }
@@ -101,7 +101,7 @@ impl CanAttackUnit for bool {
 }
 
 impl CanAttack for (Position, bool, bool, bool) {
-    fn can_attack(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_attack(&self, unit: &Unit) -> BwResult<bool> {
         let (_, _, _, check_commandability) = *self;
         if check_commandability && !unit.can_command()? {
             return Ok(false);
@@ -115,7 +115,7 @@ impl CanAttack for (Position, bool, bool, bool) {
 }
 
 impl CanAttack for (Option<&Unit<'_>>, bool, bool, bool) {
-    fn can_attack(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_attack(&self, unit: &Unit) -> BwResult<bool> {
         let (target, check_can_target_unit, check_can_issue_command_type, check_commandability) =
             *self;
         if check_commandability && !unit.can_command()? {
@@ -136,7 +136,7 @@ impl CanAttack for (Option<&Unit<'_>>, bool, bool, bool) {
     }
 }
 impl CanAttackUnit for (&Unit<'_>, bool, bool, bool) {
-    fn can_attack_unit(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_attack_unit(&self, unit: &Unit) -> BwResult<bool> {
         let (
             target_unit,
             check_can_target_unit,
@@ -193,11 +193,11 @@ impl CanAttackUnit for (&Unit<'_>, bool, bool, bool) {
 }
 
 pub trait CanBuild {
-    fn can_build(&self, unit: &Unit) -> BWResult<bool>;
+    fn can_build(&self, unit: &Unit) -> BwResult<bool>;
 }
 
 impl CanBuild for bool {
-    fn can_build(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_build(&self, unit: &Unit) -> BwResult<bool> {
         if *self && !unit.can_command()? {
             return Ok(false);
         }
@@ -219,7 +219,7 @@ impl CanBuild for bool {
 }
 
 impl CanBuild for (UnitType, bool, bool) {
-    fn can_build(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_build(&self, unit: &Unit) -> BwResult<bool> {
         let (u_type, check_can_issue_command_type, check_commandability) = *self;
         if check_commandability && !unit.can_command()? {
             return Ok(false);
@@ -244,7 +244,7 @@ impl CanBuild for (UnitType, bool, bool) {
 }
 
 impl CanBuild for (UnitType, TilePosition, bool, bool, bool) {
-    fn can_build(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_build(&self, unit: &Unit) -> BwResult<bool> {
         let (
             u_type,
             tile_pos,
@@ -274,11 +274,11 @@ impl CanBuild for (UnitType, TilePosition, bool, bool, bool) {
 }
 
 pub trait CanBuildAddon {
-    fn can_build_addon(&self, unit: &Unit) -> BWResult<bool>;
+    fn can_build_addon(&self, unit: &Unit) -> BwResult<bool>;
 }
 
 impl CanBuildAddon for bool {
-    fn can_build_addon(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_build_addon(&self, unit: &Unit) -> BwResult<bool> {
         if *self && !unit.can_command()? {
             return Ok(false);
         }
@@ -300,7 +300,7 @@ impl CanBuildAddon for bool {
 }
 
 impl CanBuildAddon for (UnitType, bool, bool) {
-    fn can_build_addon(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_build_addon(&self, unit: &Unit) -> BwResult<bool> {
         let (u_type, check_can_issue_command_type, check_commandability) = *self;
         if check_commandability && !unit.can_command()? {
             return Ok(false);
@@ -329,11 +329,11 @@ impl CanBuildAddon for (UnitType, bool, bool) {
 }
 
 pub trait CanTrain {
-    fn can_train(&self, unit: &Unit) -> BWResult<bool>;
+    fn can_train(&self, unit: &Unit) -> BwResult<bool>;
 }
 
 impl CanTrain for bool {
-    fn can_train(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_train(&self, unit: &Unit) -> BwResult<bool> {
         if *self && !unit.can_command()? {
             return Ok(false);
         }
@@ -372,7 +372,7 @@ impl CanTrain for bool {
 }
 
 impl CanTrain for (UnitType, bool, bool) {
-    fn can_train(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_train(&self, unit: &Unit) -> BwResult<bool> {
         let (u_type, check_can_issue_command_type, check_commandability) = *self;
 
         if check_commandability && !unit.can_command()? {
@@ -418,11 +418,11 @@ impl CanTrain for (UnitType, bool, bool) {
 }
 
 pub trait CanMorph {
-    fn can_morph(&self, unit: &Unit) -> BWResult<bool>;
+    fn can_morph(&self, unit: &Unit) -> BwResult<bool>;
 }
 
 impl CanMorph for bool {
-    fn can_morph(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_morph(&self, unit: &Unit) -> BwResult<bool> {
         if *self && !unit.can_command()? {
             return Ok(false);
         }
@@ -468,7 +468,7 @@ impl CanMorph for bool {
 }
 
 impl CanMorph for (UnitType, bool, bool) {
-    fn can_morph(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_morph(&self, unit: &Unit) -> BwResult<bool> {
         let (u_type, check_can_issue_command_type, check_commandability) = *self;
 
         if check_commandability && !unit.can_command()? {
@@ -514,11 +514,11 @@ impl CanMorph for (UnitType, bool, bool) {
 }
 
 pub trait CanFollow {
-    fn can_follow(&self, unit: &Unit) -> BWResult<bool>;
+    fn can_follow(&self, unit: &Unit) -> BwResult<bool>;
 }
 
 impl CanFollow for bool {
-    fn can_follow(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_follow(&self, unit: &Unit) -> BwResult<bool> {
         if *self && !unit.can_command()? {
             return Ok(false);
         }
@@ -532,7 +532,7 @@ impl CanFollow for bool {
 }
 
 impl CanFollow for (&Unit<'_>, bool, bool, bool) {
-    fn can_follow(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_follow(&self, unit: &Unit) -> BwResult<bool> {
         let (
             target_unit,
             check_can_target_unit,
@@ -558,11 +558,11 @@ impl CanFollow for (&Unit<'_>, bool, bool, bool) {
 }
 
 pub trait CanSetRallyUnit {
-    fn can_set_rally_unit(&self, unit: &Unit) -> BWResult<bool>;
+    fn can_set_rally_unit(&self, unit: &Unit) -> BwResult<bool>;
 }
 
 impl CanSetRallyUnit for bool {
-    fn can_set_rally_unit(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_set_rally_unit(&self, unit: &Unit) -> BwResult<bool> {
         if *self && !unit.can_command()? {
             return Ok(false);
         }
@@ -577,7 +577,7 @@ impl CanSetRallyUnit for bool {
 }
 
 impl CanSetRallyUnit for (&Unit<'_>, bool, bool, bool) {
-    fn can_set_rally_unit(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_set_rally_unit(&self, unit: &Unit) -> BwResult<bool> {
         let (
             target_unit,
             check_can_target_unit,
@@ -598,11 +598,11 @@ impl CanSetRallyUnit for (&Unit<'_>, bool, bool, bool) {
 }
 
 pub trait CanGather {
-    fn can_gather(&self, unit: &Unit) -> BWResult<bool>;
+    fn can_gather(&self, unit: &Unit) -> BwResult<bool>;
 }
 
 impl CanGather for bool {
-    fn can_gather(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_gather(&self, unit: &Unit) -> BwResult<bool> {
         if *self && !unit.can_command()? {
             return Ok(false);
         }
@@ -633,7 +633,7 @@ impl CanGather for bool {
 }
 
 impl CanGather for (&Unit<'_>, bool, bool, bool) {
-    fn can_gather(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_gather(&self, unit: &Unit) -> BwResult<bool> {
         let (
             target_unit,
             check_can_target_unit,
@@ -667,10 +667,10 @@ impl CanGather for (&Unit<'_>, bool, bool, bool) {
 }
 
 pub trait CanRepair {
-    fn can_repair(&self, unit: &Unit) -> BWResult<bool>;
+    fn can_repair(&self, unit: &Unit) -> BwResult<bool>;
 }
 impl CanRepair for bool {
-    fn can_repair(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_repair(&self, unit: &Unit) -> BwResult<bool> {
         if *self && !unit.can_command()? {
             return Ok(false);
         }
@@ -695,7 +695,7 @@ impl CanRepair for bool {
 }
 
 impl CanRepair for (&Unit<'_>, bool, bool, bool) {
-    fn can_repair(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_repair(&self, unit: &Unit) -> BwResult<bool> {
         let (
             target_unit,
             check_can_target_unit,
@@ -731,11 +731,11 @@ impl CanRepair for (&Unit<'_>, bool, bool, bool) {
 }
 
 pub trait CanLand {
-    fn can_land(&self, unit: &Unit) -> BWResult<bool>;
+    fn can_land(&self, unit: &Unit) -> BwResult<bool>;
 }
 
 impl CanLand for bool {
-    fn can_land(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_land(&self, unit: &Unit) -> BwResult<bool> {
         if *self && !unit.can_command()? {
             return Ok(false);
         }
@@ -751,7 +751,7 @@ impl CanLand for bool {
 }
 
 impl CanLand for (TilePosition, bool, bool) {
-    fn can_land(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_land(&self, unit: &Unit) -> BwResult<bool> {
         let (target, check_can_issue_command_type, check_commandability) = *self;
         if check_commandability && !unit.can_command()? {
             return Ok(false);
@@ -771,11 +771,11 @@ impl CanLand for (TilePosition, bool, bool) {
 }
 
 pub trait CanLoad {
-    fn can_load(&self, unit: &Unit) -> BWResult<bool>;
+    fn can_load(&self, unit: &Unit) -> BwResult<bool>;
 }
 
 impl CanLoad for bool {
-    fn can_load(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_load(&self, unit: &Unit) -> BwResult<bool> {
         if *self && !unit.can_command()? {
             return Ok(false);
         }
@@ -810,7 +810,7 @@ impl CanLoad for bool {
 }
 
 impl CanLoad for (&Unit<'_>, bool, bool, bool) {
-    fn can_load(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_load(&self, unit: &Unit) -> BwResult<bool> {
         let (
             target_unit,
             check_can_target_unit,
@@ -914,17 +914,17 @@ impl CanLoad for (&Unit<'_>, bool, bool, bool) {
 }
 
 pub trait CanUnload {
-    fn can_unload(&self, unit: &Unit) -> BWResult<bool>;
+    fn can_unload(&self, unit: &Unit) -> BwResult<bool>;
 }
 
 impl CanUnload for bool {
-    fn can_unload(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_unload(&self, unit: &Unit) -> BwResult<bool> {
         unit.can_unload_at_position(unit.get_position(), true, *self)
     }
 }
 
 impl CanUnload for (&Unit<'_>, bool, bool, bool, bool) {
-    fn can_unload(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_unload(&self, unit: &Unit) -> BwResult<bool> {
         let (
             target_unit,
             check_can_target_unit,
@@ -960,11 +960,11 @@ impl CanUnload for (&Unit<'_>, bool, bool, bool, bool) {
 }
 
 pub trait CanUnloadAllPosition {
-    fn can_unload_all_position(&self, unit: &Unit) -> BWResult<bool>;
+    fn can_unload_all_position(&self, unit: &Unit) -> BwResult<bool>;
 }
 
 impl CanUnloadAllPosition for bool {
-    fn can_unload_all_position(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_unload_all_position(&self, unit: &Unit) -> BwResult<bool> {
         if *self && !unit.can_command()? {
             return Ok(false);
         }
@@ -981,7 +981,7 @@ impl CanUnloadAllPosition for bool {
 }
 
 impl CanUnloadAllPosition for (Position, bool, bool) {
-    fn can_unload_all_position(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_unload_all_position(&self, unit: &Unit) -> BwResult<bool> {
         let (targ_drop_pos, check_can_issue_command_type, check_commandability) = *self;
 
         if check_commandability && !unit.can_command()? {
@@ -1000,11 +1000,11 @@ impl CanUnloadAllPosition for (Position, bool, bool) {
 }
 
 pub trait CanRightClickUnit {
-    fn can_right_click_unit(&self, unit: &Unit) -> BWResult<bool>;
+    fn can_right_click_unit(&self, unit: &Unit) -> BwResult<bool>;
 }
 
 impl CanRightClickUnit for bool {
-    fn can_right_click_unit(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_right_click_unit(&self, unit: &Unit) -> BwResult<bool> {
         if *self && !unit.can_command()? {
             return Ok(false);
         }
@@ -1024,7 +1024,7 @@ impl CanRightClickUnit for bool {
 }
 
 impl CanRightClickUnit for (&Unit<'_>, bool, bool, bool) {
-    fn can_right_click_unit(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_right_click_unit(&self, unit: &Unit) -> BwResult<bool> {
         let (
             target_unit,
             check_can_target_unit,
@@ -1055,17 +1055,17 @@ impl CanRightClickUnit for (&Unit<'_>, bool, bool, bool) {
 }
 
 pub trait CanCancelTrainSlot {
-    fn can_cancel_train_slot(&self, unit: &Unit) -> BWResult<bool>;
+    fn can_cancel_train_slot(&self, unit: &Unit) -> BwResult<bool>;
 }
 
 impl CanCancelTrainSlot for bool {
-    fn can_cancel_train_slot(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_cancel_train_slot(&self, unit: &Unit) -> BwResult<bool> {
         unit.can_cancel_train(*self)
     }
 }
 
 impl CanCancelTrainSlot for (i32, bool, bool) {
-    fn can_cancel_train_slot(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_cancel_train_slot(&self, unit: &Unit) -> BwResult<bool> {
         let (slot, check_can_issue_command_type, check_commandability) = *self;
 
         if check_commandability && !unit.can_command()? {
@@ -1084,11 +1084,11 @@ impl CanCancelTrainSlot for (i32, bool, bool) {
 }
 
 pub trait CanUseTechWithOrWithoutTarget {
-    fn can_use_tech_with_or_without_target(&self, unit: &Unit) -> BWResult<bool>;
+    fn can_use_tech_with_or_without_target(&self, unit: &Unit) -> BwResult<bool>;
 }
 
 impl CanUseTechWithOrWithoutTarget for bool {
-    fn can_use_tech_with_or_without_target(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_use_tech_with_or_without_target(&self, unit: &Unit) -> BwResult<bool> {
         if *self && !unit.can_command()? {
             return Ok(false);
         }
@@ -1107,7 +1107,7 @@ impl CanUseTechWithOrWithoutTarget for bool {
 }
 
 impl CanUseTechWithOrWithoutTarget for (TechType, bool, bool) {
-    fn can_use_tech_with_or_without_target(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_use_tech_with_or_without_target(&self, unit: &Unit) -> BwResult<bool> {
         let (tech, check_can_issue_command_type, check_commandability) = *self;
 
         if check_commandability && !unit.can_command()? {
@@ -1174,11 +1174,11 @@ impl CanUseTechWithOrWithoutTarget for (TechType, bool, bool) {
 }
 
 pub trait CanUseTechUnit {
-    fn can_use_tech_unit(&self, unit: &Unit) -> BWResult<bool>;
+    fn can_use_tech_unit(&self, unit: &Unit) -> BwResult<bool>;
 }
 
 impl CanUseTechUnit for (TechType, bool, bool) {
-    fn can_use_tech_unit(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_use_tech_unit(&self, unit: &Unit) -> BwResult<bool> {
         let (tech, check_can_issue_command_type, check_commandability) = *self;
 
         if check_commandability && !unit.can_command()? {
@@ -1197,7 +1197,7 @@ impl CanUseTechUnit for (TechType, bool, bool) {
 }
 
 impl CanUseTechUnit for (TechType, &Unit<'_>, bool, bool, bool, bool) {
-    fn can_use_tech_unit(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_use_tech_unit(&self, unit: &Unit) -> BwResult<bool> {
         let (
             tech,
             target_unit,
@@ -1371,11 +1371,11 @@ impl CanUseTechUnit for (TechType, &Unit<'_>, bool, bool, bool, bool) {
 }
 
 pub trait CanUseTechPosition {
-    fn can_use_tech_position(&self, unit: &Unit) -> BWResult<bool>;
+    fn can_use_tech_position(&self, unit: &Unit) -> BwResult<bool>;
 }
 
 impl CanUseTechPosition for (TechType, bool, bool) {
-    fn can_use_tech_position(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_use_tech_position(&self, unit: &Unit) -> BwResult<bool> {
         let (tech, check_can_issue_command_type, check_commandability) = *self;
         if check_commandability && !unit.can_command()? {
             return Ok(false);
@@ -1395,7 +1395,7 @@ impl CanUseTechPosition for (TechType, bool, bool) {
 }
 
 impl CanUseTechPosition for (TechType, Position, bool, bool, bool) {
-    fn can_use_tech_position(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_use_tech_position(&self, unit: &Unit) -> BwResult<bool> {
         let (
             tech,
             target,
@@ -1423,11 +1423,11 @@ impl CanUseTechPosition for (TechType, Position, bool, bool, bool) {
 }
 
 pub trait CanUseTech {
-    fn can_use_tech(&self, unit: &Unit) -> BWResult<bool>;
+    fn can_use_tech(&self, unit: &Unit) -> BwResult<bool>;
 }
 
 impl CanUseTech for (TechType, Position, bool, bool, bool, bool) {
-    fn can_use_tech(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_use_tech(&self, unit: &Unit) -> BwResult<bool> {
         let (
             tech,
             target,
@@ -1454,7 +1454,7 @@ impl CanUseTech for (TechType, Position, bool, bool, bool, bool) {
 }
 
 impl CanUseTech for (TechType, Option<&Unit<'_>>, bool, bool, bool, bool) {
-    fn can_use_tech(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_use_tech(&self, unit: &Unit) -> BwResult<bool> {
         let (
             tech,
             target,
@@ -1486,11 +1486,11 @@ impl CanUseTech for (TechType, Option<&Unit<'_>>, bool, bool, bool, bool) {
 }
 
 pub trait CanPlaceCop {
-    fn can_place_cop(&self, unit: &Unit) -> BWResult<bool>;
+    fn can_place_cop(&self, unit: &Unit) -> BwResult<bool>;
 }
 
 impl CanPlaceCop for bool {
-    fn can_place_cop(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_place_cop(&self, unit: &Unit) -> BwResult<bool> {
         if *self && !unit.can_command()? {
             return Ok(false);
         }
@@ -1506,7 +1506,7 @@ impl CanPlaceCop for bool {
 }
 
 impl CanPlaceCop for (TilePosition, bool, bool) {
-    fn can_place_cop(&self, unit: &Unit) -> BWResult<bool> {
+    fn can_place_cop(&self, unit: &Unit) -> BwResult<bool> {
         let (target, check_can_issue_command_type, check_commandability) = *self;
 
         if check_commandability && !unit.can_command()? {
@@ -1528,31 +1528,31 @@ impl CanPlaceCop for (TilePosition, bool, bool) {
 }
 
 impl<'a> Unit<'a> {
-    pub fn can_build(&self, checker: impl CanBuild) -> BWResult<bool> {
+    pub fn can_build(&self, checker: impl CanBuild) -> BwResult<bool> {
         checker.can_build(self)
     }
 
-    pub fn can_build_addon(&self, checker: impl CanBuildAddon) -> BWResult<bool> {
+    pub fn can_build_addon(&self, checker: impl CanBuildAddon) -> BwResult<bool> {
         checker.can_build_addon(self)
     }
 
-    pub fn can_train(&self, checker: impl CanTrain) -> BWResult<bool> {
+    pub fn can_train(&self, checker: impl CanTrain) -> BwResult<bool> {
         checker.can_train(self)
     }
 
-    pub fn can_morph(&self, checker: impl CanMorph) -> BWResult<bool> {
+    pub fn can_morph(&self, checker: impl CanMorph) -> BwResult<bool> {
         checker.can_morph(self)
     }
 
-    pub fn can_attack(&self, checker: impl CanAttack) -> BWResult<bool> {
+    pub fn can_attack(&self, checker: impl CanAttack) -> BwResult<bool> {
         checker.can_attack(self)
     }
 
-    pub fn can_attack_unit(&self, checker: impl CanAttackUnit) -> BWResult<bool> {
+    pub fn can_attack_unit(&self, checker: impl CanAttackUnit) -> BwResult<bool> {
         checker.can_attack_unit(self)
     }
 
-    pub fn can_attack_move(&self, check_commandability: bool) -> BWResult<bool> {
+    pub fn can_attack_move(&self, check_commandability: bool) -> BwResult<bool> {
         if check_commandability && !self.can_command()? {
             return Ok(false);
         }
@@ -1565,7 +1565,7 @@ impl<'a> Unit<'a> {
         Ok(true)
     }
 
-    pub fn can_cancel_train(&self, check_commandability: bool) -> BWResult<bool> {
+    pub fn can_cancel_train(&self, check_commandability: bool) -> BwResult<bool> {
         if check_commandability && !self.can_command()? {
             return Ok(false);
         }
@@ -1576,7 +1576,7 @@ impl<'a> Unit<'a> {
         Ok(true)
     }
 
-    pub fn can_cancel_train_slot(&self, checker: impl CanCancelTrainSlot) -> BWResult<bool> {
+    pub fn can_cancel_train_slot(&self, checker: impl CanCancelTrainSlot) -> BwResult<bool> {
         checker.can_cancel_train_slot(self)
     }
 
@@ -1633,62 +1633,62 @@ impl<'a> Unit<'a> {
         Ok(true)
     }
 
-    pub fn can_follow(&self, checker: impl CanFollow) -> BWResult<bool> {
+    pub fn can_follow(&self, checker: impl CanFollow) -> BwResult<bool> {
         checker.can_follow(self)
     }
 
-    pub fn can_land(&self, checker: impl CanLand) -> BWResult<bool> {
+    pub fn can_land(&self, checker: impl CanLand) -> BwResult<bool> {
         checker.can_land(self)
     }
 
-    pub fn can_load(&self, checker: impl CanLoad) -> BWResult<bool> {
+    pub fn can_load(&self, checker: impl CanLoad) -> BwResult<bool> {
         checker.can_load(self)
     }
 
-    pub fn can_gather(&self, checker: impl CanGather) -> BWResult<bool> {
+    pub fn can_gather(&self, checker: impl CanGather) -> BwResult<bool> {
         checker.can_gather(self)
     }
 
-    pub fn can_place_cop(&self, checker: impl CanPlaceCop) -> BWResult<bool> {
+    pub fn can_place_cop(&self, checker: impl CanPlaceCop) -> BwResult<bool> {
         checker.can_place_cop(self)
     }
 
-    pub fn can_repair(&self, checker: impl CanRepair) -> BWResult<bool> {
+    pub fn can_repair(&self, checker: impl CanRepair) -> BwResult<bool> {
         checker.can_repair(self)
     }
 
-    pub fn can_right_click_unit(&self, checker: impl CanRightClickUnit) -> BWResult<bool> {
+    pub fn can_right_click_unit(&self, checker: impl CanRightClickUnit) -> BwResult<bool> {
         checker.can_right_click_unit(self)
     }
 
-    pub fn can_set_rally_unit(&self, checker: impl CanSetRallyUnit) -> BWResult<bool> {
+    pub fn can_set_rally_unit(&self, checker: impl CanSetRallyUnit) -> BwResult<bool> {
         checker.can_set_rally_unit(self)
     }
 
-    pub fn can_unload(&self, checker: impl CanUnload) -> BWResult<bool> {
+    pub fn can_unload(&self, checker: impl CanUnload) -> BwResult<bool> {
         checker.can_unload(self)
     }
 
-    pub fn can_unload_all_position(&self, checker: impl CanUnloadAllPosition) -> BWResult<bool> {
+    pub fn can_unload_all_position(&self, checker: impl CanUnloadAllPosition) -> BwResult<bool> {
         checker.can_unload_all_position(self)
     }
 
-    pub fn can_use_tech(&self, checker: impl CanUseTech) -> BWResult<bool> {
+    pub fn can_use_tech(&self, checker: impl CanUseTech) -> BwResult<bool> {
         checker.can_use_tech(self)
     }
 
-    pub fn can_use_tech_position(&self, checker: impl CanUseTechPosition) -> BWResult<bool> {
+    pub fn can_use_tech_position(&self, checker: impl CanUseTechPosition) -> BwResult<bool> {
         checker.can_use_tech_position(self)
     }
 
-    pub fn can_use_tech_unit(&self, checker: impl CanUseTechUnit) -> BWResult<bool> {
+    pub fn can_use_tech_unit(&self, checker: impl CanUseTechUnit) -> BwResult<bool> {
         checker.can_use_tech_unit(self)
     }
 
     pub fn can_use_tech_with_or_without_target(
         &self,
         checker: impl CanUseTechWithOrWithoutTarget,
-    ) -> BWResult<bool> {
+    ) -> BwResult<bool> {
         checker.can_use_tech_with_or_without_target(self)
     }
 
@@ -1697,7 +1697,7 @@ impl<'a> Unit<'a> {
         tech: TechType,
         check_can_issue_command_type: bool,
         check_commandability: bool,
-    ) -> BWResult<bool> {
+    ) -> BwResult<bool> {
         if check_commandability && !self.can_command()? {
             return Ok(false);
         }
@@ -1847,7 +1847,7 @@ impl<'a> Unit<'a> {
         &self,
         ct: UnitCommandType,
         check_commandability: bool,
-    ) -> BWResult<bool> {
+    ) -> BwResult<bool> {
         if check_commandability && !self.can_command()? {
             return Ok(false);
         }
@@ -1900,7 +1900,7 @@ impl<'a> Unit<'a> {
         }
     }
 
-    pub fn can_set_rally_position(&self, check_commandability: bool) -> BWResult<bool> {
+    pub fn can_set_rally_position(&self, check_commandability: bool) -> BwResult<bool> {
         if check_commandability && !self.can_command()? {
             return Ok(false);
         }
@@ -1914,7 +1914,7 @@ impl<'a> Unit<'a> {
         Ok(true)
     }
 
-    pub fn can_move(&self, check_commandability: bool) -> BWResult<bool> {
+    pub fn can_move(&self, check_commandability: bool) -> BwResult<bool> {
         if check_commandability && !self.can_command()? {
             return Ok(false);
         }
@@ -1946,7 +1946,7 @@ impl<'a> Unit<'a> {
         Ok(true)
     }
 
-    pub fn can_patrol(&self, check_commandability: bool) -> BWResult<bool> {
+    pub fn can_patrol(&self, check_commandability: bool) -> BwResult<bool> {
         if check_commandability && !self.can_command()? {
             return Ok(false);
         }
@@ -1958,7 +1958,7 @@ impl<'a> Unit<'a> {
         }
     }
 
-    pub fn can_return_cargo(&self, check_commandability: bool) -> BWResult<bool> {
+    pub fn can_return_cargo(&self, check_commandability: bool) -> BwResult<bool> {
         if check_commandability && !self.can_command()? {
             return Ok(false);
         }
@@ -1981,7 +1981,7 @@ impl<'a> Unit<'a> {
         Ok(true)
     }
 
-    pub fn can_hold_position(&self, check_commandability: bool) -> BWResult<bool> {
+    pub fn can_hold_position(&self, check_commandability: bool) -> BwResult<bool> {
         if check_commandability && !self.can_command()? {
             return Ok(false);
         }
@@ -2014,7 +2014,7 @@ impl<'a> Unit<'a> {
         Ok(true)
     }
 
-    pub fn can_stop(&self, check_commandability: bool) -> BWResult<bool> {
+    pub fn can_stop(&self, check_commandability: bool) -> BwResult<bool> {
         if check_commandability && !self.can_command()? {
             return Ok(false);
         }
@@ -2037,7 +2037,7 @@ impl<'a> Unit<'a> {
         Ok(true)
     }
 
-    pub fn can_burrow(&self, check_commandability: bool) -> BWResult<bool> {
+    pub fn can_burrow(&self, check_commandability: bool) -> BwResult<bool> {
         if check_commandability && !self.can_command()? {
             return Ok(false);
         }
@@ -2048,7 +2048,7 @@ impl<'a> Unit<'a> {
         Ok(true)
     }
 
-    pub fn can_unburrow(&self, check_commandability: bool) -> BWResult<bool> {
+    pub fn can_unburrow(&self, check_commandability: bool) -> BwResult<bool> {
         if check_commandability && !self.can_command()? {
             return Ok(false);
         }
@@ -2062,7 +2062,7 @@ impl<'a> Unit<'a> {
         Ok(true)
     }
 
-    pub fn can_cloak(&self, check_commandability: bool) -> BWResult<bool> {
+    pub fn can_cloak(&self, check_commandability: bool) -> BwResult<bool> {
         if check_commandability && !self.can_command()? {
             return Ok(false);
         }
@@ -2076,7 +2076,7 @@ impl<'a> Unit<'a> {
         Ok(true)
     }
 
-    pub fn can_decloak(&self, check_commandability: bool) -> BWResult<bool> {
+    pub fn can_decloak(&self, check_commandability: bool) -> BwResult<bool> {
         if check_commandability && !self.can_command()? {
             return Ok(false);
         }
@@ -2090,7 +2090,7 @@ impl<'a> Unit<'a> {
         Ok(true)
     }
 
-    pub fn can_siege(&self, check_commandability: bool) -> BWResult<bool> {
+    pub fn can_siege(&self, check_commandability: bool) -> BwResult<bool> {
         if check_commandability && !self.can_command()? {
             return Ok(false);
         }
@@ -2101,7 +2101,7 @@ impl<'a> Unit<'a> {
         Ok(true)
     }
 
-    pub fn can_unsiege(&self, check_commandability: bool) -> BWResult<bool> {
+    pub fn can_unsiege(&self, check_commandability: bool) -> BwResult<bool> {
         if check_commandability && !self.can_command()? {
             return Ok(false);
         }
@@ -2118,7 +2118,7 @@ impl<'a> Unit<'a> {
         Ok(true)
     }
 
-    pub fn can_lift(&self, check_commandability: bool) -> BWResult<bool> {
+    pub fn can_lift(&self, check_commandability: bool) -> BwResult<bool> {
         if check_commandability && !self.can_command()? {
             return Ok(false);
         }
@@ -2138,7 +2138,7 @@ impl<'a> Unit<'a> {
         Ok(true)
     }
 
-    pub fn can_unload_with_or_without_target(&self, check_commandability: bool) -> BWResult<bool> {
+    pub fn can_unload_with_or_without_target(&self, check_commandability: bool) -> BwResult<bool> {
         if check_commandability && !self.can_command()? {
             return Ok(false);
         }
@@ -2171,7 +2171,7 @@ impl<'a> Unit<'a> {
         targ_drop_pos: Position,
         check_can_issue_command_type: bool,
         check_commandability: bool,
-    ) -> BWResult<bool> {
+    ) -> BwResult<bool> {
         if check_commandability && !self.can_command()? {
             return Ok(false);
         }
@@ -2191,11 +2191,11 @@ impl<'a> Unit<'a> {
         Ok(true)
     }
 
-    pub fn can_unload_all(&self, check_commandability: bool) -> BWResult<bool> {
+    pub fn can_unload_all(&self, check_commandability: bool) -> BwResult<bool> {
         self.can_unload_at_position(self.get_position(), true, check_commandability)
     }
 
-    pub fn can_right_click(&self, check_commandability: bool) -> BWResult<bool> {
+    pub fn can_right_click(&self, check_commandability: bool) -> BwResult<bool> {
         if check_commandability && !self.can_command()? {
             return Ok(false);
         }
@@ -2208,7 +2208,7 @@ impl<'a> Unit<'a> {
         Ok(true)
     }
 
-    pub fn can_right_click_position(&self, check_commandability: bool) -> BWResult<bool> {
+    pub fn can_right_click_position(&self, check_commandability: bool) -> BwResult<bool> {
         if check_commandability && !self.can_command()? {
             return Ok(false);
         }
@@ -2224,7 +2224,7 @@ impl<'a> Unit<'a> {
         Ok(true)
     }
 
-    pub fn can_halt_construction(&self, check_commandability: bool) -> BWResult<bool> {
+    pub fn can_halt_construction(&self, check_commandability: bool) -> BwResult<bool> {
         if check_commandability && !self.can_command()? {
             return Ok(false);
         }
@@ -2236,7 +2236,7 @@ impl<'a> Unit<'a> {
         Ok(true)
     }
 
-    pub fn can_cancel_construction(&self, check_commandability: bool) -> BWResult<bool> {
+    pub fn can_cancel_construction(&self, check_commandability: bool) -> BwResult<bool> {
         if check_commandability && !self.can_command()? {
             return Ok(false);
         }
@@ -2252,7 +2252,7 @@ impl<'a> Unit<'a> {
         Ok(true)
     }
 
-    pub fn can_cancel_addon(&self, check_commandability: bool) -> BWResult<bool> {
+    pub fn can_cancel_addon(&self, check_commandability: bool) -> BwResult<bool> {
         if check_commandability && !self.can_command()? {
             return Ok(false);
         }
@@ -2263,7 +2263,7 @@ impl<'a> Unit<'a> {
         Ok(true)
     }
 
-    pub fn can_cancel_research(&self, check_commandability: bool) -> BWResult<bool> {
+    pub fn can_cancel_research(&self, check_commandability: bool) -> BwResult<bool> {
         if check_commandability && !self.can_command()? {
             return Ok(false);
         }
@@ -2274,7 +2274,7 @@ impl<'a> Unit<'a> {
         Ok(true)
     }
 
-    pub fn can_cancel_upgrade(&self, check_commandability: bool) -> BWResult<bool> {
+    pub fn can_cancel_upgrade(&self, check_commandability: bool) -> BwResult<bool> {
         if check_commandability && !self.can_command()? {
             return Ok(false);
         }
@@ -2285,7 +2285,7 @@ impl<'a> Unit<'a> {
         Ok(true)
     }
 
-    pub fn can_cancel_morph(&self, check_commandability: bool) -> BWResult<bool> {
+    pub fn can_cancel_morph(&self, check_commandability: bool) -> BwResult<bool> {
         if check_commandability && !self.can_command()? {
             return Ok(false);
         }
@@ -2305,11 +2305,11 @@ impl<'a> Unit<'a> {
 }
 
 pub trait CanResearch {
-    fn can_research(&self, game: &Game) -> BWResult<bool>;
+    fn can_research(&self, game: &Game) -> BwResult<bool>;
 }
 
 impl CanResearch for (&Unit<'_>, bool) {
-    fn can_research(&self, _: &Game) -> BWResult<bool> {
+    fn can_research(&self, _: &Game) -> BwResult<bool> {
         let (unit, check_commandability) = *self;
         if check_commandability && !unit.can_command()? {
             return Ok(false);
@@ -2323,7 +2323,7 @@ impl CanResearch for (&Unit<'_>, bool) {
 }
 
 impl CanResearch for (Option<&Unit<'_>>, TechType, bool) {
-    fn can_research(&self, game: &Game) -> BWResult<bool> {
+    fn can_research(&self, game: &Game) -> BwResult<bool> {
         let self_ = game.self_().ok_or(Error::Unit_Not_Owned)?;
         let (unit, type_, check_can_issue_command_type) = *self;
 
@@ -2364,11 +2364,11 @@ impl CanResearch for (Option<&Unit<'_>>, TechType, bool) {
 }
 
 pub trait CanTargetUnit {
-    fn can_target_unit(&self, game: &Game) -> BWResult<bool>;
+    fn can_target_unit(&self, game: &Game) -> BwResult<bool>;
 }
 
 impl CanTargetUnit for &Unit<'_> {
-    fn can_target_unit(&self, _: &Game) -> BWResult<bool> {
+    fn can_target_unit(&self, _: &Game) -> BwResult<bool> {
         let target_unit = self;
         if !target_unit.exists() {
             return Err(Error::Unit_Does_Not_Exist);
@@ -2396,7 +2396,7 @@ impl CanTargetUnit for &Unit<'_> {
 }
 
 impl CanTargetUnit for (&Unit<'_>, &Unit<'_>, bool) {
-    fn can_target_unit(&self, game: &Game) -> BWResult<bool> {
+    fn can_target_unit(&self, game: &Game) -> BwResult<bool> {
         let (this_unit, target_unit, check_commandability) = *self;
         if check_commandability && !this_unit.can_command()? {
             return Ok(false);
@@ -2410,11 +2410,11 @@ impl CanTargetUnit for (&Unit<'_>, &Unit<'_>, bool) {
 }
 
 pub trait CanUpgrade {
-    fn can_upgrade(&self, game: &Game) -> BWResult<bool>;
+    fn can_upgrade(&self, game: &Game) -> BwResult<bool>;
 }
 
 impl CanUpgrade for (&Unit<'_>, bool) {
-    fn can_upgrade(&self, _: &Game) -> BWResult<bool> {
+    fn can_upgrade(&self, _: &Game) -> BwResult<bool> {
         let (this_unit, check_commandability) = *self;
         if check_commandability && !this_unit.can_command()? {
             return Ok(false);
@@ -2428,7 +2428,7 @@ impl CanUpgrade for (&Unit<'_>, bool) {
 }
 
 impl CanUpgrade for (Option<&Unit<'_>>, UpgradeType, bool) {
-    fn can_upgrade(&self, game: &Game) -> BWResult<bool> {
+    fn can_upgrade(&self, game: &Game) -> BwResult<bool> {
         let (this_unit, type_, check_can_issue_command_type) = *self;
         let self_ = game.self_().ok_or(Error::Unit_Not_Owned)?;
 
@@ -2476,15 +2476,15 @@ impl CanUpgrade for (Option<&Unit<'_>>, UpgradeType, bool) {
 }
 
 impl<'a> Game<'a> {
-    pub fn can_research(&self, checker: impl CanResearch) -> BWResult<bool> {
+    pub fn can_research(&self, checker: impl CanResearch) -> BwResult<bool> {
         checker.can_research(self)
     }
 
-    pub fn can_upgrade(&self, checker: impl CanUpgrade) -> BWResult<bool> {
+    pub fn can_upgrade(&self, checker: impl CanUpgrade) -> BwResult<bool> {
         checker.can_upgrade(self)
     }
 
-    pub(crate) fn can_target_unit(&self, checker: impl CanTargetUnit) -> BWResult<bool> {
+    pub(crate) fn can_target_unit(&self, checker: impl CanTargetUnit) -> BwResult<bool> {
         checker.can_target_unit(self)
     }
 }

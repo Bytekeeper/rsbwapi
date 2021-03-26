@@ -5,7 +5,7 @@ use std::os::raw::c_char;
 
 /// Many functions produce error code. BWAPI usually sets a error variable and returns a success flag.
 /// Rsbwapi instead returns a result with the error code.
-pub type BWResult<T> = Result<T, Error>;
+pub type BwResult<T> = Result<T, Error>;
 
 #[derive(Debug, Copy, Clone, FromPrimitive)]
 pub enum Color {

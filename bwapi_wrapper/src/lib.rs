@@ -2,7 +2,6 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 use crate::prelude::{UnitType, UpgradeType};
-use num_derive::FromPrimitive;
 
 pub mod command;
 pub mod tech_type;
@@ -13,7 +12,12 @@ pub mod weapon_type;
 pub mod position;
 pub mod prelude;
 
-include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+#[allow(clippy::all)]
+mod bindings {
+    use num_derive::FromPrimitive;
+    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+}
+pub use bindings::*;
 
 pub trait TypeFrom {
     fn new(i: i32) -> Self;

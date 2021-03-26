@@ -3,6 +3,7 @@ use crate::predicate::{IntoPredicate, Predicate};
 
 use crate::*;
 use bwapi_wrapper::*;
+use std::fmt;
 
 pub type UnitId = usize;
 
@@ -36,6 +37,16 @@ pub struct Unit<'a> {
     pub(crate) game: &'a Game<'a>,
     data: &'a BWAPI_UnitData,
     info: UnitInfo,
+}
+
+impl<'a> fmt::Debug for Unit<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Unit")
+            .field("id", &self.id)
+            .field("type", &self.get_type())
+            .field("position", &self.get_position())
+            .finish()
+    }
 }
 
 impl<'a> Unit<'a> {
@@ -906,26 +917,26 @@ impl<'a> Unit<'a> {
  * Unit Commands
  */
 impl<'a> Unit<'a> {
-    pub fn attack<T: UnitOrPosition>(&self, target: T) -> BWResult<bool> {
+    pub fn attack<T: UnitOrPosition>(&self, target: T) -> BwResult<bool> {
         let mut cmd = self.command(false);
         target.assign_attack(&mut cmd);
         self.issue_command(cmd)
     }
 
-    pub fn gather(&self, target: &Unit) -> BWResult<bool> {
+    pub fn gather(&self, target: &Unit) -> BwResult<bool> {
         self.issue_command(UnitCommand {
             targetIndex: target.id as i32,
             ..self.command_type(UnitCommandType::Gather, false)
         })
     }
 
-    pub fn right_click<T: UnitOrPosition>(&self, target: T) -> BWResult<bool> {
+    pub fn right_click<T: UnitOrPosition>(&self, target: T) -> BwResult<bool> {
         let mut cmd = self.command(false);
         target.assign_right_click(&mut cmd);
         self.issue_command(cmd)
     }
 
-    pub fn build<P: Into<TilePosition>>(&self, type_: UnitType, target: P) -> BWResult<bool> {
+    pub fn build<P: Into<TilePosition>>(&self, type_: UnitType, target: P) -> BwResult<bool> {
         let target = target.into();
         self.issue_command(UnitCommand {
             x: target.x,
@@ -935,48 +946,48 @@ impl<'a> Unit<'a> {
         })
     }
 
-    pub fn build_addon(&self, type_: UnitType) -> BWResult<bool> {
+    pub fn build_addon(&self, type_: UnitType) -> BwResult<bool> {
         self.issue_command(UnitCommand {
             extra: type_ as i32,
             ..self.command_type(UnitCommandType::Build, false)
         })
     }
 
-    pub fn train(&self, type_: UnitType) -> BWResult<bool> {
+    pub fn train(&self, type_: UnitType) -> BwResult<bool> {
         self.issue_command(UnitCommand {
             extra: type_ as i32,
             ..self.command_type(UnitCommandType::Train, false)
         })
     }
 
-    pub fn morph(&self, type_: UnitType) -> BWResult<bool> {
+    pub fn morph(&self, type_: UnitType) -> BwResult<bool> {
         self.issue_command(UnitCommand {
             extra: type_ as i32,
             ..self.command_type(UnitCommandType::Morph, false)
         })
     }
 
-    pub fn research(&self, tech: TechType) -> BWResult<bool> {
+    pub fn research(&self, tech: TechType) -> BwResult<bool> {
         self.issue_command(UnitCommand {
             extra: tech as i32,
             ..self.command_type(UnitCommandType::Research, false)
         })
     }
 
-    pub fn upgrade(&self, upgrade: UpgradeType) -> BWResult<bool> {
+    pub fn upgrade(&self, upgrade: UpgradeType) -> BwResult<bool> {
         self.issue_command(UnitCommand {
             extra: upgrade as i32,
             ..self.command_type(UnitCommandType::Upgrade, false)
         })
     }
 
-    pub fn set_rally_point<P: UnitOrPosition>(&self, target: P) -> BWResult<bool> {
+    pub fn set_rally_point<P: UnitOrPosition>(&self, target: P) -> BwResult<bool> {
         let mut cmd = self.command(false);
         target.assign_rally_point(&mut cmd);
         self.issue_command(cmd)
     }
 
-    pub fn move_<P: Into<Position>>(&self, target: P) -> BWResult<bool> {
+    pub fn move_<P: Into<Position>>(&self, target: P) -> BwResult<bool> {
         let target = target.into();
         self.issue_command(UnitCommand {
             x: target.x,
@@ -985,7 +996,7 @@ impl<'a> Unit<'a> {
         })
     }
 
-    pub fn patrol<P: Into<Position>>(&self, target: P) -> BWResult<bool> {
+    pub fn patrol<P: Into<Position>>(&self, target: P) -> BwResult<bool> {
         let target = target.into();
         self.issue_command(UnitCommand {
             x: target.x,
@@ -994,81 +1005,81 @@ impl<'a> Unit<'a> {
         })
     }
 
-    pub fn hold_position(&self) -> BWResult<bool> {
+    pub fn hold_position(&self) -> BwResult<bool> {
         self.issue_command(UnitCommand {
             ..self.command_type(UnitCommandType::Hold_Position, false)
         })
     }
 
-    pub fn stop(&self) -> BWResult<bool> {
+    pub fn stop(&self) -> BwResult<bool> {
         self.issue_command(UnitCommand {
             ..self.command_type(UnitCommandType::Stop, false)
         })
     }
 
-    pub fn follow(&self, target: &Unit) -> BWResult<bool> {
+    pub fn follow(&self, target: &Unit) -> BwResult<bool> {
         self.issue_command(UnitCommand {
             targetIndex: target.id as i32,
             ..self.command_type(UnitCommandType::Follow, false)
         })
     }
 
-    pub fn return_cargo(&self) -> BWResult<bool> {
+    pub fn return_cargo(&self) -> BwResult<bool> {
         self.issue_command(UnitCommand {
             ..self.command_type(UnitCommandType::Return_Cargo, false)
         })
     }
 
-    pub fn repair(&self, target: &Unit) -> BWResult<bool> {
+    pub fn repair(&self, target: &Unit) -> BwResult<bool> {
         self.issue_command(UnitCommand {
             targetIndex: target.id as i32,
             ..self.command_type(UnitCommandType::Repair, false)
         })
     }
 
-    pub fn burrow(&self) -> BWResult<bool> {
+    pub fn burrow(&self) -> BwResult<bool> {
         self.issue_command(UnitCommand {
             ..self.command_type(UnitCommandType::Burrow, false)
         })
     }
 
-    pub fn unburrow(&self) -> BWResult<bool> {
+    pub fn unburrow(&self) -> BwResult<bool> {
         self.issue_command(UnitCommand {
             ..self.command_type(UnitCommandType::Unburrow, false)
         })
     }
 
-    pub fn cloak(&self) -> BWResult<bool> {
+    pub fn cloak(&self) -> BwResult<bool> {
         self.issue_command(UnitCommand {
             ..self.command_type(UnitCommandType::Cloak, false)
         })
     }
 
-    pub fn decloak(&self) -> BWResult<bool> {
+    pub fn decloak(&self) -> BwResult<bool> {
         self.issue_command(UnitCommand {
             ..self.command_type(UnitCommandType::Decloak, false)
         })
     }
 
-    pub fn siege(&self) -> BWResult<bool> {
+    pub fn siege(&self) -> BwResult<bool> {
         self.issue_command(UnitCommand {
             ..self.command_type(UnitCommandType::Siege, false)
         })
     }
 
-    pub fn unsiege(&self) -> BWResult<bool> {
+    pub fn unsiege(&self) -> BwResult<bool> {
         self.issue_command(UnitCommand {
             ..self.command_type(UnitCommandType::Unsiege, false)
         })
     }
 
-    pub fn lift(&self) -> BWResult<bool> {
+    pub fn lift(&self) -> BwResult<bool> {
         self.issue_command(UnitCommand {
             ..self.command_type(UnitCommandType::Lift, false)
         })
     }
 
-    pub fn land<TP: Into<TilePosition>>(&self, target: TP) -> BWResult<bool> {
+    pub fn land<TP: Into<TilePosition>>(&self, target: TP) -> BwResult<bool> {
         let target = target.into();
         self.issue_command(UnitCommand {
             x: target.x,
@@ -1077,21 +1088,21 @@ impl<'a> Unit<'a> {
         })
     }
 
-    pub fn load(&self, target: &Unit) -> BWResult<bool> {
+    pub fn load(&self, target: &Unit) -> BwResult<bool> {
         self.issue_command(UnitCommand {
             targetIndex: target.id as i32,
             ..self.command_type(UnitCommandType::Load, false)
         })
     }
 
-    pub fn unload(&self, target: &Unit) -> BWResult<bool> {
+    pub fn unload(&self, target: &Unit) -> BwResult<bool> {
         self.issue_command(UnitCommand {
             targetIndex: target.id as i32,
             ..self.command_type(UnitCommandType::Unload, false)
         })
     }
 
-    pub fn unload_all<P: Into<Position>, OP: Into<Option<P>>>(&self, target: OP) -> BWResult<bool> {
+    pub fn unload_all<P: Into<Position>, OP: Into<Option<P>>>(&self, target: OP) -> BwResult<bool> {
         let target = target.into();
         if let Some(target) = target {
             let target = target.into();
@@ -1107,25 +1118,25 @@ impl<'a> Unit<'a> {
         }
     }
 
-    pub fn halt_construction(&self) -> BWResult<bool> {
+    pub fn halt_construction(&self) -> BwResult<bool> {
         self.issue_command(UnitCommand {
             ..self.command_type(UnitCommandType::Halt_Construction, false)
         })
     }
 
-    pub fn cancel_construction(&self) -> BWResult<bool> {
+    pub fn cancel_construction(&self) -> BwResult<bool> {
         self.issue_command(UnitCommand {
             ..self.command_type(UnitCommandType::Cancel_Construction, false)
         })
     }
 
-    pub fn cancel_addon(&self) -> BWResult<bool> {
+    pub fn cancel_addon(&self) -> BwResult<bool> {
         self.issue_command(UnitCommand {
             ..self.command_type(UnitCommandType::Cancel_Addon, false)
         })
     }
 
-    pub fn cancel_train<S: Into<Option<i32>>>(&self, slot: S) -> BWResult<bool> {
+    pub fn cancel_train<S: Into<Option<i32>>>(&self, slot: S) -> BwResult<bool> {
         let slot = slot.into();
         self.issue_command(UnitCommand {
             extra: slot.unwrap_or(-2),
@@ -1133,19 +1144,19 @@ impl<'a> Unit<'a> {
         })
     }
 
-    pub fn cancel_morph(&self) -> BWResult<bool> {
+    pub fn cancel_morph(&self) -> BwResult<bool> {
         self.issue_command(UnitCommand {
             ..self.command_type(UnitCommandType::Cancel_Morph, false)
         })
     }
 
-    pub fn cancel_research(&self) -> BWResult<bool> {
+    pub fn cancel_research(&self) -> BwResult<bool> {
         self.issue_command(UnitCommand {
             ..self.command_type(UnitCommandType::Cancel_Research, false)
         })
     }
 
-    pub fn cancel_upgrade(&self) -> BWResult<bool> {
+    pub fn cancel_upgrade(&self) -> BwResult<bool> {
         self.issue_command(UnitCommand {
             ..self.command_type(UnitCommandType::Cancel_Upgrade, false)
         })
@@ -1155,7 +1166,7 @@ impl<'a> Unit<'a> {
         &self,
         tech: TechType,
         target: OT,
-    ) -> BWResult<bool> {
+    ) -> BwResult<bool> {
         let mut cmd = self.command(false);
         if let Some(target) = target.into() {
             target.assign_use_tech(tech, &mut cmd);
@@ -1168,7 +1179,7 @@ impl<'a> Unit<'a> {
         }
     }
 
-    pub fn place_cop<TP: Into<TilePosition>>(&self, target: TP) -> BWResult<bool> {
+    pub fn place_cop<TP: Into<TilePosition>>(&self, target: TP) -> BwResult<bool> {
         let target = target.into();
         self.issue_command(UnitCommand {
             x: target.x,
@@ -1201,7 +1212,7 @@ impl<'a> Unit<'a> {
         }
     }
 
-    pub fn issue_command(&self, cmd: UnitCommand) -> BWResult<bool> {
+    pub fn issue_command(&self, cmd: UnitCommand) -> BwResult<bool> {
         if !self.can_issue_command(cmd)? {
             return Ok(false);
         }
