@@ -2,6 +2,7 @@
 //! Helper traits and impls for the various can_xyz methods.
 //! BWAPI uses multiple overloaded methods, which is emulated using traits. Therefore, traits in here are
 //! usually implemented for `bool` and for one or more tuples. The `bool` in this case is the parameter `checkCommandibility`.
+//! Be warned, all the checking API is not stable, as it is mostly a rough conversion from C++
 
 use crate::*;
 
@@ -192,6 +193,7 @@ impl CanAttackUnit for (&Unit<'_>, bool, bool, bool) {
     }
 }
 
+/// Argument tuple to check if some unit can build some building
 pub trait CanBuild {
     fn can_build(&self, unit: &Unit) -> BwResult<bool>;
 }

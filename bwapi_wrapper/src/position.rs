@@ -118,6 +118,10 @@ macro_rules! pos_math_ops {
                 let dy = self.y - other.y;
                 (dx * dx + dy * dy) as u32
             }
+
+            pub fn distance(&self, other: $t) -> f64 {
+                (self.distance_squared(other) as f64).sqrt()
+            }
         }
 
         impl From<PositionTuple> for $t {
