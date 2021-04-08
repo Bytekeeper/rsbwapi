@@ -385,11 +385,10 @@ impl<'a> Game<'a> {
         self.data.averageFPS
     }
 
-    pub fn get_player(&self, i: i32) -> Option<Player> {
-        if !(0..self.data.playerCount).contains(&i) {
+    pub fn get_player(&self, i: PlayerId) -> Option<Player> {
+        if !(0..self.data.playerCount as usize).contains(&i) {
             None
         } else {
-            let i = i as usize;
             let data = self.data.players.get(i)?;
             Some(Player::new(i, &self, &data))
         }
@@ -432,12 +431,14 @@ impl<'a> Game<'a> {
         }
     }
 
+    /// Returns a unit, if it exists or could exist still.
+    /// For known dead units, it will return None.
     pub fn get_unit(&self, id: UnitId) -> Option<Unit> {
-        if !(0..10000).contains(&id) {
-            None
-        } else {
-            self.context.unit_infos[id].map(|ui| Unit::new(id, self, &self.data.units[id], ui))
-        }
+        let unit_data = self.data.units.get(id)?;
+        self.context
+            .unit_infos
+            .get(id)?
+            .map(|ui| Unit::new(id, self, unit_data, ui))
     }
 
     pub fn get_units_in_rectangle<
@@ -731,7 +732,7 @@ impl<'a> Game<'a> {
     }
 
     pub fn neutral(&self) -> Player {
-        self.get_player(self.data.neutral)
+        self.get_player(self.data.neutral as PlayerId)
             .expect("Neutral player to exist")
     }
 
@@ -888,11 +889,11 @@ impl<'a> Game<'a> {
     }
 
     pub fn enemy(&self) -> Option<Player> {
-        self.get_player(self.data.enemy)
+        self.get_player(self.data.enemy as PlayerId)
     }
 
     pub fn self_(&self) -> Option<Player> {
-        self.get_player(self.data.self_)
+        self.get_player(self.data.self_ as PlayerId)
     }
 
     pub fn get_frame_count(&self) -> i32 {
@@ -1164,7 +1165,7 @@ impl GameContext {
                         module.on_receive_text(
                             frame,
                             frame
-                                .get_player(event.v1)
+                                .get_player(event.v1 as usize)
                                 .expect("Player could not be retrieved"),
                             frame.event_str(event.v2 as usize),
                         )
@@ -1175,7 +1176,7 @@ impl GameContext {
                         module.on_player_left(
                             frame,
                             frame
-                                .get_player(event.v1)
+                                .get_player(event.v1 as usize)
                                 .expect("Player could not be retrieved"),
                         )
                     });

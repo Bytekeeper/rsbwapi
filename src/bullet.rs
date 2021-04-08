@@ -25,7 +25,7 @@ impl<'a> Bullet<'a> {
     }
 
     pub fn get_player(&self) -> Option<Player> {
-        self.frame.get_player(self.data.player)
+        self.frame.get_player(self.data.player as usize)
     }
 
     pub fn get_id(&self) -> usize {

@@ -261,7 +261,7 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_last_attacking_player(&self) -> Option<Player> {
-        self.game.get_player(self.data.lastAttackerPlayer)
+        self.game.get_player(self.data.lastAttackerPlayer as usize)
     }
 
     pub fn get_left(&self) -> i32 {
@@ -906,9 +906,9 @@ impl<'a> Unit<'a> {
         self.data.isMorphing
     }
 
-    pub fn get_player(&self) -> Player {
+    pub fn get_player(&self) -> Player<'a> {
         self.game
-            .get_player(self.data.player)
+            .get_player(self.data.player as usize)
             .unwrap_or_else(|| self.game.neutral())
     }
 }

@@ -18,8 +18,8 @@ pub mod unit;
 pub use aimodule::AiModule;
 pub use force::Force;
 pub use game::Game;
-pub use player::Player;
-pub use unit::Unit;
+pub use player::{Player, PlayerId};
+pub use unit::{Unit, UnitId};
 
 pub fn start(mut module: impl AiModule) {
     let mut client = client::Client::default();

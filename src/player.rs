@@ -7,15 +7,17 @@ use bwapi_wrapper::prelude::*;
 use bwapi_wrapper::*;
 use num_traits::FromPrimitive;
 
+pub type PlayerId = usize;
+
 #[derive(Clone, Copy)]
 pub struct Player<'a> {
-    pub id: usize,
+    pub id: PlayerId,
     game: &'a Game<'a>,
     data: &'a BWAPI_PlayerData,
 }
 
 impl<'a> Player<'a> {
-    pub(crate) fn new(id: usize, game: &'a Game<'a>, data: &'a BWAPI_PlayerData) -> Self {
+    pub(crate) fn new(id: PlayerId, game: &'a Game<'a>, data: &'a BWAPI_PlayerData) -> Self {
         Player { id, game, data }
     }
 
@@ -81,8 +83,8 @@ impl<'a> Player<'a> {
         self.game.get_force(self.force_id())
     }
 
-    pub fn get_id(&self) -> i32 {
-        self.id as i32
+    pub fn get_id(&self) -> PlayerId {
+        self.id as PlayerId
     }
 
     pub fn get_kill_score(&self) -> i32 {
