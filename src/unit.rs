@@ -3,7 +3,7 @@ use crate::predicate::{IntoPredicate, Predicate};
 
 use crate::*;
 use bwapi_wrapper::*;
-use std::fmt;
+use std::{convert::From, fmt};
 
 pub type UnitId = usize;
 
@@ -31,12 +31,18 @@ impl UnitInfo {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct Unit<'a> {
     id: UnitId,
     pub(crate) game: &'a Game<'a>,
     data: &'a BWAPI_UnitData,
     info: UnitInfo,
+}
+
+impl From<Unit<'_>> for UnitId {
+    fn from(unit: Unit<'_>) -> Self {
+        unit.id
+    }
 }
 
 impl<'a> fmt::Debug for Unit<'a> {
@@ -218,7 +224,7 @@ impl<'a> Unit<'a> {
             .game
             .get_all_units()
             .iter()
-            .filter(|u| u.get_carrier() == Some(*self))
+            .filter(|u| u.get_carrier().as_ref() == Some(self))
             .cloned()
             .collect();
         self.game
@@ -250,7 +256,7 @@ impl<'a> Unit<'a> {
             .game
             .get_all_units()
             .iter()
-            .filter(|u| u.get_hatchery() == Some(*self))
+            .filter(|u| u.get_hatchery().as_ref() == Some(self))
             .cloned()
             .collect();
         self.game
@@ -769,6 +775,14 @@ impl<'a> Unit<'a> {
             self.get_type(),
             UnitType::Terran_Siege_Tank_Siege_Mode | UnitType::Hero_Edmund_Duke_Siege_Mode
         )
+    }
+
+    pub fn is_moving(&self) -> bool {
+        self.data.isMoving
+    }
+
+    pub fn last_command_frame(&self) -> i32 {
+        self.game.context.last_command_frame.borrow()[self.id]
     }
 
     pub fn is_starting_attack(&self) -> bool {

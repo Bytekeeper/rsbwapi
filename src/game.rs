@@ -23,6 +23,7 @@ pub struct GameContext {
     visible_units: Vec<usize>,
     static_minerals: Vec<usize>,
     static_geysers: Vec<usize>,
+    pub(crate) last_command_frame: RefCell<[i32; 10000]>,
 }
 
 pub struct UnitLocation {
@@ -45,7 +46,7 @@ impl PointDistance for UnitLocation {
 }
 
 pub struct Game<'a> {
-    context: &'a GameContext,
+    pub(crate) context: &'a GameContext,
     data: &'a BWAPI_GameData,
     units: Vec<Unit<'a>>,
     rtree: RTree<UnitLocation>,
@@ -973,6 +974,7 @@ impl GameContext {
             visible_units: vec![],
             static_geysers: vec![],
             static_minerals: vec![],
+            last_command_frame: RefCell::new([0; 10000]),
         }
     }
 
@@ -1004,7 +1006,7 @@ impl GameContext {
             frame
                 .units
                 .iter()
-                .map(|&u| UnitLocation {
+                .map(|u| UnitLocation {
                     id: u.get_id(),
                     location: Rectangle::from_corners(
                         [u.get_left(), u.get_top()],

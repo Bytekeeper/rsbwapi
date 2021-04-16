@@ -3,6 +3,8 @@ use crate::player::Player;
 use crate::unit::Unit;
 use bwapi_wrapper::prelude::Position;
 
+/// Callbacks used by rsbwapi. For safety reasons, all references passed in are only valid for the
+/// call duration.
 pub trait AiModule {
     fn on_end(&mut self, _game: &Game, _winner: bool) {}
     fn on_nuke_detect(&mut self, _game: &Game, _position: Position) {}

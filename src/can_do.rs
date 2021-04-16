@@ -385,23 +385,23 @@ impl CanTrain for (UnitType, bool, bool) {
             return Ok(false);
         }
 
+        let larva = unit.get_larva();
         let unit = if unit.get_type().produces_larva() {
             if u_type.what_builds().0 == UnitType::Zerg_Larva {
-                unit.get_larva()
+                larva
                     .iter()
                     .find(|u| u.can_train(true).unwrap_or(false))
-                    .cloned()
-                    .unwrap_or(*unit)
+                    .unwrap_or(unit)
             } else if unit.is_constructing() || !unit.is_completed() {
                 return Err(Error::Unit_Busy);
             } else {
-                *unit
+                unit
             }
         } else {
-            *unit
+            unit
         };
 
-        if !unit.game.can_make(&unit, u_type)? {
+        if !unit.game.can_make(unit, u_type)? {
             return Ok(false);
         }
 
@@ -481,12 +481,12 @@ impl CanMorph for (UnitType, bool, bool) {
             return Ok(false);
         }
 
+        let larva = unit.get_larva();
         let unit = if unit.get_type().produces_larva() {
             if u_type.what_builds().0 == UnitType::Zerg_Larva {
-                unit.get_larva()
+                larva
                     .iter()
                     .find(|u| u.can_morph(true).unwrap_or(false))
-                    .cloned()
                     .ok_or(Error::Unit_Does_Not_Exist)?
             } else if unit.is_constructing()
                 || !unit.is_completed()
@@ -494,13 +494,13 @@ impl CanMorph for (UnitType, bool, bool) {
             {
                 return Err(Error::Unit_Busy);
             } else {
-                *unit
+                unit
             }
         } else {
-            *unit
+            unit
         };
 
-        if !unit.game.can_make(&unit, u_type)? {
+        if !unit.game.can_make(unit, u_type)? {
             return Ok(false);
         }
 
@@ -954,7 +954,7 @@ impl CanUnload for (&Unit<'_>, bool, bool, bool, bool) {
             return Err(Error::Incompatible_State);
         }
 
-        if target_unit.get_transport() != Some(*unit) {
+        if target_unit.get_transport().as_ref() != Some(unit) {
             return Err(Error::Invalid_Parameter);
         }
         Ok(true)

@@ -9,7 +9,7 @@ use num_traits::FromPrimitive;
 
 pub type PlayerId = usize;
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct Player<'a> {
     pub id: PlayerId,
     game: &'a Game<'a>,
