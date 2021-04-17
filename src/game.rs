@@ -2,6 +2,7 @@ use crate::aimodule::AiModule;
 use crate::bullet::Bullet;
 use crate::command::Commands;
 use crate::force::Force;
+use crate::player::Player;
 use crate::predicate::IntoPredicate;
 use crate::predicate::Predicate;
 use crate::region::Region;
@@ -11,13 +12,28 @@ use crate::unit::{Unit, UnitId, UnitInfo};
 use crate::*;
 use bwapi_wrapper::*;
 use core::cell::RefCell;
+#[cfg(feature = "metrics")]
+use metered::{hdr_histogram::HdrHistogram, measure, time_source::StdInstantMicros, ResponseTime};
 use rstar::primitives::Rectangle;
 use rstar::{Envelope, PointDistance, RTree, RTreeObject, AABB};
 use std::collections::HashMap;
 
-use crate::player::Player;
+#[derive(Default, Debug, serde::Serialize)]
+#[cfg(feature = "metrics")]
+pub struct RsBwapiMetrics {
+    frame_time: ResponseTime<RefCell<HdrHistogram>, StdInstantMicros>,
+}
+
+#[cfg(not(feature = "metrics"))]
+macro_rules! measure {
+    ($metric:expr, $e:expr) => {
+        $e
+    };
+}
 
 pub struct GameContext {
+    #[cfg(feature = "metrics")]
+    metrics: std::rc::Rc<RsBwapiMetrics>,
     data: Shm<BWAPI_GameData>,
     unit_infos: [Option<UnitInfo>; 10000],
     visible_units: Vec<usize>,
@@ -57,6 +73,11 @@ pub struct Game<'a> {
 }
 
 impl<'a> Game<'a> {
+    #[cfg(feature = "metrics")]
+    pub fn get_metrics(&self) -> &RsBwapiMetrics {
+        &self.context.metrics
+    }
+
     pub fn can_build_here<P: Into<TilePosition>, B: Into<Option<&'a Unit<'a>>>>(
         &self,
         builder: B,
@@ -969,6 +990,8 @@ impl<'a> Game<'a> {
 impl GameContext {
     pub(crate) fn new(data: Shm<BWAPI_GameData>) -> Self {
         GameContext {
+            #[cfg(feature = "metrics")]
+            metrics: Default::default(),
             data,
             unit_infos: [None; 10000],
             visible_units: vec![],
@@ -1033,173 +1056,178 @@ impl GameContext {
     }
 
     pub(crate) fn handle_events(&mut self, module: &mut impl AiModule) {
-        let commands = RefCell::new(Commands::new());
-        for i in 0..self.data.get().eventCount {
-            let event: BWAPIC_Event = self.data.get().events[i as usize];
-            use BWAPI_EventType_Enum::*;
-            match event.type_ {
-                MatchStart => {
-                    let data = self.data.get();
-                    self.visible_units = (0..data.initialUnitCount as usize)
-                        .filter(|&i| {
-                            data.units[i].exists && data.units[i].type_ != UnitType::Unknown as i32
-                        })
-                        .collect();
+        measure!(&self.metrics.clone().frame_time, {
+            let commands = RefCell::new(Commands::new());
+            for i in 0..self.data.get().eventCount {
+                let event: BWAPIC_Event = self.data.get().events[i as usize];
+                use BWAPI_EventType_Enum::*;
+                match event.type_ {
+                    MatchStart => {
+                        let data = self.data.get();
+                        self.visible_units = (0..data.initialUnitCount as usize)
+                            .filter(|&i| {
+                                data.units[i].exists
+                                    && data.units[i].type_ != UnitType::Unknown as i32
+                            })
+                            .collect();
 
-                    for &i in self.visible_units.iter() {
-                        self.unit_infos[i] = Some(UnitInfo::new(i, &data.units[i]));
-                        let ut = UnitType::new(data.units[i].type_);
-                        if ut == UnitType::Resource_Vespene_Geyser {
-                            self.static_geysers.push(i);
+                        for &i in self.visible_units.iter() {
+                            self.unit_infos[i] = Some(UnitInfo::new(i, &data.units[i]));
+                            let ut = UnitType::new(data.units[i].type_);
+                            if ut == UnitType::Resource_Vespene_Geyser {
+                                self.static_geysers.push(i);
+                            }
+                            if ut.is_mineral_field() {
+                                self.static_minerals.push(i);
+                            }
                         }
-                        if ut.is_mineral_field() {
-                            self.static_minerals.push(i);
-                        }
+                        self.with_frame(&commands, |f| module.on_start(f));
+                        // No longer visible after the start event
+                        self.visible_units.clear();
                     }
-                    self.with_frame(&commands, |f| module.on_start(f));
-                    // No longer visible after the start event
-                    self.visible_units.clear();
+                    MatchFrame => {
+                        self.with_frame(&commands, |f| module.on_frame(f));
+                    }
+                    UnitCreate => {
+                        let id = event.v1 as usize;
+                        self.ensure_unit_info(id);
+                        self.with_frame(&commands, |frame| {
+                            module.on_unit_create(
+                                frame,
+                                frame.get_unit(id).expect("Created Unit to exist"),
+                            )
+                        });
+                    }
+                    UnitDestroy => {
+                        let id = event.v1 as usize;
+                        self.unit_invisible(id);
+                        self.with_frame(&commands, |frame| {
+                            module.on_unit_destroy(
+                                frame,
+                                frame
+                                    .get_unit(id)
+                                    .expect("Unit to be still available this frame"),
+                            )
+                        });
+                        self.unit_infos[id as usize] = Option::None;
+                    }
+                    UnitDiscover => {
+                        let id = event.v1 as usize;
+                        self.ensure_unit_info(id);
+                        self.with_frame(&commands, |frame| {
+                            module.on_unit_discover(
+                                frame,
+                                frame.get_unit(id).expect("Unit could not be retrieved"),
+                            )
+                        });
+                    }
+                    UnitEvade => {
+                        self.with_frame(&commands, |frame| {
+                            module.on_unit_evade(
+                                frame,
+                                frame
+                                    .get_unit(event.v1 as usize)
+                                    .expect("Unit could not be retrieved"),
+                            )
+                        });
+                    }
+                    UnitShow => {
+                        let id = event.v1 as usize;
+                        self.visible_units.push(id);
+                        self.ensure_unit_info(id);
+                        self.with_frame(&commands, |frame| {
+                            module.on_unit_show(
+                                frame,
+                                frame.get_unit(id).expect("Unit could not be retrieved"),
+                            )
+                        });
+                    }
+                    UnitHide => {
+                        let id = event.v1 as usize;
+                        self.unit_invisible(id);
+                        self.with_frame(&commands, |frame| {
+                            module.on_unit_hide(
+                                frame,
+                                frame.get_unit(id).expect("Unit could not be retrieved"),
+                            )
+                        });
+                    }
+                    UnitMorph => {
+                        self.with_frame(&commands, |frame| {
+                            module.on_unit_morph(
+                                frame,
+                                frame
+                                    .get_unit(event.v1 as usize)
+                                    .expect("Unit could not be retrieved"),
+                            )
+                        });
+                    }
+                    UnitRenegade => {
+                        self.with_frame(&commands, |frame| {
+                            module.on_unit_renegade(
+                                frame,
+                                frame
+                                    .get_unit(event.v1 as usize)
+                                    .expect("Unit could not be retrieved"),
+                            )
+                        });
+                    }
+                    UnitComplete => {
+                        let id = event.v1 as usize;
+                        self.ensure_unit_info(id);
+                        self.with_frame(&commands, |frame| {
+                            module.on_unit_complete(
+                                frame,
+                                frame.get_unit(id).expect("Unit could not be retrieved"),
+                            )
+                        });
+                    }
+                    MatchEnd => {
+                        self.with_frame(&commands, |frame| module.on_end(frame, event.v1 != 0))
+                    }
+                    MenuFrame => {}
+                    SendText => self.with_frame(&commands, |frame| {
+                        module.on_send_text(frame, frame.event_str(event.v1 as usize))
+                    }),
+                    ReceiveText => {
+                        self.with_frame(&commands, |frame| {
+                            module.on_receive_text(
+                                frame,
+                                frame
+                                    .get_player(event.v1 as usize)
+                                    .expect("Player could not be retrieved"),
+                                frame.event_str(event.v2 as usize),
+                            )
+                        });
+                    }
+                    PlayerLeft => {
+                        self.with_frame(&commands, |frame| {
+                            module.on_player_left(
+                                frame,
+                                frame
+                                    .get_player(event.v1 as usize)
+                                    .expect("Player could not be retrieved"),
+                            )
+                        });
+                    }
+                    NukeDetect => {
+                        self.with_frame(&commands, |frame| {
+                            module.on_nuke_detect(
+                                frame,
+                                Position {
+                                    x: event.v1,
+                                    y: event.v2,
+                                },
+                            )
+                        });
+                    }
+                    SaveGame => self.with_frame(&commands, |frame| {
+                        module.on_save_game(frame, frame.event_str(event.v1 as usize))
+                    }),
+                    None => {}
                 }
-                MatchFrame => {
-                    self.with_frame(&commands, |f| module.on_frame(f));
-                }
-                UnitCreate => {
-                    let id = event.v1 as usize;
-                    self.ensure_unit_info(id);
-                    self.with_frame(&commands, |frame| {
-                        module.on_unit_create(
-                            frame,
-                            frame.get_unit(id).expect("Created Unit to exist"),
-                        )
-                    });
-                }
-                UnitDestroy => {
-                    let id = event.v1 as usize;
-                    self.unit_invisible(id);
-                    self.with_frame(&commands, |frame| {
-                        module.on_unit_destroy(
-                            frame,
-                            frame
-                                .get_unit(id)
-                                .expect("Unit to be still available this frame"),
-                        )
-                    });
-                    self.unit_infos[id as usize] = Option::None;
-                }
-                UnitDiscover => {
-                    let id = event.v1 as usize;
-                    self.ensure_unit_info(id);
-                    self.with_frame(&commands, |frame| {
-                        module.on_unit_discover(
-                            frame,
-                            frame.get_unit(id).expect("Unit could not be retrieved"),
-                        )
-                    });
-                }
-                UnitEvade => {
-                    self.with_frame(&commands, |frame| {
-                        module.on_unit_evade(
-                            frame,
-                            frame
-                                .get_unit(event.v1 as usize)
-                                .expect("Unit could not be retrieved"),
-                        )
-                    });
-                }
-                UnitShow => {
-                    let id = event.v1 as usize;
-                    self.visible_units.push(id);
-                    self.ensure_unit_info(id);
-                    self.with_frame(&commands, |frame| {
-                        module.on_unit_show(
-                            frame,
-                            frame.get_unit(id).expect("Unit could not be retrieved"),
-                        )
-                    });
-                }
-                UnitHide => {
-                    let id = event.v1 as usize;
-                    self.unit_invisible(id);
-                    self.with_frame(&commands, |frame| {
-                        module.on_unit_hide(
-                            frame,
-                            frame.get_unit(id).expect("Unit could not be retrieved"),
-                        )
-                    });
-                }
-                UnitMorph => {
-                    self.with_frame(&commands, |frame| {
-                        module.on_unit_morph(
-                            frame,
-                            frame
-                                .get_unit(event.v1 as usize)
-                                .expect("Unit could not be retrieved"),
-                        )
-                    });
-                }
-                UnitRenegade => {
-                    self.with_frame(&commands, |frame| {
-                        module.on_unit_renegade(
-                            frame,
-                            frame
-                                .get_unit(event.v1 as usize)
-                                .expect("Unit could not be retrieved"),
-                        )
-                    });
-                }
-                UnitComplete => {
-                    let id = event.v1 as usize;
-                    self.ensure_unit_info(id);
-                    self.with_frame(&commands, |frame| {
-                        module.on_unit_complete(
-                            frame,
-                            frame.get_unit(id).expect("Unit could not be retrieved"),
-                        )
-                    });
-                }
-                MatchEnd => self.with_frame(&commands, |frame| module.on_end(frame, event.v1 != 0)),
-                MenuFrame => {}
-                SendText => self.with_frame(&commands, |frame| {
-                    module.on_send_text(frame, frame.event_str(event.v1 as usize))
-                }),
-                ReceiveText => {
-                    self.with_frame(&commands, |frame| {
-                        module.on_receive_text(
-                            frame,
-                            frame
-                                .get_player(event.v1 as usize)
-                                .expect("Player could not be retrieved"),
-                            frame.event_str(event.v2 as usize),
-                        )
-                    });
-                }
-                PlayerLeft => {
-                    self.with_frame(&commands, |frame| {
-                        module.on_player_left(
-                            frame,
-                            frame
-                                .get_player(event.v1 as usize)
-                                .expect("Player could not be retrieved"),
-                        )
-                    });
-                }
-                NukeDetect => {
-                    self.with_frame(&commands, |frame| {
-                        module.on_nuke_detect(
-                            frame,
-                            Position {
-                                x: event.v1,
-                                y: event.v2,
-                            },
-                        )
-                    });
-                }
-                SaveGame => self.with_frame(&commands, |frame| {
-                    module.on_save_game(frame, frame.event_str(event.v1 as usize))
-                }),
-                None => {}
             }
-        }
-        commands.into_inner().commit(self.data.get_mut());
+            commands.into_inner().commit(self.data.get_mut());
+        })
     }
 }
