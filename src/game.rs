@@ -16,7 +16,7 @@ use core::cell::RefCell;
 use metered::{hdr_histogram::HdrHistogram, measure, time_source::StdInstantMicros, ResponseTime};
 use rstar::primitives::Rectangle;
 use rstar::{Envelope, PointDistance, RTree, RTreeObject, AABB};
-use std::collections::HashMap;
+use std::{collections::HashMap, convert::TryInto};
 
 #[derive(Default, Debug, serde::Serialize)]
 #[cfg(feature = "metrics")]
@@ -460,7 +460,8 @@ impl<'a> Game<'a> {
         self.context
             .unit_infos
             .get(id)?
-            .map(|ui| Unit::new(id, self, unit_data, ui))
+            .as_ref()
+            .map(|ui| Unit::new(id, self, unit_data, &ui))
     }
 
     pub fn get_units_in_rectangle<
@@ -993,7 +994,7 @@ impl GameContext {
             #[cfg(feature = "metrics")]
             metrics: Default::default(),
             data,
-            unit_infos: [None; 10000],
+            unit_infos: vec![None; 10000].try_into().unwrap(),
             visible_units: vec![],
             static_geysers: vec![],
             static_minerals: vec![],

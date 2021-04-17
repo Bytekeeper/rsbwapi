@@ -7,7 +7,7 @@ use std::{convert::From, fmt};
 
 pub type UnitId = usize;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct UnitInfo {
     pub id: UnitId,
     pub initial_hit_points: i32,
@@ -36,7 +36,7 @@ pub struct Unit<'a> {
     id: UnitId,
     pub(crate) game: &'a Game<'a>,
     data: &'a BWAPI_UnitData,
-    info: UnitInfo,
+    info: &'a UnitInfo,
 }
 
 impl From<Unit<'_>> for UnitId {
@@ -60,7 +60,7 @@ impl<'a> Unit<'a> {
         id: UnitId,
         game: &'a Game<'a>,
         data: &'a BWAPI_UnitData,
-        info: UnitInfo,
+        info: &'a UnitInfo,
     ) -> Self {
         Unit {
             id,

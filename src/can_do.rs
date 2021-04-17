@@ -6,7 +6,7 @@
 
 use crate::*;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct CanIssueCommandArg {
     pub c: UnitCommand,
     pub check_can_use_tech_position_on_positions: bool,
