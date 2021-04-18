@@ -265,7 +265,7 @@ impl CanBuild for (UnitType, TilePosition, bool, bool, bool) {
         if check_target_unit_type && !unit.can_build((u_type, false, false))? {
             return Ok(false);
         }
-        if !tile_pos.is_valid() {
+        if !tile_pos.is_valid(unit.game) {
             return Err(Error::Invalid_Tile_Position);
         }
         if !unit.game.can_build_here(unit, tile_pos, u_type, true)? {
@@ -2184,7 +2184,7 @@ impl<'a> Unit<'a> {
 
         if self.get_type() != UnitType::Terran_Bunker {
             let wp = targ_drop_pos.to_walk_position();
-            if !wp.is_valid() {
+            if !wp.is_valid(self.game) {
                 return Err(Error::Invalid_Tile_Position);
             } else if !self.game.is_walkable(wp) {
                 return Err(Error::Unreachable_Location);

@@ -862,7 +862,7 @@ impl<'a> Unit<'a> {
         if let Ok(target) = target.to_position() {
             self.is_flying()
                 || self.exists()
-                    && target.is_valid()
+                    && target.is_valid(self.game)
                     && (self.game.has_path(self.get_position(), target)
                         || self
                             .game

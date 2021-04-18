@@ -72,6 +72,12 @@ pub struct Game<'a> {
     pylons: RefCell<Option<Vec<usize>>>,
 }
 
+impl<'a> PositionValidator for Game<'a> {
+    fn is_valid<const N: i32>(&self, pos: &ScaledPosition<N>) -> bool {
+        pos.x >= 0 && pos.y >= 0 && pos.x < self.map_width() * N && pos.y < self.map_height()
+    }
+}
+
 impl<'a> Game<'a> {
     #[cfg(feature = "metrics")]
     pub fn get_metrics(&self) -> &RsBwapiMetrics {
@@ -95,7 +101,7 @@ impl<'a> Game<'a> {
         let lt = position;
         let rb = lt + type_.tile_size();
 
-        if !lt.is_valid() || !(rb.to_position() - Position { x: 1, y: 1 }).is_valid() {
+        if !self.is_valid(&lt) || !self.is_valid(&(rb.to_position() - Position { x: 1, y: 1 })) {
             return Err(Error::Unbuildable_Location);
         }
 
@@ -490,7 +496,7 @@ impl<'a> Game<'a> {
         pred: P,
     ) -> Vec<Unit> {
         let tile = tile.into();
-        if !tile.is_valid() {
+        if !self.is_valid(&tile) {
             vec![]
         } else {
             let p = tile.to_position();
@@ -590,7 +596,7 @@ impl<'a> Game<'a> {
     ) -> bool {
         let source = source.into();
         let destination = destination.into();
-        if source.is_valid() && destination.is_valid() {
+        if self.is_valid(&source) && self.is_valid(&destination) {
             let rgn_a = self.get_region_at(source);
             let rgn_b = self.get_region_at(destination);
             if let (Some(rgn_a), Some(rgn_b)) = (rgn_a, rgn_b) {

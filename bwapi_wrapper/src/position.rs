@@ -1,22 +1,14 @@
 use core::ops::{Add, Div, Mul, Sub};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub struct Position {
+pub struct ScaledPosition<const N: i32> {
     pub x: i32,
     pub y: i32,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct TilePosition {
-    pub x: i32,
-    pub y: i32,
-}
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct WalkPosition {
-    pub x: i32,
-    pub y: i32,
-}
+pub type Position = ScaledPosition<1>;
+pub type WalkPosition = ScaledPosition<8>;
+pub type TilePosition = ScaledPosition<32>;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Vector2D {
@@ -27,23 +19,20 @@ pub struct Vector2D {
 pub type PositionTuple = (i32, i32);
 pub const ORIGIN: Position = Position { x: 0, y: 0 };
 
+fn pos_to_pos<const I: i32, const O: i32>(pos: ScaledPosition<I>) -> ScaledPosition<O> {
+    ScaledPosition {
+        x: pos.x * I / O,
+        y: pos.y * I / O,
+    }
+}
+
 impl Position {
-    pub fn new(x: i32, y: i32) -> Option<Self> {
-        Some(Self { x, y })
+    pub fn to_tile_position(self) -> TilePosition {
+        pos_to_pos(self)
     }
 
-    pub fn to_tile_position(&self) -> TilePosition {
-        TilePosition {
-            x: self.x / 32,
-            y: self.y / 32,
-        }
-    }
-
-    pub fn to_walk_position(&self) -> WalkPosition {
-        WalkPosition {
-            x: self.x / 8,
-            y: self.y / 8,
-        }
+    pub fn to_walk_position(self) -> WalkPosition {
+        pos_to_pos(self)
     }
 
     pub fn get_approx_distance<P: Into<Position>>(&self, other: P) -> i32 {
@@ -65,34 +54,22 @@ impl Position {
 }
 
 impl TilePosition {
-    pub fn to_position(&self) -> Position {
-        Position {
-            x: self.x * 32,
-            y: self.y * 32,
-        }
+    pub fn to_position(self) -> Position {
+        pos_to_pos(self)
     }
 
-    pub fn to_walk_position(&self) -> WalkPosition {
-        WalkPosition {
-            x: self.x * 8,
-            y: self.y * 8,
-        }
+    pub fn to_walk_position(self) -> WalkPosition {
+        pos_to_pos(self)
     }
 }
 
 impl WalkPosition {
-    pub fn to_tile_position(&self) -> TilePosition {
-        TilePosition {
-            x: self.x / 4,
-            y: self.y / 4,
-        }
+    pub fn to_tile_position(self) -> TilePosition {
+        pos_to_pos(self)
     }
 
-    pub fn to_position(&self) -> Position {
-        Position {
-            x: self.x * 8,
-            y: self.y * 8,
-        }
+    pub fn to_position(self) -> Position {
+        pos_to_pos(self)
     }
 }
 
@@ -106,112 +83,113 @@ impl Vector2D {
     }
 }
 
-macro_rules! pos_math_ops {
-    ($($t:ty)*) => ($(
-        impl $t {
-            pub fn is_valid(&self) -> bool {
-                self.x >= 0 && self.y >= 0
-            }
-
-            pub fn distance_squared(&self, other: $t) -> u32 {
-                let dx = self.x - other.x;
-                let dy = self.y - other.y;
-                (dx * dx + dy * dy) as u32
-            }
-
-            pub fn distance(&self, other: $t) -> f64 {
-                (self.distance_squared(other) as f64).sqrt()
-            }
-        }
-
-        impl From<PositionTuple> for $t {
-            fn from(pos: PositionTuple) -> Self {
-                Self { x: pos.0, y: pos.1 }
-            }
-        }
-
-        impl From<$t> for PositionTuple {
-            fn from(pos: $t) -> Self {
-                (pos.x, pos.y)
-            }
-        }
-
-        impl Mul<i32> for $t {
-            type Output = $t;
-
-            fn mul(self, other: i32) -> Self::Output {
-                Self::Output {
-                    x: self.x * other,
-                    y: self.y * other
-                }
-            }
-        }
-
-        impl Mul<$t> for i32 {
-            type Output = $t;
-
-            fn mul(self, other: $t) -> Self::Output {
-                Self::Output {
-                     x: self * other.x,
-                     y: self * other.y
-                }
-            }
-        }
-
-        impl Div<i32> for $t {
-            type Output = Self;
-            fn div(self, other: i32) -> Self::Output {
-                Self::Output {
-                    x: self.x / other,
-                    y: self.y / other,
-                }
-            }
-        }
-
-        impl Sub<$t> for $t {
-            type Output = Self;
-
-            fn sub(self, other: $t) -> Self::Output {
-                Self::Output {
-                    x: self.x - other.x,
-                    y: self.y - other.y,
-                }
-            }
-        }
-
-        impl Sub<PositionTuple> for $t {
-            type Output = Self;
-
-            fn sub(self, other: PositionTuple) -> Self::Output {
-                Self::Output {
-                    x: self.x - other.0,
-                    y: self.y - other.1,
-                }
-            }
-        }
-
-        impl Add<$t> for $t {
-            type Output = Self;
-
-            fn add(self, other: $t) -> Self::Output {
-                Self::Output {
-                    x: self.x + other.x,
-                    y: self.y + other.y,
-                }
-            }
-        }
-
-        impl Add<PositionTuple> for $t {
-            type Output = Self;
-
-            fn add(self, other: PositionTuple) -> Self::Output {
-                Self::Output {
-                    x: self.x + other.0,
-                    y: self.y + other.1
-                }
-            }
-        }
-    )*)
+pub trait PositionValidator {
+    fn is_valid<const N: i32>(&self, pos: &ScaledPosition<N>) -> bool;
 }
 
-pos_math_ops!(Position WalkPosition TilePosition);
+impl<const N: i32> ScaledPosition<N> {
+    pub fn new(x: i32, y: i32) -> Option<Self> {
+        Some(Self { x, y })
+    }
+
+    pub fn is_valid(&self, validator: &impl PositionValidator) -> bool {
+        validator.is_valid(self)
+    }
+
+    pub fn distance_squared(&self, other: Self) -> u32 {
+        let dx = self.x - other.x;
+        let dy = self.y - other.y;
+        (dx * dx + dy * dy) as u32
+    }
+
+    pub fn distance(&self, other: Self) -> f64 {
+        (self.distance_squared(other) as f64).sqrt()
+    }
+}
+
+impl<const N: i32> From<PositionTuple> for ScaledPosition<N> {
+    fn from(pos: PositionTuple) -> Self {
+        Self { x: pos.0, y: pos.1 }
+    }
+}
+
+impl<const N: i32> From<ScaledPosition<N>> for PositionTuple {
+    fn from(pos: ScaledPosition<N>) -> Self {
+        (pos.x, pos.y)
+    }
+}
+
+impl<const N: i32> Mul<i32> for ScaledPosition<N> {
+    type Output = Self;
+
+    fn mul(self, other: i32) -> Self::Output {
+        Self::Output {
+            x: self.x * other,
+            y: self.y * other,
+        }
+    }
+}
+
+impl<const N: i32> Mul<ScaledPosition<N>> for i32 {
+    type Output = ScaledPosition<N>;
+
+    fn mul(self, other: ScaledPosition<N>) -> Self::Output {
+        Self::Output {
+            x: self * other.x,
+            y: self * other.y,
+        }
+    }
+}
+impl<const N: i32> Div<i32> for ScaledPosition<N> {
+    type Output = Self;
+    fn div(self, other: i32) -> Self::Output {
+        Self::Output {
+            x: self.x / other,
+            y: self.y / other,
+        }
+    }
+}
+
+impl<const N: i32> Sub<ScaledPosition<N>> for ScaledPosition<N> {
+    type Output = Self;
+
+    fn sub(self, other: ScaledPosition<N>) -> Self::Output {
+        Self::Output {
+            x: self.x - other.x,
+            y: self.y - other.y,
+        }
+    }
+}
+
+impl<const N: i32> Sub<PositionTuple> for ScaledPosition<N> {
+    type Output = Self;
+
+    fn sub(self, other: PositionTuple) -> Self::Output {
+        Self::Output {
+            x: self.x - other.0,
+            y: self.y - other.1,
+        }
+    }
+}
+
+impl<const N: i32> Add<ScaledPosition<N>> for ScaledPosition<N> {
+    type Output = Self;
+
+    fn add(self, other: ScaledPosition<N>) -> Self::Output {
+        Self::Output {
+            x: self.x + other.x,
+            y: self.y + other.y,
+        }
+    }
+}
+
+impl<const N: i32> Add<PositionTuple> for ScaledPosition<N> {
+    type Output = Self;
+
+    fn add(self, other: PositionTuple) -> Self::Output {
+        Self::Output {
+            x: self.x + other.0,
+            y: self.y + other.1,
+        }
+    }
+}
