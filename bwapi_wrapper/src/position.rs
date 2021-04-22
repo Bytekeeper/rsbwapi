@@ -1,6 +1,6 @@
 use core::ops::{Add, Div, Mul, Sub};
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct ScaledPosition<const N: i32> {
     pub x: i32,
     pub y: i32,
@@ -74,12 +74,8 @@ impl WalkPosition {
 }
 
 impl Vector2D {
-    pub fn new(x: f64, y: f64) -> Option<Self> {
-        if x == 0.0 && y == 0.0 {
-            None
-        } else {
-            Some(Self { x, y })
-        }
+    pub fn new(x: f64, y: f64) -> Self {
+        Self { x, y }
     }
 }
 
@@ -88,8 +84,17 @@ pub trait PositionValidator {
 }
 
 impl<const N: i32> ScaledPosition<N> {
-    pub fn new(x: i32, y: i32) -> Option<Self> {
-        Some(Self { x, y })
+    pub fn new_checked(validator: &impl PositionValidator, x: i32, y: i32) -> Option<Self> {
+        let pos = Self::new(x, y);
+        if validator.is_valid(&pos) {
+            Some(pos)
+        } else {
+            None
+        }
+    }
+
+    pub fn new(x: i32, y: i32) -> Self {
+        Self { x, y }
     }
 
     pub fn is_valid(&self, validator: &impl PositionValidator) -> bool {

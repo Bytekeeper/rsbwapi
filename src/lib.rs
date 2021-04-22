@@ -1,3 +1,4 @@
+mod map_analyzer;
 mod shm;
 
 pub use crate::types::*;

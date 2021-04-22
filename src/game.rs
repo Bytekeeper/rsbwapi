@@ -16,7 +16,7 @@ use core::cell::RefCell;
 use metered::{hdr_histogram::HdrHistogram, measure, time_source::StdInstantMicros, ResponseTime};
 use rstar::primitives::Rectangle;
 use rstar::{Envelope, PointDistance, RTree, RTreeObject, AABB};
-use std::{collections::HashMap, convert::TryInto};
+use std::collections::HashMap;
 
 #[derive(Default, Debug, serde::Serialize)]
 #[cfg(feature = "metrics")]
@@ -34,12 +34,11 @@ macro_rules! measure {
 pub struct GameContext {
     #[cfg(feature = "metrics")]
     metrics: std::rc::Rc<RsBwapiMetrics>,
-    data: Shm<BWAPI_GameData>,
-    unit_infos: [Option<UnitInfo>; 10000],
+    pub(crate) data: Shm<BWAPI_GameData>,
+    pub(crate) unit_infos: Box<[Option<RefCell<UnitInfo>>]>,
     visible_units: Vec<usize>,
     static_minerals: Vec<usize>,
     static_geysers: Vec<usize>,
-    pub(crate) last_command_frame: RefCell<[i32; 10000]>,
 }
 
 pub struct UnitLocation {
@@ -74,7 +73,10 @@ pub struct Game<'a> {
 
 impl<'a> PositionValidator for Game<'a> {
     fn is_valid<const N: i32>(&self, pos: &ScaledPosition<N>) -> bool {
-        pos.x >= 0 && pos.y >= 0 && pos.x < self.map_width() * N && pos.y < self.map_height()
+        pos.x >= 0
+            && pos.y >= 0
+            && pos.x < self.map_width() * 32 / N
+            && pos.y < self.map_height() * 32 / N
     }
 }
 
@@ -1000,11 +1002,10 @@ impl GameContext {
             #[cfg(feature = "metrics")]
             metrics: Default::default(),
             data,
-            unit_infos: vec![None; 10000].try_into().unwrap(),
+            unit_infos: vec![None; 10000].into_boxed_slice(),
             visible_units: vec![],
             static_geysers: vec![],
             static_minerals: vec![],
-            last_command_frame: RefCell::new([0; 10000]),
         }
     }
 
@@ -1012,7 +1013,7 @@ impl GameContext {
         self.data.get().isInGame
     }
 
-    fn with_frame(&self, cmd: &RefCell<Commands>, cb: impl FnOnce(&Game)) {
+    pub(crate) fn with_frame(&self, cmd: &RefCell<Commands>, cb: impl FnOnce(&Game)) {
         let data = self.data.get();
         let mut frame = Game {
             context: self,
@@ -1051,7 +1052,7 @@ impl GameContext {
     fn ensure_unit_info(&mut self, id: UnitId) {
         if self.unit_infos[id].is_none() {
             let data = self.data.get();
-            self.unit_infos[id] = Some(UnitInfo::new(id, &data.units[id]));
+            self.unit_infos[id] = Some(RefCell::new(UnitInfo::new(id, &data.units[id])));
         }
     }
 
@@ -1059,6 +1060,24 @@ impl GameContext {
         let index = self.visible_units.iter().position(|&i| i as usize == id);
         if let Some(index) = index {
             self.visible_units.swap_remove(index);
+        }
+    }
+
+    pub(crate) fn match_start(&mut self) {
+        let data = self.data.get();
+        self.visible_units = (0..data.initialUnitCount as usize)
+            .filter(|&i| data.units[i].exists && data.units[i].type_ != UnitType::Unknown as i32)
+            .collect();
+
+        for &i in self.visible_units.iter() {
+            self.unit_infos[i] = Some(RefCell::new(UnitInfo::new(i, &data.units[i])));
+            let ut = UnitType::new(data.units[i].type_);
+            if ut == UnitType::Resource_Vespene_Geyser {
+                self.static_geysers.push(i);
+            }
+            if ut.is_mineral_field() {
+                self.static_minerals.push(i);
+            }
         }
     }
 
@@ -1070,24 +1089,7 @@ impl GameContext {
                 use BWAPI_EventType_Enum::*;
                 match event.type_ {
                     MatchStart => {
-                        let data = self.data.get();
-                        self.visible_units = (0..data.initialUnitCount as usize)
-                            .filter(|&i| {
-                                data.units[i].exists
-                                    && data.units[i].type_ != UnitType::Unknown as i32
-                            })
-                            .collect();
-
-                        for &i in self.visible_units.iter() {
-                            self.unit_infos[i] = Some(UnitInfo::new(i, &data.units[i]));
-                            let ut = UnitType::new(data.units[i].type_);
-                            if ut == UnitType::Resource_Vespene_Geyser {
-                                self.static_geysers.push(i);
-                            }
-                            if ut.is_mineral_field() {
-                                self.static_minerals.push(i);
-                            }
-                        }
+                        self.match_start();
                         self.with_frame(&commands, |f| module.on_start(f));
                         // No longer visible after the start event
                         self.visible_units.clear();

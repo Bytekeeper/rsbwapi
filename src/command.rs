@@ -510,8 +510,6 @@ impl<'a> Game<'a> {
     }
 
     pub fn issue_command(&self, cmd: UnitCommand) {
-        self.context.last_command_frame.borrow_mut()[cmd.unitIndex as usize] =
-            self.get_frame_count();
         self.cmd().unit_commands.push(cmd)
     }
 

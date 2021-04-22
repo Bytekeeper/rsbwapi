@@ -3,7 +3,7 @@ use crate::predicate::{IntoPredicate, Predicate};
 
 use crate::*;
 use bwapi_wrapper::*;
-use std::{convert::From, fmt};
+use std::{cell::RefCell, convert::From, fmt};
 
 pub type UnitId = usize;
 
@@ -14,6 +14,7 @@ pub(crate) struct UnitInfo {
     pub initial_resources: i32,
     pub initial_position: Position,
     pub initial_type: UnitType,
+    pub last_command_frame: i32,
 }
 
 impl UnitInfo {
@@ -27,6 +28,7 @@ impl UnitInfo {
                 y: data.positionY,
             },
             initial_type: UnitType::new(data.type_),
+            last_command_frame: 0,
         }
     }
 }
@@ -36,7 +38,7 @@ pub struct Unit<'a> {
     id: UnitId,
     pub(crate) game: &'a Game<'a>,
     data: &'a BWAPI_UnitData,
-    info: &'a UnitInfo,
+    info: &'a RefCell<UnitInfo>,
 }
 
 impl From<Unit<'_>> for UnitId {
@@ -60,7 +62,7 @@ impl<'a> Unit<'a> {
         id: UnitId,
         game: &'a Game<'a>,
         data: &'a BWAPI_UnitData,
-        info: &'a UnitInfo,
+        info: &'a RefCell<UnitInfo>,
     ) -> Self {
         Unit {
             id,
@@ -190,15 +192,16 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_initial_hit_points(&self) -> i32 {
-        self.info.initial_hit_points
+        self.info.borrow().initial_hit_points
     }
 
     pub fn get_initial_resources(&self) -> i32 {
-        self.info.initial_resources
+        self.info.borrow().initial_resources
     }
 
     pub fn get_initial_tile_position(&self) -> TilePosition {
-        (self.info.initial_position - self.info.initial_type.tile_size().to_position() / 2)
+        (self.info.borrow().initial_position
+            - self.info.borrow().initial_type.tile_size().to_position() / 2)
             .to_tile_position()
     }
 
@@ -325,7 +328,8 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_order_target_position(&self) -> Option<Position> {
-        Position::new(
+        Position::new_checked(
+            self.game,
             self.data.orderTargetPositionX,
             self.data.orderTargetPositionY,
         )
@@ -435,7 +439,11 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_target_position(&self) -> Option<Position> {
-        Position::new(self.data.targetPositionX, self.data.targetPositionY)
+        Position::new_checked(
+            self.game,
+            self.data.targetPositionX,
+            self.data.targetPositionY,
+        )
     }
 
     pub fn get_tech(&self) -> TechType {
@@ -782,7 +790,7 @@ impl<'a> Unit<'a> {
     }
 
     pub fn last_command_frame(&self) -> i32 {
-        self.game.context.last_command_frame.borrow()[self.id]
+        self.info.borrow().last_command_frame
     }
 
     pub fn is_starting_attack(&self) -> bool {
@@ -1258,6 +1266,7 @@ impl<'a> Unit<'a> {
             cmd
         };
         self.game.issue_command(cmd);
+        self.info.borrow_mut().last_command_frame = self.game.get_frame_count();
         Ok(true)
     }
 }

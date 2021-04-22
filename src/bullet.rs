@@ -7,13 +7,13 @@ use num_traits::FromPrimitive;
 
 pub struct Bullet<'a> {
     id: usize,
-    frame: &'a Game<'a>,
+    game: &'a Game<'a>,
     data: &'a BWAPI_BulletData,
 }
 
 impl<'a> Bullet<'a> {
-    pub fn new(id: usize, frame: &'a Game<'a>, data: &'a BWAPI_BulletData) -> Self {
-        Self { id, frame, data }
+    pub fn new(id: usize, game: &'a Game<'a>, data: &'a BWAPI_BulletData) -> Self {
+        Self { id, game, data }
     }
 
     pub fn exists(&self) -> bool {
@@ -25,7 +25,7 @@ impl<'a> Bullet<'a> {
     }
 
     pub fn get_player(&self) -> Option<Player> {
-        self.frame.get_player(self.data.player as usize)
+        self.game.get_player(self.data.player as usize)
     }
 
     pub fn get_id(&self) -> usize {
@@ -48,15 +48,19 @@ impl<'a> Bullet<'a> {
     }
 
     pub fn get_source(&self) -> Option<Unit> {
-        self.frame.get_unit(self.data.source as usize)
+        self.game.get_unit(self.data.source as usize)
     }
 
     pub fn get_target(&self) -> Option<Unit> {
-        self.frame.get_unit(self.data.target as usize)
+        self.game.get_unit(self.data.target as usize)
     }
 
     pub fn get_target_position(&self) -> Option<Position> {
-        Position::new(self.data.targetPositionX, self.data.targetPositionY)
+        Position::new_checked(
+            self.game,
+            self.data.targetPositionX,
+            self.data.targetPositionY,
+        )
     }
 
     pub fn get_type(&self) -> BulletType {
@@ -64,7 +68,12 @@ impl<'a> Bullet<'a> {
     }
 
     pub fn get_velocity(&self) -> Option<Vector2D> {
-        Vector2D::new(self.data.velocityX, self.data.velocityY)
+        let result = Vector2D::new(self.data.velocityX, self.data.velocityY);
+        if result.x == 0.0 && result.y == 0.0 {
+            None
+        } else {
+            Some(result)
+        }
     }
 
     pub fn is_visible(&self, player: &Player) -> bool {
