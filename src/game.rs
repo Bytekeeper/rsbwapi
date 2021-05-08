@@ -24,13 +24,6 @@ pub struct RsBwapiMetrics {
     frame_time: ResponseTime<RefCell<HdrHistogram>, StdInstantMicros>,
 }
 
-#[cfg(not(feature = "metrics"))]
-macro_rules! measure {
-    ($metric:expr, $e:expr) => {
-        $e
-    };
-}
-
 pub struct GameContext {
     #[cfg(feature = "metrics")]
     metrics: std::rc::Rc<RsBwapiMetrics>,
@@ -39,6 +32,7 @@ pub struct GameContext {
     visible_units: Vec<usize>,
     static_minerals: Vec<usize>,
     static_geysers: Vec<usize>,
+    static_neutrals: Vec<usize>,
 }
 
 pub struct UnitLocation {
@@ -72,7 +66,7 @@ pub struct Game<'a> {
 }
 
 impl<'a> PositionValidator for Game<'a> {
-    fn is_valid<const N: i32>(&self, pos: &ScaledPosition<N>) -> bool {
+    fn is_valid<const N: i32>(&self, pos: ScaledPosition<N>) -> bool {
         pos.x >= 0
             && pos.y >= 0
             && pos.x < self.map_width() * 32 / N
@@ -103,7 +97,7 @@ impl<'a> Game<'a> {
         let lt = position;
         let rb = lt + type_.tile_size();
 
-        if !self.is_valid(&lt) || !self.is_valid(&(rb.to_position() - Position { x: 1, y: 1 })) {
+        if !self.is_valid(lt) || !self.is_valid(rb.to_position() - Position { x: 1, y: 1 }) {
             return Err(Error::Unbuildable_Location);
         }
 
@@ -498,7 +492,7 @@ impl<'a> Game<'a> {
         pred: P,
     ) -> Vec<Unit> {
         let tile = tile.into();
-        if !self.is_valid(&tile) {
+        if !self.is_valid(tile) {
             vec![]
         } else {
             let p = tile.to_position();
@@ -591,6 +585,14 @@ impl<'a> Game<'a> {
             .collect()
     }
 
+    pub fn get_static_neutral_units(&self) -> Vec<Unit> {
+        self.context
+            .static_neutrals
+            .iter()
+            .map(|&i| self.get_unit(i).expect("static mineral to have existed"))
+            .collect()
+    }
+
     pub fn has_path<S: Into<Position>, D: Into<Position>>(
         &self,
         source: S,
@@ -598,7 +600,7 @@ impl<'a> Game<'a> {
     ) -> bool {
         let source = source.into();
         let destination = destination.into();
-        if self.is_valid(&source) && self.is_valid(&destination) {
+        if self.is_valid(source) && self.is_valid(destination) {
             let rgn_a = self.get_region_at(source);
             let rgn_b = self.get_region_at(destination);
             if let (Some(rgn_a), Some(rgn_b)) = (rgn_a, rgn_b) {
@@ -1006,6 +1008,7 @@ impl GameContext {
             visible_units: vec![],
             static_geysers: vec![],
             static_minerals: vec![],
+            static_neutrals: vec![],
         }
     }
 
@@ -1077,6 +1080,9 @@ impl GameContext {
             }
             if ut.is_mineral_field() {
                 self.static_minerals.push(i);
+            }
+            if data.players[data.units[i].player as usize].isNeutral {
+                self.static_neutrals.push(i);
             }
         }
     }
