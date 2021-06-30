@@ -21,7 +21,6 @@ num-derive = "0.3"
 derive_more = "0.99"
 rstar = "0.8"
 itertools="0.10"
-bitfield="0.13"
 
 metered = { version = "0.8", optional = true}
 serde = { version = "1.0", optional = true}
