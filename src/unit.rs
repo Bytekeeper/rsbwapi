@@ -205,6 +205,10 @@ impl<'a> Unit<'a> {
             .to_tile_position()
     }
 
+    pub fn get_initial_type(&self) -> UnitType {
+        self.info.borrow().initial_type
+    }
+
     pub fn get_interceptor_count(&self) -> i32 {
         self.data.interceptorCount
     }

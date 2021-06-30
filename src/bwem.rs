@@ -145,14 +145,51 @@ impl TempAreaInfo {
     }
 }
 
+type NeutralId = usize;
+
 #[derive(Default)]
 struct Neutral {
+    id: NeutralId,
+    unit_id: UnitId,
     area: Rectangle<TilePosition>,
+    next_stacked: NeutralId,
 }
 
 impl Neutral {
-    fn next_stacked(&self) -> Option<Neutral> {
-        unimplemented!();
+    fn new(id: NeutralId, unit: &Unit, map: &mut Map) -> Self {
+        Self {
+            id,
+            unit_id: unit.get_id(),
+            area: Rectangle::new(
+                unit.get_initial_tile_position(),
+                unit.get_initial_tile_position() + unit.get_initial_type().tile_size() - (1, 1),
+            ),
+            next_stacked: 0, // 0 is invalid
+        }
+    }
+
+    fn put_on_tiles(&self, map: &mut Map) {
+        for tp in self.area.into_iter() {
+            if map.tiles[tp].get_neutral() >= 0 {
+                map.tiles[tp].add_neutral(self);
+                return;
+            } else {
+                let mut top = map.tiles[tp].get_neutral_mut().last_stacked_mut();
+                debug_assert!(self.unit_id != top.unit_id);
+                if top.area == self.area {
+                    top.next_stacked = self.id;
+                    return;
+                }
+            }
+        }
+    }
+
+    fn next_stacked(&self) -> Option<NeutralId> {
+        if self.next_stacked < 0 {
+            None
+        } else {
+            Some(self.next_stacked)
+        }
     }
 
     fn set_blocking(&mut self, true_doors: &[WalkPosition]) {
@@ -276,6 +313,7 @@ pub struct Tile {
     bits: Bits,
     min_altitude: Altitude,
     area_id: AreaId,
+    neutral_id: NeutralId,
 }
 
 bitfield! {
@@ -301,8 +339,8 @@ impl Tile {
         self.bits.set_doodad(1);
     }
 
-    fn get_neutral_mut(&mut self) -> Option<&mut Neutral> {
-        unimplemented!()
+    fn get_neutral(&mut self) -> NeutralId {
+        self.neutral_id
     }
 
     fn set_min_altitude(&mut self, altitude: Altitude) {
@@ -363,7 +401,7 @@ impl Map {
         result.decide_seas_or_lakes();
         result.initialize_neutrals(game);
         result.compute_altitude();
-        // result.process_blocking_neutrals();
+        result.process_blocking_neutrals();
         result.compute_areas();
         result.create_choke_points();
         // result.compute_choke_point_distance_matrix();
@@ -574,9 +612,7 @@ impl Map {
                             if self.is_valid(next)
                                 && !visited.contains(&next)
                                 && self.mini_tiles[next].walkable()
-                                && self.tiles[next.to_tile_position()]
-                                    .get_neutral_mut()
-                                    .is_none()
+                                && self.tiles[next.to_tile_position()].get_neutral() == 0
                                 && self.adjouns_8_some_lake_or_neutral(next)
                             {
                                 to_visit.push(next);
@@ -618,9 +654,9 @@ impl Map {
                         // 4)  If at least 2 true doors, pCandidate is a blocking static building
                         if visited.len() >= 2 {
                             // Marks pCandidate (and any Neutral stacked with it) as blocking.
-                            let mut p_neutral = self.tiles[p_candidate.area.tl].get_neutral_mut();
-                            while let Some(ref mut neutral) = p_neutral {
-                                neutral.set_blocking(&true_doors);
+                            let mut p_neutral = self.tiles[p_candidate.area.tl].get_neutral();
+                            while p_neutral > 0 {
+                                p_neutral.set_blocking(&true_doors);
                             }
 
                             // Marks all the miniTiles of pCandidate as blocked.
@@ -935,7 +971,7 @@ impl Map {
 }
 
 #[cfg(test)]
-mod tes {
+mod test {
     use super::*;
     use crate::{command::Commands, game::*};
     use image::*;
