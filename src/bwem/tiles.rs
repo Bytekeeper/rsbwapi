@@ -2,11 +2,9 @@ use super::{area::*, defs::*, neutral::*};
 use std::cell::RefCell;
 use std::rc::Rc;
 
-///////////////////////////////////////////////////////////////////////////////////////////////
 ///                                                                                          //
-///                                  class MiniTile                                                                                   
+/// class MiniTile                                                                                   
 ///                                                                                          //
-///////////////////////////////////////////////////////////////////////////////////////////////
 ///                                                                                                                                   
 /// Corresponds to BWAPI/Starcraft's concept of minitile (8x8 pixels).                                                                
 /// MiniTiles are accessed using WalkPositions (Cf. Map::GetMiniTile).                                                                
@@ -22,11 +20,121 @@ pub struct MiniTile {
     area_id: AreaId,
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////
+const blocking_cp: AreaId = AreaId::MIN;
+
+impl MiniTile {
+    /// Corresponds approximatively to BWAPI::isWalkable
+    /// The differences are:
+    ///  - For each BWAPI's unwalkable MiniTile, we also mark its 8 neighbours as not walkable.
+    ///    According to some tests, this prevents from wrongly pretending one small unit can go by some thin path.
+    ///  - The relation buildable ==> walkable is enforced, by marking as walkable any MiniTile part of a buildable Tile (Cf. Tile::Buildable)
+    /// Among the MiniTiles having Altitude() > 0, the walkable ones are considered Terrain-MiniTiles, and the other ones Lake-MiniTiles.
+    pub fn walkable(&self) -> bool {
+        self.area_id != 0
+    }
+
+    /// Distance in pixels between the center of this MiniTile and the center of the nearest Sea-MiniTile
+    /// Sea-MiniTiles all have their Altitude() equal to 0.
+    /// MiniTiles having Altitude() > 0 are not Sea-MiniTiles. They can be either Terrain-MiniTiles or Lake-MiniTiles.
+    pub fn altitude(&self) -> Altitude {
+        self.altitude
+    }
+
+    /// Sea-MiniTiles are unwalkable MiniTiles that have their Altitude() equal to 0.
+    pub fn sea(&self) -> bool {
+        self.altitude == 0
+    }
+
+    /// Lake-MiniTiles are unwalkable MiniTiles that have their Altitude() > 0.
+    /// They form small zones (inside Terrain-zones) that can be eaysily walked around (e.g. Starcraft's doodads)
+    /// The intent is to preserve the continuity of altitudes inside Areas.
+    pub fn lake(&self) -> bool {
+        self.altitude != 0 && !self.walkable()
+    }
+
+    /// Terrain MiniTiles are just walkable MiniTiles
+    pub fn terrain(&self) -> bool {
+        self.walkable()
+    }
+
+    /// For Sea and Lake MiniTiles, returns 0
+    /// For Terrain MiniTiles, returns a non zero id:
+    ///    - if (id > 0), id uniquely identifies the Area A that contains this MiniTile.
+    ///      Moreover we have: A.Id() == id and Map::GetArea(id) == A
+    ///      For more information about positive Area::ids, see Area::Id()
+    ///    - if (id < 0), then this MiniTile is part of a Terrain-zone that was considered too small to create an Area for it.
+    ///      Note: negative Area::ids start from -2
+    /// Note: because of the lakes, Map::GetNearestArea should be prefered over Map::GetArea.
+    pub fn area_id(&self) -> AreaId {
+        self.area_id
+    }
+
+    //      Details: The functions below are used by the BWEM's internals
+
+    pub fn set_walkable(&mut self, walkable: bool) {
+        if walkable {
+            self.area_id = -1;
+            self.altitude = -1;
+        } else {
+            self.area_id = 0;
+            self.altitude = 1;
+        }
+    }
+    pub fn sea_or_lake(&self) -> bool {
+        self.altitude == 1
+    }
+
+    pub fn set_sea(&mut self) {
+        debug_assert!(!self.walkable() && self.sea_or_lake());
+        self.altitude = 0;
+    }
+
+    pub fn set_lake(&mut self) {
+        debug_assert!(!self.walkable() && self.sea());
+        self.altitude = -1;
+    }
+
+    pub fn altitude_missing(&self) -> bool {
+        self.altitude == -1
+    }
+
+    pub fn set_altitude(&mut self, a: Altitude) {
+        debug_assert!(self.altitude_missing() && a > 0);
+        self.altitude = a;
+    }
+
+    pub fn area_id_missing(&self) -> bool {
+        self.area_id == -1
+    }
+
+    pub fn set_area_id(&mut self, id: AreaId) {
+        debug_assert!(self.area_id_missing() && id >= 1);
+        self.area_id = id;
+    }
+
+    pub fn replace_area_id(&mut self, id: AreaId) {
+        debug_assert!(self.area_id > 0 && (id >= 1 || id <= -2) && id != self.area_id);
+        self.area_id = id;
+    }
+
+    pub fn set_blocked(&mut self) {
+        debug_assert!(self.area_id_missing());
+        self.area_id = blocking_cp;
+    }
+
+    pub fn blocked(&self) -> bool {
+        self.area_id == blocking_cp
+    }
+
+    pub fn replace_blocked_area_id(&mut self, id: AreaId) {
+        debug_assert!(self.area_id == blocking_cp && id >= 1);
+        self.area_id = id;
+    }
+}
+
 ///                                                                                          //
-///                                  class Tile
+/// class Tile
 ///                                                                                          //
-///////////////////////////////////////////////////////////////////////////////////////////////
 ///
 /// Corresponds to BWAPI/Starcraft's concept of tile (32x32 pixels).
 /// Tiles are accessed using TilePositions (Cf. Map::GetTile).
@@ -41,7 +149,7 @@ pub struct MiniTile {
 /// Tiles inherit utils::Markable, which provides marking ability
 /// Tiles inherit utils::UserData, which provides free-to-use data.
 pub struct Tile {
-    p_neutral: Option<Rc<RefCell<Neutral>>>,
+    p_neutral: Option<Neutral>,
     min_altitude: Altitude,
     area_id: AreaId,
     internal_data: isize,
@@ -108,7 +216,7 @@ impl Tile {
     /// is destroyed and BWEM is informed of that by a call of Map::OnMineralDestroyed(BWAPI::Unit u) for exemple. In such a case,
     /// BWEM automatically updates the data by deleting the Neutral instance and clearing any reference to it such as the one
     /// returned by Tile::GetNeutral(). In case of stacked Neutrals, the next one is then returned.
-    pub fn get_neutral(&self) -> Option<Rc<RefCell<Neutral>>> {
+    pub fn get_neutral(&self) -> Option<Neutral> {
         self.p_neutral.clone()
     }
 
@@ -132,9 +240,8 @@ impl Tile {
         self.bits.doodad = true;
     }
 
-    pub fn add_neutral(&mut self, p_neutral: Rc<RefCell<Neutral>>) {
-        debug_assert!(self.p_neutral.is_none());
-        self.p_neutral = Some(p_neutral);
+    pub fn add_neutral(&mut self, p_neutral: Neutral) {
+        self.p_neutral = Some(p_neutral)
     }
 
     pub fn set_area_id(&mut self, id: AreaId) {
@@ -151,13 +258,20 @@ impl Tile {
         self.min_altitude = a;
     }
 
-    pub fn remove_neutral(&mut self, p_neutral: Rc<RefCell<Neutral>>) {
+    pub fn remove_neutral(&mut self, p_neutral: Neutral) {
         debug_assert!(self.p_neutral == Some(p_neutral));
-        unimplemented!()
+        self.p_neutral = None;
     }
-    // void                            RemoveNeutral(Neutral * pNeutral){ bwem_assert(pNeutral && (m_pNeutral == pNeutral)); utils::unused(pNeutral); m_pNeutral = nullptr; }
-    /*
-    int                                     InternalData() const                    { return m_internalData; }
-    void                            SetInternalData(int data) const { m_internalData = data; }
-    */
+
+    pub fn internal_data(&self) -> isize {
+        self.internal_data
+    }
+
+    pub fn set_internal_data(&mut self, data: isize) {
+        self.internal_data = data;
+    }
+}
+
+pub trait TileOfPosition<P> {
+    type Tile;
 }
