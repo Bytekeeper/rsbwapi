@@ -10,13 +10,13 @@ use crate::shm::Shm;
 use crate::types::c_str_to_str;
 use crate::unit::{Unit, UnitId, UnitInfo};
 use crate::*;
+use ahash::AHashMap;
 use bwapi_wrapper::*;
-use core::cell::RefCell;
+use core::cell::{Cell, RefCell};
 #[cfg(feature = "metrics")]
 use metered::{hdr_histogram::HdrHistogram, measure, time_source::StdInstantMicros, ResponseTime};
 use rstar::primitives::Rectangle;
 use rstar::{Envelope, PointDistance, RTree, RTreeObject, AABB};
-use std::collections::HashMap;
 
 #[derive(Default, Debug, serde::Serialize)]
 #[cfg(feature = "metrics")]
@@ -28,7 +28,7 @@ pub struct GameContext {
     #[cfg(feature = "metrics")]
     metrics: std::rc::Rc<RsBwapiMetrics>,
     pub(crate) data: Shm<BWAPI_GameData>,
-    pub(crate) unit_infos: Box<[Option<RefCell<UnitInfo>>]>,
+    pub(crate) unit_infos: Box<[Option<Cell<UnitInfo>>]>,
     visible_units: Vec<usize>,
     static_minerals: Vec<usize>,
     static_geysers: Vec<usize>,
@@ -60,8 +60,8 @@ pub struct Game<'a> {
     units: Vec<Unit<'a>>,
     rtree: RTree<UnitLocation>,
     pub(crate) cmd: &'a RefCell<Commands>,
-    pub(crate) connected_units: RefCell<HashMap<usize, Vec<usize>>>,
-    pub(crate) loaded_units: RefCell<HashMap<usize, Vec<usize>>>,
+    pub(crate) connected_units: RefCell<AHashMap<usize, Vec<usize>>>,
+    pub(crate) loaded_units: RefCell<AHashMap<usize, Vec<usize>>>,
     pylons: RefCell<Option<Vec<usize>>>,
 }
 
@@ -414,7 +414,7 @@ impl<'a> Game<'a> {
             None
         } else {
             let data = self.data.players.get(i)?;
-            Some(Player::new(i, &self, &data))
+            Some(Player::new(i, self, data))
         }
     }
 
@@ -463,7 +463,7 @@ impl<'a> Game<'a> {
             .unit_infos
             .get(id)?
             .as_ref()
-            .map(|ui| Unit::new(id, self, unit_data, &ui))
+            .map(|ui| Unit::new(id, self, unit_data, ui))
     }
 
     pub fn get_units_in_rectangle<
@@ -556,7 +556,7 @@ impl<'a> Game<'a> {
 
     pub fn get_players(&self) -> Vec<Player> {
         (0..self.data.playerCount as usize)
-            .map(|i| Player::new(i, &self, &self.data.players[i as usize]))
+            .map(|i| Player::new(i, self, &self.data.players[i as usize]))
             .collect()
     }
 
@@ -1023,8 +1023,8 @@ impl GameContext {
             data,
             units: vec![],
             cmd,
-            connected_units: RefCell::new(HashMap::new()),
-            loaded_units: RefCell::new(HashMap::new()),
+            connected_units: RefCell::new(AHashMap::new()),
+            loaded_units: RefCell::new(AHashMap::new()),
             rtree: RTree::new(),
             pylons: RefCell::new(None),
         };
@@ -1055,7 +1055,7 @@ impl GameContext {
     fn ensure_unit_info(&mut self, id: UnitId) {
         if self.unit_infos[id].is_none() {
             let data = self.data.get();
-            self.unit_infos[id] = Some(RefCell::new(UnitInfo::new(id, &data.units[id])));
+            self.unit_infos[id] = Some(Cell::new(UnitInfo::new(&data.units[id])));
         }
     }
 
@@ -1073,7 +1073,7 @@ impl GameContext {
             .collect();
 
         for &i in self.visible_units.iter() {
-            self.unit_infos[i] = Some(RefCell::new(UnitInfo::new(i, &data.units[i])));
+            self.unit_infos[i] = Some(Cell::new(UnitInfo::new(&data.units[i])));
             let ut = UnitType::new(data.units[i].type_);
             if ut == UnitType::Resource_Vespene_Geyser {
                 self.static_geysers.push(i);

@@ -1,5 +1,5 @@
 use bwapi_wrapper::prelude::{Error, ScaledPosition, TilePosition, WalkPosition};
-use derive_more::{Add, AddAssign, Display, From, Sub, SubAssign};
+use derive_more::{Add, AddAssign, Sub, SubAssign};
 use num_derive::FromPrimitive;
 use std::ffi::CStr;
 use std::os::raw::c_char;

@@ -3,13 +3,12 @@ use crate::predicate::{IntoPredicate, Predicate};
 
 use crate::*;
 use bwapi_wrapper::*;
-use std::{cell::RefCell, convert::From, fmt};
+use std::{cell::Cell, convert::From, fmt};
 
 pub type UnitId = usize;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub(crate) struct UnitInfo {
-    pub id: UnitId,
     pub initial_hit_points: i32,
     pub initial_resources: i32,
     pub initial_position: Position,
@@ -18,9 +17,8 @@ pub(crate) struct UnitInfo {
 }
 
 impl UnitInfo {
-    pub(crate) fn new(id: UnitId, data: &BWAPI_UnitData) -> Self {
+    pub(crate) fn new(data: &BWAPI_UnitData) -> Self {
         Self {
-            id,
             initial_hit_points: data.hitPoints,
             initial_resources: data.resources,
             initial_position: Position {
@@ -38,7 +36,7 @@ pub struct Unit<'a> {
     id: UnitId,
     pub(crate) game: &'a Game<'a>,
     data: &'a BWAPI_UnitData,
-    info: &'a RefCell<UnitInfo>,
+    info: &'a Cell<UnitInfo>,
 }
 
 impl From<Unit<'_>> for UnitId {
@@ -62,7 +60,7 @@ impl<'a> Unit<'a> {
         id: UnitId,
         game: &'a Game<'a>,
         data: &'a BWAPI_UnitData,
-        info: &'a RefCell<UnitInfo>,
+        info: &'a Cell<UnitInfo>,
     ) -> Self {
         Unit {
             id,
@@ -192,21 +190,21 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_initial_hit_points(&self) -> i32 {
-        self.info.borrow().initial_hit_points
+        self.info.get().initial_hit_points
     }
 
     pub fn get_initial_resources(&self) -> i32 {
-        self.info.borrow().initial_resources
+        self.info.get().initial_resources
     }
 
     pub fn get_initial_tile_position(&self) -> TilePosition {
-        (self.info.borrow().initial_position
-            - self.info.borrow().initial_type.tile_size().to_position() / 2)
+        (self.info.get().initial_position
+            - self.info.get().initial_type.tile_size().to_position() / 2)
             .to_tile_position()
     }
 
     pub fn get_initial_type(&self) -> UnitType {
-        self.info.borrow().initial_type
+        self.info.get().initial_type
     }
 
     pub fn get_interceptor_count(&self) -> i32 {
@@ -794,7 +792,7 @@ impl<'a> Unit<'a> {
     }
 
     pub fn last_command_frame(&self) -> i32 {
-        self.info.borrow().last_command_frame
+        self.info.get().last_command_frame
     }
 
     pub fn is_starting_attack(&self) -> bool {
@@ -1270,7 +1268,9 @@ impl<'a> Unit<'a> {
             cmd
         };
         self.game.issue_command(cmd);
-        self.info.borrow_mut().last_command_frame = self.game.get_frame_count();
+        let mut info = self.info.get();
+        info.last_command_frame = self.game.get_frame_count();
+        self.info.set(info);
         Ok(true)
     }
 }

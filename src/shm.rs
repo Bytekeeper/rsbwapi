@@ -28,12 +28,6 @@ impl<T> Shm<T> {
         // SAFETY: Shm is !Sync, and self is &mut
         unsafe { self.1.as_mut() }
     }
-
-    #[cfg(not(windows))]
-    pub(crate) unsafe fn from_slice(data: &mut [u8]) -> Self {
-        assert_eq!(data.len(), std::mem::size_of::<T>());
-        Shm(0, NonNull::new(data as *mut [u8] as *mut T).unwrap())
-    }
 }
 
 impl<T: ?Sized> Drop for Shm<T> {

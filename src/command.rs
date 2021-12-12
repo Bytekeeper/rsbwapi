@@ -22,7 +22,7 @@ impl<'a> CommandApplier<'a> {
             return Err(());
         }
         let command_count = *count as usize;
-        dst[command_count..command_count + copy_amount].copy_from_slice(&src);
+        dst[command_count..command_count + copy_amount].copy_from_slice(src);
         *count += copy_amount as i32;
         Ok(())
     }
@@ -54,7 +54,7 @@ impl<'a> CommandApplier<'a> {
                     x,
                     y,
                     string,
-                } => self.draw_text(*ctype, *x, *y, &string),
+                } => self.draw_text(*ctype, *x, *y, string),
                 SendText { message, to_allies } => self.send_text(message, *to_allies),
                 SetMap(map_file_name) => self.set_map(map_file_name),
             }

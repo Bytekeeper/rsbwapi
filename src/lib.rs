@@ -1,4 +1,3 @@
-#[macro_use]
 #[cfg(not(feature = "metrics"))]
 macro_rules! measure {
     ($metric:expr, $e:expr) => {
@@ -41,17 +40,5 @@ pub fn start(mut module: impl AiModule) {
 
     while client.get_game().is_in_game() {
         client.update(&mut module);
-    }
-}
-
-fn pick<T>(slice: &mut [T], i: usize, j: usize) -> (&mut T, &mut T) {
-    assert!(i != j);
-
-    // SAFETY: i != j which prevents mutable references to the same index
-    unsafe {
-        (
-            std::mem::transmute::<&mut T, &mut T>(&mut slice[i]),
-            std::mem::transmute::<&mut T, &mut T>(&mut slice[j]),
-        )
     }
 }
