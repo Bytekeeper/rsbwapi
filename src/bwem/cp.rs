@@ -39,7 +39,7 @@ pub struct ChokePoint {
     nodes_in_area: [(WalkPosition, WalkPosition); 4],
     geometry: VecDeque<WalkPosition>,
     blocked: bool,
-    blocking_neutral: Option<Rc<RefCell<Neutral>>>,
+    blocking_neutral: Option<Rc<dyn Neutral>>,
     p_path_back_trace: Option<Rc<RefCell<ChokePoint>>>,
 }
 
@@ -86,7 +86,7 @@ impl ChokePoint {
 
     /// Pretty much the same as Pos(n), except that the returned MiniTile position is guaranteed to be part of pArea.
     /// That is: Map::GetArea(PosInArea(n, pArea)) == pArea.
-    pub fn pos_in_area(&self, n: Node, area: Rc<RefCell<Area>>) {
+    pub fn pos_in_area(&self, n: Node, area: &mut Area) -> TilePosition {
         unimplemented!();
     }
 
@@ -115,7 +115,7 @@ impl ChokePoint {
     /// unless this blocking Neutral has been destroyed.
     /// In this case, returns a pointer to the next blocking Neutral that was stacked at the same location,
     /// or nullptr if no such Neutral exists.
-    pub fn blocking_neutral(&self) -> Option<Rc<RefCell<Neutral>>> {
+    pub fn blocking_neutral(&self) -> Option<Rc<dyn Neutral>> {
         self.blocking_neutral.clone()
     }
 
@@ -166,12 +166,12 @@ impl ChokePoint {
         area1: Rc<RefCell<Area>>,
         area2: Rc<RefCell<Area>>,
         geometry: VecDeque<WalkPosition>,
-        neutral: Option<Rc<RefCell<Neutral>>>,
+        neutral: Option<Rc<dyn Neutral>>,
     ) {
         unimplemented!();
     }
 
-    pub fn on_blocking_neutral_destroyed(&mut self, neutral: Rc<RefCell<Neutral>>) {
+    pub fn on_blocking_neutral_destroyed(&mut self, neutral: Rc<dyn Neutral>) {
         unimplemented!();
     }
 

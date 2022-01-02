@@ -2,7 +2,7 @@ use core::ops::{Add, Div, DivAssign, Index, IndexMut, Mul, MulAssign, Sub};
 use derive_more::{Add, AddAssign, Display, From, Sub, SubAssign};
 
 #[derive(
-    Default, Debug, Display, Copy, Clone, Eq, PartialEq, Add, Sub, AddAssign, SubAssign, From,
+    Default, Debug, Display, Copy, Clone, Eq, PartialEq, Add, Sub, AddAssign, SubAssign, From, Hash,
 )]
 #[display(fmt = "Position<{}> ({}, {})", N, x, y)]
 pub struct ScaledPosition<const N: i32> {
@@ -88,6 +88,10 @@ impl TilePosition {
 
     pub const fn to_walk_position(self) -> WalkPosition {
         pos_to_pos(self)
+    }
+
+    pub const fn center(self) -> Position {
+        Position::new(self.x / 32 + 16, self.y / 32 + 16)
     }
 }
 
@@ -214,6 +218,28 @@ impl<const N: i32> Add<PositionTuple> for ScaledPosition<N> {
         Self::Output {
             x: self.x + other.0,
             y: self.y + other.1,
+        }
+    }
+}
+
+impl<const N: i32> Add<i32> for ScaledPosition<N> {
+    type Output = Self;
+
+    fn add(self, other: i32) -> Self::Output {
+        Self::Output {
+            x: self.x + other,
+            y: self.y + other,
+        }
+    }
+}
+
+impl<const N: i32> Sub<i32> for ScaledPosition<N> {
+    type Output = Self;
+
+    fn sub(self, other: i32) -> Self::Output {
+        Self::Output {
+            x: self.x - other,
+            y: self.y - other,
         }
     }
 }

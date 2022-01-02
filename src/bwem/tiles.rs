@@ -1,5 +1,5 @@
 use super::{area::*, defs::*, neutral::*};
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 ///                                                                                          //
@@ -15,9 +15,10 @@ use std::rc::Rc;
 ///      - the id of the Area it is part of, if ever.                                                                                 
 /// The whole process of analysis of a Map relies on the walkability information                                                      
 /// from which are derived successively : altitudes, Areas, ChokePoints.
+#[derive(Default)]
 pub struct MiniTile {
-    altitude: Altitude,
-    area_id: AreaId,
+    altitude: Cell<Altitude>,
+    area_id: Cell<AreaId>,
 }
 
 const blocking_cp: AreaId = AreaId::MIN;
@@ -30,26 +31,26 @@ impl MiniTile {
     ///  - The relation buildable ==> walkable is enforced, by marking as walkable any MiniTile part of a buildable Tile (Cf. Tile::Buildable)
     /// Among the MiniTiles having Altitude() > 0, the walkable ones are considered Terrain-MiniTiles, and the other ones Lake-MiniTiles.
     pub fn walkable(&self) -> bool {
-        self.area_id != 0
+        self.area_id.get() != 0
     }
 
     /// Distance in pixels between the center of this MiniTile and the center of the nearest Sea-MiniTile
     /// Sea-MiniTiles all have their Altitude() equal to 0.
     /// MiniTiles having Altitude() > 0 are not Sea-MiniTiles. They can be either Terrain-MiniTiles or Lake-MiniTiles.
     pub fn altitude(&self) -> Altitude {
-        self.altitude
+        self.altitude.get()
     }
 
     /// Sea-MiniTiles are unwalkable MiniTiles that have their Altitude() equal to 0.
     pub fn sea(&self) -> bool {
-        self.altitude == 0
+        self.altitude.get() == 0
     }
 
     /// Lake-MiniTiles are unwalkable MiniTiles that have their Altitude() > 0.
     /// They form small zones (inside Terrain-zones) that can be eaysily walked around (e.g. Starcraft's doodads)
     /// The intent is to preserve the continuity of altitudes inside Areas.
     pub fn lake(&self) -> bool {
-        self.altitude != 0 && !self.walkable()
+        self.altitude.get() != 0 && !self.walkable()
     }
 
     /// Terrain MiniTiles are just walkable MiniTiles
@@ -66,69 +67,69 @@ impl MiniTile {
     ///      Note: negative Area::ids start from -2
     /// Note: because of the lakes, Map::GetNearestArea should be prefered over Map::GetArea.
     pub fn area_id(&self) -> AreaId {
-        self.area_id
+        self.area_id.get()
     }
 
     //      Details: The functions below are used by the BWEM's internals
 
-    pub fn set_walkable(&mut self, walkable: bool) {
+    pub fn set_walkable(&self, walkable: bool) {
         if walkable {
-            self.area_id = -1;
-            self.altitude = -1;
+            self.area_id.set(-1);
+            self.altitude.set(-1);
         } else {
-            self.area_id = 0;
-            self.altitude = 1;
+            self.area_id.set(0);
+            self.altitude.set(1);
         }
     }
     pub fn sea_or_lake(&self) -> bool {
-        self.altitude == 1
+        self.altitude.get() == 1
     }
 
-    pub fn set_sea(&mut self) {
+    pub fn set_sea(&self) {
         debug_assert!(!self.walkable() && self.sea_or_lake());
-        self.altitude = 0;
+        self.altitude.set(0);
     }
 
-    pub fn set_lake(&mut self) {
+    pub fn set_lake(&self) {
         debug_assert!(!self.walkable() && self.sea());
-        self.altitude = -1;
+        self.altitude.set(-1);
     }
 
     pub fn altitude_missing(&self) -> bool {
-        self.altitude == -1
+        self.altitude.get() == -1
     }
 
-    pub fn set_altitude(&mut self, a: Altitude) {
+    pub fn set_altitude(&self, a: Altitude) {
         debug_assert!(self.altitude_missing() && a > 0);
-        self.altitude = a;
+        self.altitude.set(a);
     }
 
     pub fn area_id_missing(&self) -> bool {
-        self.area_id == -1
+        self.area_id.get() == -1
     }
 
-    pub fn set_area_id(&mut self, id: AreaId) {
+    pub fn set_area_id(&self, id: AreaId) {
         debug_assert!(self.area_id_missing() && id >= 1);
-        self.area_id = id;
+        self.area_id.set(id);
     }
 
-    pub fn replace_area_id(&mut self, id: AreaId) {
-        debug_assert!(self.area_id > 0 && (id >= 1 || id <= -2) && id != self.area_id);
-        self.area_id = id;
+    pub fn replace_area_id(&self, id: AreaId) {
+        debug_assert!(self.area_id.get() > 0 && (id >= 1 || id <= -2) && id != self.area_id.get());
+        self.area_id.set(id);
     }
 
-    pub fn set_blocked(&mut self) {
+    pub fn set_blocked(&self) {
         debug_assert!(self.area_id_missing());
-        self.area_id = blocking_cp;
+        self.area_id.set(blocking_cp);
     }
 
     pub fn blocked(&self) -> bool {
-        self.area_id == blocking_cp
+        self.area_id.get() == blocking_cp
     }
 
-    pub fn replace_blocked_area_id(&mut self, id: AreaId) {
-        debug_assert!(self.area_id == blocking_cp && id >= 1);
-        self.area_id = id;
+    pub fn replace_blocked_area_id(&self, id: AreaId) {
+        debug_assert!(self.area_id.get() == blocking_cp && id >= 1);
+        self.area_id.set(id);
     }
 }
 
@@ -149,14 +150,31 @@ impl MiniTile {
 /// Tiles inherit utils::Markable, which provides marking ability
 /// Tiles inherit utils::UserData, which provides free-to-use data.
 pub struct Tile {
-    p_neutral: Option<Neutral>,
+    neutral: *mut dyn Neutral,
     min_altitude: Altitude,
     area_id: AreaId,
-    internal_data: isize,
+    internal_data: i32,
     bits: Bits,
+    pub(crate) mark: TileMark,
+}
+
+markable!(tile_mark, TileMark);
+
+impl Default for Tile {
+    fn default() -> Self {
+        Self {
+            neutral: std::ptr::null_mut::<Mineral>(),
+            min_altitude: 0,
+            area_id: 0,
+            internal_data: 0,
+            bits: Default::default(),
+            mark: Default::default(),
+        }
+    }
 }
 
 /// TODO: These are actual bits in the original implementation!
+#[derive(Default)]
 pub struct Bits {
     buildable: bool,
     ground_height: u8,
@@ -216,13 +234,19 @@ impl Tile {
     /// is destroyed and BWEM is informed of that by a call of Map::OnMineralDestroyed(BWAPI::Unit u) for exemple. In such a case,
     /// BWEM automatically updates the data by deleting the Neutral instance and clearing any reference to it such as the one
     /// returned by Tile::GetNeutral(). In case of stacked Neutrals, the next one is then returned.
-    pub fn get_neutral(&self) -> Option<Neutral> {
-        self.p_neutral.clone()
+    pub fn get_neutral(&self) -> *mut dyn Neutral {
+        self.neutral
     }
 
     /// Returns the number of Neutrals that occupy this Tile (Cf. GetNeutral).
     pub fn stacked_neutrals(&self) -> isize {
-        unimplemented!()
+        let mut stack_size = 0;
+        let mut stacked = self.get_neutral();
+        while !stacked.is_null() {
+            stack_size += 1;
+            stacked = unsafe { &*stacked }.next_stacked();
+        }
+        stack_size
     }
 
     ///      Details: The functions below are used by the BWEM's internals
@@ -231,7 +255,7 @@ impl Tile {
         self.bits.buildable = true;
     }
 
-    pub fn set_ground_height(&mut self, h: isize) {
+    pub fn set_ground_height(&mut self, h: i32) {
         debug_assert!((0 <= h) && (h <= 2));
         self.bits.ground_height = h as u8;
     }
@@ -240,8 +264,8 @@ impl Tile {
         self.bits.doodad = true;
     }
 
-    pub fn add_neutral(&mut self, p_neutral: Neutral) {
-        self.p_neutral = Some(p_neutral)
+    pub fn add_neutral(&mut self, neutral: *mut dyn Neutral) {
+        self.neutral = neutral;
     }
 
     pub fn set_area_id(&mut self, id: AreaId) {
@@ -258,16 +282,19 @@ impl Tile {
         self.min_altitude = a;
     }
 
-    pub fn remove_neutral(&mut self, p_neutral: Neutral) {
-        debug_assert!(self.p_neutral == Some(p_neutral));
-        self.p_neutral = None;
+    pub fn remove_neutral(&mut self, neutral: *mut dyn Neutral) {
+        debug_assert!(
+            !self.neutral.is_null()
+                && unsafe { &*self.neutral }.unit_id() == unsafe { &*neutral }.unit_id()
+        );
+        self.neutral = std::ptr::null_mut::<Mineral>();
     }
 
-    pub fn internal_data(&self) -> isize {
+    pub fn internal_data(&self) -> i32 {
         self.internal_data
     }
 
-    pub fn set_internal_data(&mut self, data: isize) {
+    pub fn set_internal_data(&mut self, data: i32) {
         self.internal_data = data;
     }
 }
