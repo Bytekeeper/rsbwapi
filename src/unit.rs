@@ -203,6 +203,10 @@ impl<'a> Unit<'a> {
             .to_tile_position()
     }
 
+    pub fn get_initial_position(&self) -> Position {
+        self.info.get().initial_position
+    }
+
     pub fn get_initial_type(&self) -> UnitType {
         self.info.get().initial_type
     }

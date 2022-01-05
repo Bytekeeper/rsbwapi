@@ -5,8 +5,9 @@ macro_rules! measure {
     };
 }
 
-mod bwem;
+// mod bwem;
 mod shm;
+mod sma;
 
 pub use crate::types::*;
 pub use bwapi_wrapper::prelude::*;

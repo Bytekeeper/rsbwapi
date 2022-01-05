@@ -22,7 +22,7 @@ pub struct Vector2D {
 
 pub type PositionTuple = (i32, i32);
 pub const ORIGIN: Position = Position { x: 0, y: 0 };
-pub const WALK_POSITION_8_DIR: [WalkPosition; 8] = dir_8();
+pub const WALK_POSITION_8_DIR: [WalkPosition; 8] = dir_8(1, 1);
 pub const WALK_POSITION_4_DIR: [WalkPosition; 4] = dir_4();
 
 pub const fn dir_4<const N: i32>() -> [ScaledPosition<N>; 4] {
@@ -34,16 +34,16 @@ pub const fn dir_4<const N: i32>() -> [ScaledPosition<N>; 4] {
     ]
 }
 
-pub const fn dir_8<const N: i32>() -> [ScaledPosition<N>; 8] {
+pub const fn dir_8<const N: i32>(dx: i32, dy: i32) -> [ScaledPosition<N>; 8] {
     [
-        ScaledPosition::<N>::new(-1, -1),
-        ScaledPosition::<N>::new(0, -1),
-        ScaledPosition::<N>::new(1, -1),
-        ScaledPosition::<N>::new(1, 0),
-        ScaledPosition::<N>::new(1, 1),
-        ScaledPosition::<N>::new(0, 1),
-        ScaledPosition::<N>::new(-1, 1),
-        ScaledPosition::<N>::new(-1, 0),
+        ScaledPosition::<N>::new(-dx, -dy),
+        ScaledPosition::<N>::new(0, -dy),
+        ScaledPosition::<N>::new(dx, -dy),
+        ScaledPosition::<N>::new(dx, 0),
+        ScaledPosition::<N>::new(dx, dy),
+        ScaledPosition::<N>::new(0, dy),
+        ScaledPosition::<N>::new(-dx, dy),
+        ScaledPosition::<N>::new(-dx, 0),
     ]
 }
 

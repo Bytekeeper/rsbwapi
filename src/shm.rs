@@ -20,13 +20,18 @@ pub(crate) struct Shm<T: ?Sized>(usize, NonNull<T>);
 
 impl<T> Shm<T> {
     pub(crate) fn get(&self) -> &T {
-        // SAFETY: Shm is !Sync
+        // Not safe at all
         unsafe { self.1.as_ref() }
     }
 
     pub(crate) fn get_mut(&mut self) -> &mut T {
-        // SAFETY: Shm is !Sync, and self is &mut
+        // Not safe at all
         unsafe { self.1.as_mut() }
+    }
+
+    #[cfg(test)]
+    pub fn from_mut_slice(data: &mut [u8]) -> Shm<T> {
+        Self(data.len(), NonNull::new(data.as_mut_ptr()).unwrap().cast())
     }
 }
 
