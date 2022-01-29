@@ -573,7 +573,7 @@ impl<'a> Game<'a> {
         self.context
             .static_geysers
             .iter()
-            .map(|&i| self.get_unit(i).expect("static geyser to have existed"))
+            .flat_map(|&i| self.get_unit(i))
             .collect()
     }
 
@@ -581,7 +581,7 @@ impl<'a> Game<'a> {
         self.context
             .static_minerals
             .iter()
-            .map(|&i| self.get_unit(i).expect("static mineral to have existed"))
+            .flat_map(|&i| self.get_unit(i))
             .collect()
     }
 
@@ -589,7 +589,7 @@ impl<'a> Game<'a> {
         self.context
             .static_neutrals
             .iter()
-            .map(|&i| self.get_unit(i).expect("static mineral to have existed"))
+            .flat_map(|&i| self.get_unit(i))
             .collect()
     }
 

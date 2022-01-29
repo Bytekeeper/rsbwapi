@@ -72,8 +72,8 @@ impl MiniTile {
     }
 }
 
-struct Base {
-    position: TilePosition,
+pub struct Base {
+    pub position: TilePosition,
     minerals: Vec<UnitId>,
     geysers: Vec<UnitId>,
 }
@@ -334,14 +334,15 @@ impl BaseFinder {
     }
 }
 
-struct Map {
+#[derive(Default)]
+pub struct Map {
     mini_tiles: Vec<MiniTile>,
     walk_size: WalkPosition,
-    bases: Vec<Base>,
+    pub bases: Vec<Base>,
 }
 
 impl Map {
-    fn new(game: &Game) -> Self {
+    pub fn new(game: &Game) -> Self {
         let walk_size = WalkPosition::new(game.map_width() * 4, game.map_height() * 4);
         let mini_tiles = vec![MiniTile::default(); (walk_size.x * walk_size.y) as usize];
         let mut result = Self {

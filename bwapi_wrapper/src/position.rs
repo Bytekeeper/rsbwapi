@@ -91,7 +91,7 @@ impl TilePosition {
     }
 
     pub const fn center(self) -> Position {
-        Position::new(self.x / 32 + 16, self.y / 32 + 16)
+        Position::new(self.x * 32 + 16, self.y * 32 + 16)
     }
 }
 

@@ -441,7 +441,7 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_target(&self) -> Option<Unit> {
-        self.game.get_unit(self.id)
+        self.game.get_unit(self.data.target as usize)
     }
 
     pub fn get_target_position(&self) -> Option<Position> {

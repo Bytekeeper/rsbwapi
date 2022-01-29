@@ -7,7 +7,6 @@ macro_rules! measure {
 
 // mod bwem;
 mod shm;
-mod sma;
 
 pub use crate::types::*;
 pub use bwapi_wrapper::prelude::*;
@@ -21,6 +20,7 @@ pub mod game;
 pub mod player;
 pub mod predicate;
 pub mod region;
+pub mod sma;
 pub mod types;
 pub mod unit;
 
