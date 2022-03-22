@@ -6,6 +6,7 @@ macro_rules! measure {
 }
 
 // mod bwem;
+mod cell;
 mod shm;
 
 pub use crate::types::*;
@@ -20,7 +21,7 @@ pub mod game;
 pub mod player;
 pub mod predicate;
 pub mod region;
-pub mod sma;
+// pub mod sma;
 pub mod types;
 pub mod unit;
 

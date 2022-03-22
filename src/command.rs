@@ -164,9 +164,9 @@ impl Commands {
     }
 }
 
-impl<'a> Game<'a> {
+impl Game {
     fn cmd(&self) -> RefMut<Commands> {
-        self.cmd.borrow_mut()
+        RefMut::map(self.inner.borrow_mut(), |d| &mut d.cmd)
     }
 
     pub fn send_text_ex(&self, to_allies: bool, message: &str) {
@@ -561,7 +561,7 @@ impl<'a> Game<'a> {
         Ok(())
     }
 
-    pub fn leave_game(&mut self) {
+    pub fn leave_game(&self) {
         self.cmd().game_commands.push(BWAPIC_Command {
             type_: BWAPIC_CommandType_Enum::LeaveGame,
             value1: 0,
@@ -569,7 +569,7 @@ impl<'a> Game<'a> {
         });
     }
 
-    pub fn pause_game(&mut self) {
+    pub fn pause_game(&self) {
         self.cmd().game_commands.push(BWAPIC_Command {
             type_: BWAPIC_CommandType_Enum::PauseGame,
             value1: 0,

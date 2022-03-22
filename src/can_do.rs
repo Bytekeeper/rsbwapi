@@ -115,7 +115,7 @@ impl CanAttack for (Position, bool, bool, bool) {
     }
 }
 
-impl CanAttack for (Option<&Unit<'_>>, bool, bool, bool) {
+impl CanAttack for (Option<&Unit>, bool, bool, bool) {
     fn can_attack(&self, unit: &Unit) -> BwResult<bool> {
         let (target, check_can_target_unit, check_can_issue_command_type, check_commandability) =
             *self;
@@ -136,7 +136,7 @@ impl CanAttack for (Option<&Unit<'_>>, bool, bool, bool) {
         Ok(true)
     }
 }
-impl CanAttackUnit for (&Unit<'_>, bool, bool, bool) {
+impl CanAttackUnit for (&Unit, bool, bool, bool) {
     fn can_attack_unit(&self, unit: &Unit) -> BwResult<bool> {
         let (
             target_unit,
@@ -265,7 +265,7 @@ impl CanBuild for (UnitType, TilePosition, bool, bool, bool) {
         if check_target_unit_type && !unit.can_build((u_type, false, false))? {
             return Ok(false);
         }
-        if !tile_pos.is_valid(unit.game) {
+        if !tile_pos.is_valid(&unit.game) {
             return Err(Error::Invalid_Tile_Position);
         }
         if !unit.game.can_build_here(unit, tile_pos, u_type, true)? {
@@ -533,7 +533,7 @@ impl CanFollow for bool {
     }
 }
 
-impl CanFollow for (&Unit<'_>, bool, bool, bool) {
+impl CanFollow for (&Unit, bool, bool, bool) {
     fn can_follow(&self, unit: &Unit) -> BwResult<bool> {
         let (
             target_unit,
@@ -578,7 +578,7 @@ impl CanSetRallyUnit for bool {
     }
 }
 
-impl CanSetRallyUnit for (&Unit<'_>, bool, bool, bool) {
+impl CanSetRallyUnit for (&Unit, bool, bool, bool) {
     fn can_set_rally_unit(&self, unit: &Unit) -> BwResult<bool> {
         let (
             target_unit,
@@ -634,7 +634,7 @@ impl CanGather for bool {
     }
 }
 
-impl CanGather for (&Unit<'_>, bool, bool, bool) {
+impl CanGather for (&Unit, bool, bool, bool) {
     fn can_gather(&self, unit: &Unit) -> BwResult<bool> {
         let (
             target_unit,
@@ -696,7 +696,7 @@ impl CanRepair for bool {
     }
 }
 
-impl CanRepair for (&Unit<'_>, bool, bool, bool) {
+impl CanRepair for (&Unit, bool, bool, bool) {
     fn can_repair(&self, unit: &Unit) -> BwResult<bool> {
         let (
             target_unit,
@@ -811,7 +811,7 @@ impl CanLoad for bool {
     }
 }
 
-impl CanLoad for (&Unit<'_>, bool, bool, bool) {
+impl CanLoad for (&Unit, bool, bool, bool) {
     fn can_load(&self, unit: &Unit) -> BwResult<bool> {
         let (
             target_unit,
@@ -925,7 +925,7 @@ impl CanUnload for bool {
     }
 }
 
-impl CanUnload for (&Unit<'_>, bool, bool, bool, bool) {
+impl CanUnload for (&Unit, bool, bool, bool, bool) {
     fn can_unload(&self, unit: &Unit) -> BwResult<bool> {
         let (
             target_unit,
@@ -1025,7 +1025,7 @@ impl CanRightClickUnit for bool {
     }
 }
 
-impl CanRightClickUnit for (&Unit<'_>, bool, bool, bool) {
+impl CanRightClickUnit for (&Unit, bool, bool, bool) {
     fn can_right_click_unit(&self, unit: &Unit) -> BwResult<bool> {
         let (
             target_unit,
@@ -1198,7 +1198,7 @@ impl CanUseTechUnit for (TechType, bool, bool) {
     }
 }
 
-impl CanUseTechUnit for (TechType, &Unit<'_>, bool, bool, bool, bool) {
+impl CanUseTechUnit for (TechType, &Unit, bool, bool, bool, bool) {
     fn can_use_tech_unit(&self, unit: &Unit) -> BwResult<bool> {
         let (
             tech,
@@ -1455,7 +1455,7 @@ impl CanUseTech for (TechType, Position, bool, bool, bool, bool) {
     }
 }
 
-impl CanUseTech for (TechType, Option<&Unit<'_>>, bool, bool, bool, bool) {
+impl CanUseTech for (TechType, Option<&Unit>, bool, bool, bool, bool) {
     fn can_use_tech(&self, unit: &Unit) -> BwResult<bool> {
         let (
             tech,
@@ -1529,7 +1529,7 @@ impl CanPlaceCop for (TilePosition, bool, bool) {
     }
 }
 
-impl<'a> Unit<'a> {
+impl Unit {
     pub fn can_build(&self, checker: impl CanBuild) -> BwResult<bool> {
         checker.can_build(self)
     }
@@ -2184,7 +2184,7 @@ impl<'a> Unit<'a> {
 
         if self.get_type() != UnitType::Terran_Bunker {
             let wp = targ_drop_pos.to_walk_position();
-            if !wp.is_valid(self.game) {
+            if !wp.is_valid(&self.game) {
                 return Err(Error::Invalid_Tile_Position);
             } else if !self.game.is_walkable(wp) {
                 return Err(Error::Unreachable_Location);
@@ -2310,7 +2310,7 @@ pub trait CanResearch {
     fn can_research(&self, game: &Game) -> BwResult<bool>;
 }
 
-impl CanResearch for (&Unit<'_>, bool) {
+impl CanResearch for (&Unit, bool) {
     fn can_research(&self, _: &Game) -> BwResult<bool> {
         let (unit, check_commandability) = *self;
         if check_commandability && !unit.can_command()? {
@@ -2324,7 +2324,7 @@ impl CanResearch for (&Unit<'_>, bool) {
     }
 }
 
-impl CanResearch for (Option<&Unit<'_>>, TechType, bool) {
+impl CanResearch for (Option<&Unit>, TechType, bool) {
     fn can_research(&self, game: &Game) -> BwResult<bool> {
         let self_ = game.self_().ok_or(Error::Unit_Not_Owned)?;
         let (unit, type_, check_can_issue_command_type) = *self;
@@ -2369,7 +2369,7 @@ pub trait CanTargetUnit {
     fn can_target_unit(&self, game: &Game) -> BwResult<bool>;
 }
 
-impl CanTargetUnit for &Unit<'_> {
+impl CanTargetUnit for &Unit {
     fn can_target_unit(&self, _: &Game) -> BwResult<bool> {
         let target_unit = self;
         if !target_unit.exists() {
@@ -2397,7 +2397,7 @@ impl CanTargetUnit for &Unit<'_> {
     }
 }
 
-impl CanTargetUnit for (&Unit<'_>, &Unit<'_>, bool) {
+impl CanTargetUnit for (&Unit, &Unit, bool) {
     fn can_target_unit(&self, game: &Game) -> BwResult<bool> {
         let (this_unit, target_unit, check_commandability) = *self;
         if check_commandability && !this_unit.can_command()? {
@@ -2415,7 +2415,7 @@ pub trait CanUpgrade {
     fn can_upgrade(&self, game: &Game) -> BwResult<bool>;
 }
 
-impl CanUpgrade for (&Unit<'_>, bool) {
+impl CanUpgrade for (&Unit, bool) {
     fn can_upgrade(&self, _: &Game) -> BwResult<bool> {
         let (this_unit, check_commandability) = *self;
         if check_commandability && !this_unit.can_command()? {
@@ -2429,7 +2429,7 @@ impl CanUpgrade for (&Unit<'_>, bool) {
     }
 }
 
-impl CanUpgrade for (Option<&Unit<'_>>, UpgradeType, bool) {
+impl CanUpgrade for (Option<&Unit>, UpgradeType, bool) {
     fn can_upgrade(&self, game: &Game) -> BwResult<bool> {
         let (this_unit, type_, check_can_issue_command_type) = *self;
         let self_ = game.self_().ok_or(Error::Unit_Not_Owned)?;
@@ -2477,7 +2477,7 @@ impl CanUpgrade for (Option<&Unit<'_>>, UpgradeType, bool) {
     }
 }
 
-impl<'a> Game<'a> {
+impl Game {
     pub fn can_research(&self, checker: impl CanResearch) -> BwResult<bool> {
         checker.can_research(self)
     }

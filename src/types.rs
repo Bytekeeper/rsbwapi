@@ -62,12 +62,12 @@ pub enum TextSize {
     Huge,
 }
 
-pub(crate) fn c_str_to_str(i: &[c_char]) -> &str {
+pub(crate) fn c_str_to_str(i: &[c_char]) -> String {
     unsafe {
         let i = &*(i as *const [c_char] as *const [u8]);
         CStr::from_bytes_with_nul_unchecked(&i[..=i.iter().position(|&c| c == 0).unwrap()])
-            .to_str()
-            .unwrap()
+            .to_string_lossy()
+            .to_string()
     }
 }
 

@@ -1,4 +1,6 @@
+use core::ops::{Deref, DerefMut};
 use core::ptr::NonNull;
+
 #[cfg(windows)]
 use std::ffi::CString;
 #[cfg(windows)]
@@ -18,15 +20,24 @@ pub(crate) struct Shm<T: ?Sized>(HANDLE, NonNull<T>);
 #[cfg(not(windows))]
 pub(crate) struct Shm<T: ?Sized>(usize, NonNull<T>);
 
+impl<T> Deref for Shm<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { self.1.as_ref() }
+    }
+}
+
+impl<T> DerefMut for Shm<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { self.1.as_mut() }
+    }
+}
+
 impl<T> Shm<T> {
     pub(crate) fn get(&self) -> &T {
         // Not safe at all
         unsafe { self.1.as_ref() }
-    }
-
-    pub(crate) fn get_mut(&mut self) -> &mut T {
-        // Not safe at all
-        unsafe { self.1.as_mut() }
     }
 
     #[cfg(test)]

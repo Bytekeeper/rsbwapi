@@ -6,23 +6,27 @@ use crate::unit::Unit;
 use bwapi_wrapper::prelude::*;
 use bwapi_wrapper::*;
 use num_traits::FromPrimitive;
+use std::cell::Ref;
 
 pub type PlayerId = usize;
 
 #[derive(Clone)]
-pub struct Player<'a> {
+pub struct Player {
     pub id: PlayerId,
-    game: &'a Game<'a>,
-    data: &'a BWAPI_PlayerData,
+    game: Game,
 }
 
-impl<'a> Player<'a> {
-    pub(crate) fn new(id: PlayerId, game: &'a Game<'a>, data: &'a BWAPI_PlayerData) -> Self {
-        Player { id, game, data }
+impl Player {
+    pub(crate) fn new(id: PlayerId, game: Game) -> Self {
+        Player { id, game }
+    }
+
+    fn data(&self) -> Ref<'_, BWAPI_PlayerData> {
+        Ref::map(self.game.inner.borrow(), |d| &d.data.players[self.id])
     }
 
     pub fn all_unit_count(&self, unit: UnitType) -> i32 {
-        self.data.allUnitCount[unit as usize]
+        self.data().allUnitCount[unit as usize]
     }
 
     pub fn armor(&self, unit: UnitType) -> i32 {
@@ -38,7 +42,7 @@ impl<'a> Player<'a> {
     }
 
     pub fn completed_unit_count(&self, unit: UnitType) -> i32 {
-        self.data.completedUnitCount[unit as usize]
+        self.data().completedUnitCount[unit as usize]
     }
 
     pub fn damage(&self, wpn: WeaponType) -> i32 {
@@ -48,35 +52,35 @@ impl<'a> Player<'a> {
     }
 
     pub fn dead_unit_count(&self, unit: UnitType) -> i32 {
-        self.data.deadUnitCount[unit as usize]
+        self.data().deadUnitCount[unit as usize]
     }
 
     pub fn gas(&self) -> i32 {
-        self.data.gas
+        self.data().gas
     }
 
     pub fn gathered_gas(&self) -> i32 {
-        self.data.gatheredGas
+        self.data().gatheredGas
     }
 
     pub fn gathered_minerals(&self) -> i32 {
-        self.data.gatheredMinerals
+        self.data().gatheredMinerals
     }
 
     pub fn get_building_score(&self) -> i32 {
-        self.data.totalBuildingScore
+        self.data().totalBuildingScore
     }
 
     pub fn get_color(&self) -> Color {
-        Color::from_i32(self.data.color).unwrap()
+        Color::from_i32(self.data().color).unwrap()
     }
 
     pub fn get_custom_score(&self) -> i32 {
-        self.data.customScore
+        self.data().customScore
     }
 
     pub(crate) fn force_id(&self) -> i32 {
-        self.data.force
+        self.data().force
     }
 
     pub fn get_force(&self) -> Force {
@@ -88,19 +92,19 @@ impl<'a> Player<'a> {
     }
 
     pub fn get_kill_score(&self) -> i32 {
-        self.data.totalKillScore
+        self.data().totalKillScore
     }
 
     pub fn get_max_upgrade_level(&self, upgrade: UpgradeType) -> i32 {
-        self.data.maxUpgradeLevel[upgrade as usize]
+        self.data().maxUpgradeLevel[upgrade as usize]
     }
 
-    pub fn get_name(&self) -> &str {
-        c_str_to_str(&self.data.name)
+    pub fn get_name(&self) -> String {
+        c_str_to_str(&self.data().name)
     }
 
     pub fn get_race(&self) -> Race {
-        Race::new(self.data.race)
+        Race::new(self.data().race)
     }
 
     pub fn get_units(&self) -> Vec<Unit> {
@@ -113,11 +117,11 @@ impl<'a> Player<'a> {
     }
 
     pub fn get_upgrade_level(&self, upgrade_type: UpgradeType) -> i32 {
-        self.data.upgradeLevel[upgrade_type as usize]
+        self.data().upgradeLevel[upgrade_type as usize]
     }
 
     pub fn has_researched(&self, tech: TechType) -> bool {
-        self.data.hasResearched[tech as usize]
+        self.data().hasResearched[tech as usize]
     }
 
     pub fn has_unit_type_requirement(&self, unit: UnitType, amount: i32) -> bool {
@@ -148,51 +152,51 @@ impl<'a> Player<'a> {
     }
 
     pub fn is_ally(&self, other: &Player) -> bool {
-        self.data.isAlly[other.id]
+        self.data().isAlly[other.id]
     }
 
     pub fn is_defeated(&self) -> bool {
-        self.data.isDefeated
+        self.data().isDefeated
     }
 
     pub fn is_enemy(&self, other: &Player) -> bool {
-        self.data.isEnemy[other.id]
+        self.data().isEnemy[other.id]
     }
 
     pub fn is_neutral(&self) -> bool {
-        self.data.isNeutral
+        self.data().isNeutral
     }
 
     pub fn is_observer(&self) -> bool {
-        !self.data.isParticipating
+        !self.data().isParticipating
     }
 
     pub fn is_research_available(&self, tech: TechType) -> bool {
-        self.data.isResearchAvailable[tech as usize]
+        self.data().isResearchAvailable[tech as usize]
     }
 
     pub fn is_researching(&self, tech: TechType) -> bool {
-        self.data.isResearching[tech as usize]
+        self.data().isResearching[tech as usize]
     }
 
     pub fn is_unit_available(&self, unit: UnitType) -> bool {
-        self.data.isUnitAvailable[unit as usize]
+        self.data().isUnitAvailable[unit as usize]
     }
 
     pub fn is_upgrading(&self, upgrade: UpgradeType) -> bool {
-        self.data.isUpgrading[upgrade as usize]
+        self.data().isUpgrading[upgrade as usize]
     }
 
     pub fn is_victorious(&self) -> bool {
-        self.data.isVictorious
+        self.data().isVictorious
     }
 
     pub fn killed_unit_count(&self, unit: UnitType) -> i32 {
-        self.data.killedUnitCount[unit as usize]
+        self.data().killedUnitCount[unit as usize]
     }
 
     pub fn left_game(&self) -> bool {
-        self.data.leftGame
+        self.data().leftGame
     }
 
     pub fn max_energy(&self, unit: UnitType) -> i32 {
@@ -226,23 +230,23 @@ impl<'a> Player<'a> {
     }
 
     pub fn minerals(&self) -> i32 {
-        self.data.minerals
+        self.data().minerals
     }
 
     pub fn refunded_gas(&self) -> i32 {
-        self.data.refundedGas
+        self.data().refundedGas
     }
 
     pub fn refunded_minerals(&self) -> i32 {
-        self.data.refundedMinerals
+        self.data().refundedMinerals
     }
 
     pub fn repaired_gas(&self) -> i32 {
-        self.data.repairedGas
+        self.data().repairedGas
     }
 
     pub fn repaired_minerals(&self) -> i32 {
-        self.data.repairedMinerals
+        self.data().repairedMinerals
     }
 
     pub fn sight_range(&self, unit: UnitType) -> i32 {
@@ -276,7 +280,7 @@ impl<'a> Player<'a> {
     }
 
     pub fn supply_total_for(&self, race: Race) -> i32 {
-        self.data.supplyTotal[race as usize]
+        self.data().supplyTotal[race as usize]
     }
 
     pub fn supply_used(&self) -> i32 {
@@ -284,7 +288,7 @@ impl<'a> Player<'a> {
     }
 
     pub fn supply_used_by(&self, race: Race) -> i32 {
-        self.data.supplyUsed[race as usize]
+        self.data().supplyUsed[race as usize]
     }
 
     pub fn top_speed(&self, unit: UnitType) -> f64 {
@@ -321,7 +325,7 @@ impl<'a> Player<'a> {
     }
 
     pub fn visible_unit_count(&self, unit: UnitType) -> i32 {
-        self.data.visibleUnitCount[unit as usize]
+        self.data().visibleUnitCount[unit as usize]
     }
 
     pub fn weapon_damage_cooldown(&self, unit: UnitType) -> i32 {
@@ -358,7 +362,7 @@ impl<'a> Player<'a> {
     }
 }
 
-impl<'a> PartialEq for Player<'a> {
+impl PartialEq for Player {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }

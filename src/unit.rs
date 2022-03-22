@@ -1,9 +1,17 @@
+use crate::cell::Wrap;
 use crate::player::Player;
 use crate::predicate::{IntoPredicate, Predicate};
+use delegate::delegate;
 
+use crate::game::GameInternal;
 use crate::*;
 use bwapi_wrapper::*;
-use std::{cell::Cell, convert::From, fmt};
+use std::{
+    cell::{Ref, RefMut},
+    convert::From,
+    fmt,
+    ops::Deref,
+};
 
 pub type UnitId = usize;
 
@@ -32,20 +40,21 @@ impl UnitInfo {
 }
 
 #[derive(Clone)]
-pub struct Unit<'a> {
+pub struct Unit {
     id: UnitId,
-    pub(crate) game: &'a Game<'a>,
-    data: &'a BWAPI_UnitData,
-    info: &'a Cell<UnitInfo>,
+    // Game has a Rc to shared memory containing the data below, it can't be moved.
+    pub(crate) game: Game,
+    // To be safe, we should never hand out a reference with a long lifetime
+    data: &'static BWAPI_UnitData,
 }
 
-impl From<Unit<'_>> for UnitId {
-    fn from(unit: Unit<'_>) -> Self {
+impl From<Unit> for UnitId {
+    fn from(unit: Unit) -> Self {
         unit.id
     }
 }
 
-impl<'a> fmt::Debug for Unit<'a> {
+impl<'a> fmt::Debug for Unit {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Unit")
             .field("id", &self.id)
@@ -55,19 +64,20 @@ impl<'a> fmt::Debug for Unit<'a> {
     }
 }
 
-impl<'a> Unit<'a> {
-    pub(crate) fn new(
-        id: UnitId,
-        game: &'a Game<'a>,
-        data: &'a BWAPI_UnitData,
-        info: &'a Cell<UnitInfo>,
-    ) -> Self {
-        Unit {
-            id,
-            game,
-            data,
-            info,
-        }
+impl Unit {
+    pub fn get_type(&self) -> UnitType {
+        UnitType::new(self.data.type_)
+    }
+    pub(crate) fn new(id: UnitId, game: Game, data: &'static BWAPI_UnitData) -> Self {
+        Unit { id, game, data }
+    }
+
+    fn info(&self) -> Ref<'_, Option<UnitInfo>> {
+        Ref::map(self.game.inner.borrow(), |d| &d.unit_infos[self.id])
+    }
+
+    fn info_mut(&self) -> RefMut<'_, Option<UnitInfo>> {
+        RefMut::map(self.game.inner.borrow_mut(), |d| &mut d.unit_infos[self.id])
     }
 
     pub(crate) fn get_buttonset(&self) -> i32 {
@@ -81,10 +91,6 @@ impl<'a> Unit<'a> {
     ) -> Option<Unit> {
         self.game
             .get_closest_unit(self.get_position(), pred, radius)
-    }
-
-    pub fn get_type(&self) -> UnitType {
-        UnitType::new(self.data.type_)
     }
 
     pub fn is_accelerating(&self) -> bool {
@@ -190,39 +196,38 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_initial_hit_points(&self) -> i32 {
-        self.info.get().initial_hit_points
+        self.info().expect("UnitInfo missing").initial_hit_points
     }
 
     pub fn get_initial_resources(&self) -> i32 {
-        self.info.get().initial_resources
+        self.info().expect("UnitInfo missing").initial_resources
     }
 
     pub fn get_initial_tile_position(&self) -> TilePosition {
-        (self.info.get().initial_position
-            - self.info.get().initial_type.tile_size().to_position() / 2)
+        (self.get_initial_position() - self.get_initial_type().tile_size().to_position() / 2)
             .to_tile_position()
     }
 
     pub fn get_initial_position(&self) -> Position {
-        self.info.get().initial_position
+        self.info().expect("UnitInfo missing").initial_position
     }
 
     pub fn get_initial_type(&self) -> UnitType {
-        self.info.get().initial_type
+        self.info().expect("UnitInfo missing").initial_type
     }
 
     pub fn get_interceptor_count(&self) -> i32 {
         self.data.interceptorCount
     }
 
-    pub fn get_interceptors(&self) -> Vec<Unit<'a>> {
+    pub fn get_interceptors(&self) -> Vec<Unit> {
         if self.get_type() != UnitType::Protoss_Carrier
             && self.get_type() != UnitType::Hero_Gantrithor
         {
             return vec![];
         }
-        let burrowed_map = self.game.connected_units.borrow();
-        let interceptors = burrowed_map.get(&self.id);
+        let borrowed_map = &self.game.inner.borrow().connected_units;
+        let interceptors = borrowed_map.get(&self.id);
         if let Some(interceptors) = interceptors {
             return interceptors
                 .iter()
@@ -237,8 +242,9 @@ impl<'a> Unit<'a> {
             .cloned()
             .collect();
         self.game
-            .connected_units
+            .inner
             .borrow_mut()
+            .connected_units
             .insert(self.id, interceptors.iter().map(|u| u.id).collect());
         interceptors
     }
@@ -255,7 +261,7 @@ impl<'a> Unit<'a> {
         if !self.get_type().produces_larva() {
             return vec![];
         }
-        if let Some(larva) = self.game.connected_units.borrow().get(&self.id) {
+        if let Some(larva) = self.game.inner.borrow().connected_units.get(&self.id) {
             return larva
                 .iter()
                 .map(|&i| self.game.get_unit(i).expect("Larva to be present"))
@@ -269,8 +275,9 @@ impl<'a> Unit<'a> {
             .cloned()
             .collect();
         self.game
-            .connected_units
+            .inner
             .borrow_mut()
+            .connected_units
             .insert(self.id, larva.iter().map(|u| u.id).collect());
         larva
     }
@@ -284,7 +291,7 @@ impl<'a> Unit<'a> {
     }
 
     pub fn get_loaded_units(&self) -> Vec<Unit> {
-        let map = self.game.loaded_units.borrow();
+        let map = &self.game.inner.borrow().loaded_units;
         let loaded_units = map.get(&self.id);
         if let Some(loaded_units) = loaded_units {
             loaded_units
@@ -306,8 +313,9 @@ impl<'a> Unit<'a> {
                 .cloned()
                 .collect();
             self.game
-                .loaded_units
+                .inner
                 .borrow_mut()
+                .loaded_units
                 .insert(self.id, loaded_units.iter().map(|u| u.id).collect());
             loaded_units
         }
@@ -335,7 +343,7 @@ impl<'a> Unit<'a> {
 
     pub fn get_order_target_position(&self) -> Option<Position> {
         Position::new_checked(
-            self.game,
+            &self.game,
             self.data.orderTargetPositionX,
             self.data.orderTargetPositionY,
         )
@@ -446,7 +454,7 @@ impl<'a> Unit<'a> {
 
     pub fn get_target_position(&self) -> Option<Position> {
         Position::new_checked(
-            self.game,
+            &self.game,
             self.data.targetPositionX,
             self.data.targetPositionY,
         )
@@ -485,7 +493,7 @@ impl<'a> Unit<'a> {
         UpgradeType::new(self.data.upgrade)
     }
 
-    pub fn get_units_in_radius<Pred: IntoPredicate<Unit<'a>>>(
+    pub fn get_units_in_radius<Pred: IntoPredicate<Unit>>(
         &self,
         radius: i32,
         pred: Pred,
@@ -494,7 +502,7 @@ impl<'a> Unit<'a> {
             .get_units_in_radius(self.get_position(), radius, pred)
     }
 
-    pub fn get_units_in_weapon_range<Pred: IntoPredicate<Unit<'a>>>(
+    pub fn get_units_in_weapon_range<Pred: IntoPredicate<Unit>>(
         &self,
         weapon: WeaponType,
         pred: Pred,
@@ -508,7 +516,7 @@ impl<'a> Unit<'a> {
         self.game.get_units_in_rectangle(
             (self.get_left() - max, self.get_top() - max),
             (self.get_right() + max, self.get_bottom() * max),
-            |u: &Unit<'a>| -> bool {
+            |u: &Unit| -> bool {
                 if u == self || u.is_invincible() {
                     return false;
                 }
@@ -796,7 +804,7 @@ impl<'a> Unit<'a> {
     }
 
     pub fn last_command_frame(&self) -> i32 {
-        self.info.get().last_command_frame
+        self.info().expect("UnitInfo missing").last_command_frame
     }
 
     pub fn is_starting_attack(&self) -> bool {
@@ -876,7 +884,7 @@ impl<'a> Unit<'a> {
         if let Ok(target) = target.to_position() {
             self.is_flying()
                 || self.exists()
-                    && target.is_valid(self.game)
+                    && target.is_valid(&self.game)
                     && (self.game.has_path(self.get_position(), target)
                         || self
                             .game
@@ -934,7 +942,7 @@ impl<'a> Unit<'a> {
         self.data.isMorphing
     }
 
-    pub fn get_player(&self) -> Player<'a> {
+    pub fn get_player(&self) -> Player {
         self.game
             .get_player(self.data.player as usize)
             .unwrap_or_else(|| self.game.neutral())
@@ -944,7 +952,7 @@ impl<'a> Unit<'a> {
 /***
  * Unit Commands
  */
-impl<'a> Unit<'a> {
+impl<'a> Unit {
     pub fn attack<T: UnitOrPosition>(&self, target: T) -> BwResult<bool> {
         let mut cmd = self.command(false);
         target.assign_attack(&mut cmd);
@@ -1272,9 +1280,9 @@ impl<'a> Unit<'a> {
             cmd
         };
         self.game.issue_command(cmd);
-        let mut info = self.info.get();
-        info.last_command_frame = self.game.get_frame_count();
-        self.info.set(info);
+        self.info_mut()
+            .expect("UnitInfo missing")
+            .last_command_frame = self.game.get_frame_count();
         Ok(true)
     }
 }
@@ -1291,7 +1299,7 @@ pub trait UnitOrPosition {
     fn to_position(&self) -> Result<Position, PathErr>;
 }
 
-impl UnitOrPosition for &Unit<'_> {
+impl UnitOrPosition for &Unit {
     fn assign_attack(&self, cmd: &mut UnitCommand) {
         cmd.targetIndex = self.id as i32;
         cmd.type_._base = UnitCommandType::Attack_Unit as u32;
@@ -1350,7 +1358,7 @@ impl<I: Into<Position> + Copy> UnitOrPosition for I {
     }
 }
 
-impl<'a> PartialEq for Unit<'a> {
+impl<'a> PartialEq for Unit {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
