@@ -93,9 +93,9 @@ impl BaseFinder {
         let mapx = game.map_width() as usize;
         let mapy = game.map_height() as usize;
         let scanw = mapx + 2;
-        let mut walk_grid = vec![true; scanw * (mapy + 2)];
-        let mut resblock = vec![false; ((mapx + 2) * (mapy + 2)) as usize];
-        let mut resval = vec![0; ((mapx + 2) * (mapy + 2)) as usize];
+        let walk_grid = vec![true; scanw * (mapy + 2)];
+        let resblock = vec![false; ((mapx + 2) * (mapy + 2)) as usize];
+        let resval = vec![0; ((mapx + 2) * (mapy + 2)) as usize];
         let mut finder = BaseFinder {
             mapx,
             mapy,
@@ -207,7 +207,7 @@ impl BaseFinder {
 
         for y in p1.y..p2.y {
             let mut off = self.tile_off(p1.x as usize, y as usize);
-            for x in p1.x..p2.x {
+            for _ in p1.x..p2.x {
                 self.resblock[off] = true;
                 off += 1;
             }
@@ -481,9 +481,8 @@ impl Map {
         for y in 0..self.walk_size.y {
             for x in 0..self.walk_size.x {
                 let wp = WalkPosition::new(x, y);
-                match self.get_mini_tile(wp).altitude {
-                    Altitude::Walkable(a) => walkpos_by_descending_altitude.push((wp, a)),
-                    _ => (),
+                if let Altitude::Walkable(a) = self.get_mini_tile(wp).altitude {
+                    walkpos_by_descending_altitude.push((wp, a));
                 }
             }
         }
@@ -502,7 +501,7 @@ impl Map {
         }
         let mut areas = vec![Area::default()];
         let mut horizon = vec![];
-        for (wp, altitude) in walkpos_by_descending_altitude {
+        for (wp, _altitude) in walkpos_by_descending_altitude {
             let mut n = Neighbors::None;
             for &d in &WALK_POSITION_4_DIR {
                 if self.valid(wp + d) {
@@ -590,47 +589,51 @@ mod test {
             let data = read(entry.path()).unwrap();
             let mut inflated = inflate_bytes_zlib(&data).unwrap();
             let shm = Shm::from_mut_slice(inflated.as_mut_slice().into());
-            let mut game_context = GameContext::new(shm);
+            let mut game = Game::new(shm);
             let commands = RefCell::new(Commands::new());
-            game_context.match_start();
-            game_context.with_frame(&commands, |game| {
-                let timer = Instant::now();
-                let tm = Map::new(game);
-                println!("{}", timer.elapsed().as_micros());
-                let mut img: RgbImage =
-                    ImageBuffer::new(4 * game.map_width() as u32, 4 * game.map_height() as u32);
-                for y in 0..tm.walk_size.y {
-                    for x in 0..tm.walk_size.x {
-                        let alt = tm.get_mini_tile(WalkPosition::new(x, y));
-                        match alt.altitude {
-                            Altitude::Unwalkable(a) => {
-                                img.put_pixel(x as u32, y as u32, Rgb([0, 0, 255 - a as u8]))
-                            }
-                            Altitude::Walkable(a) => img.put_pixel(
-                                x as u32,
-                                y as u32,
-                                Rgb([255 - (a / 2) as u8, (27 * alt.area_id % 255) as u8, 255]),
-                            ),
-                            Altitude::Border => {
-                                img.put_pixel(x as u32, y as u32, Rgb([255, 255, 255]))
-                            }
-                            _ => (),
+            game.match_start();
+            let timer = Instant::now();
+            let tm = Map::new(&game);
+            println!("{}", timer.elapsed().as_micros());
+            let mut img: RgbImage =
+                ImageBuffer::new(4 * game.map_width() as u32, 4 * game.map_height() as u32);
+            for y in 0..tm.walk_size.y {
+                for x in 0..tm.walk_size.x {
+                    let alt = tm.get_mini_tile(WalkPosition::new(x, y));
+                    match alt.altitude {
+                        Altitude::Unwalkable(a) => {
+                            img.put_pixel(x as u32, y as u32, Rgb([0, 0, 255 - a as u8]))
                         }
+                        Altitude::Walkable(a) => img.put_pixel(
+                            x as u32,
+                            y as u32,
+                            Rgb([255 - (a / 2) as u8, (27 * alt.area_id % 255) as u8, 255]),
+                        ),
+                        Altitude::Border => img.put_pixel(x as u32, y as u32, Rgb([255, 255, 255])),
+                        _ => (),
                     }
                 }
-                for &Base { position: tp, .. } in &tm.bases {
-                    let wp = tp.to_walk_position();
-                    img.put_pixel(wp.x as u32, wp.y as u32, Rgb([255, 255, 255]));
-                    img.put_pixel(1 + wp.x as u32, wp.y as u32, Rgb([255, 255, 255]));
-                    img.put_pixel(1 + wp.x as u32, 1 + wp.y as u32, Rgb([255, 255, 255]));
-                    img.put_pixel(wp.x as u32, 1 + wp.y as u32, Rgb([255, 255, 255]));
-                }
-                target.push(format!(
-                    "{}.png",
-                    entry.path().file_name().unwrap().to_string_lossy()
-                ));
-                img.save(target).unwrap();
-            });
+            }
+            for base in game.get_start_locations() {
+                let wp = base.to_walk_position();
+                img.put_pixel(wp.x as u32, wp.y as u32, Rgb([255, 0, 0]));
+                img.put_pixel(1 + wp.x as u32, wp.y as u32, Rgb([255, 0, 0]));
+                img.put_pixel(1 + wp.x as u32, 1 + wp.y as u32, Rgb([255, 0, 0]));
+                img.put_pixel(wp.x as u32, 1 + wp.y as u32, Rgb([255, 0, 0]));
+            }
+            for &Base { position: tp, .. } in &tm.bases {
+                let wp = tp.to_walk_position();
+                img.put_pixel(wp.x as u32, wp.y as u32, Rgb([255, 255, 255]));
+                img.put_pixel(1 + wp.x as u32, wp.y as u32, Rgb([255, 255, 255]));
+                img.put_pixel(1 + wp.x as u32, 1 + wp.y as u32, Rgb([255, 255, 255]));
+                img.put_pixel(wp.x as u32, 1 + wp.y as u32, Rgb([255, 255, 255]));
+            }
+            target.push(format!(
+                "{}.png",
+                entry.path().file_name().unwrap().to_string_lossy()
+            ));
+            eprintln!("{}", target.to_string_lossy());
+            img.save(target).unwrap();
             break;
         }
         panic!();

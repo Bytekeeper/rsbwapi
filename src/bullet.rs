@@ -1,35 +1,34 @@
 use crate::game::Game;
 use crate::player::Player;
+use crate::projected::Projected;
 use crate::unit::Unit;
 use bwapi_wrapper::prelude::*;
 use bwapi_wrapper::*;
 use num_traits::FromPrimitive;
-use std::cell::Ref;
 
 pub struct Bullet {
     id: usize,
-    game: Game,
+    inner: Projected<Game, BWAPI_BulletData>,
 }
 
 impl Bullet {
-    pub fn new(id: usize, game: Game) -> Self {
-        Self { id, game }
-    }
-
-    fn data(&self) -> Ref<'_, BWAPI_BulletData> {
-        Ref::map(self.game.inner.borrow(), |d| &d.data.bullets[self.id])
+    pub(crate) fn new(id: usize, game: Game, data: *const BWAPI_BulletData) -> Self {
+        Self {
+            id,
+            inner: unsafe { Projected::new(game, data) },
+        }
     }
 
     pub fn exists(&self) -> bool {
-        self.data().exists
+        self.inner.exists
     }
 
     pub fn get_angle(&self) -> f64 {
-        self.data().angle
+        self.inner.angle
     }
 
     pub fn get_player(&self) -> Option<Player> {
-        self.game.get_player(self.data().player as usize)
+        self.inner.game().get_player(self.inner.player as usize)
     }
 
     pub fn get_id(&self) -> usize {
@@ -38,41 +37,41 @@ impl Bullet {
 
     pub fn get_position(&self) -> Option<Position> {
         Some(Position {
-            x: self.data().positionX,
-            y: self.data().positionY,
+            x: self.inner.positionX,
+            y: self.inner.positionY,
         })
     }
 
     pub fn get_remove_timer(&self) -> Option<i32> {
-        if self.data().removeTimer > 0 {
-            Some(self.data().removeTimer)
+        if self.inner.removeTimer > 0 {
+            Some(self.inner.removeTimer)
         } else {
             None
         }
     }
 
     pub fn get_source(&self) -> Option<Unit> {
-        self.game.get_unit(self.data().source as usize)
+        self.inner.game().get_unit(self.inner.source as usize)
     }
 
     pub fn get_target(&self) -> Option<Unit> {
-        self.game.get_unit(self.data().target as usize)
+        self.inner.game().get_unit(self.inner.target as usize)
     }
 
     pub fn get_target_position(&self) -> Option<Position> {
         Position::new_checked(
-            &self.game,
-            self.data().targetPositionX,
-            self.data().targetPositionY,
+            self.inner.game(),
+            self.inner.targetPositionX,
+            self.inner.targetPositionY,
         )
     }
 
     pub fn get_type(&self) -> BulletType {
-        BulletType::from_i32(self.data().type_).unwrap()
+        BulletType::from_i32(self.inner.type_).unwrap()
     }
 
     pub fn get_velocity(&self) -> Option<Vector2D> {
-        let result = Vector2D::new(self.data().velocityX, self.data().velocityY);
+        let result = Vector2D::new(self.inner.velocityX, self.inner.velocityY);
         if result.x == 0.0 && result.y == 0.0 {
             None
         } else {
@@ -81,7 +80,7 @@ impl Bullet {
     }
 
     pub fn is_visible(&self, player: &Player) -> bool {
-        self.data().isVisible[player.id]
+        self.inner.isVisible[player.id]
     }
 }
 

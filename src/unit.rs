@@ -1,17 +1,10 @@
-use crate::cell::Wrap;
 use crate::player::Player;
 use crate::predicate::{IntoPredicate, Predicate};
-use delegate::delegate;
+use crate::projected::Projected;
 
-use crate::game::GameInternal;
 use crate::*;
 use bwapi_wrapper::*;
-use std::{
-    cell::{Ref, RefMut},
-    convert::From,
-    fmt,
-    ops::Deref,
-};
+use std::{borrow::Borrow, convert::From, fmt};
 
 pub type UnitId = usize;
 
@@ -42,10 +35,7 @@ impl UnitInfo {
 #[derive(Clone)]
 pub struct Unit {
     id: UnitId,
-    // Game has a Rc to shared memory containing the data below, it can't be moved.
-    pub(crate) game: Game,
-    // To be safe, we should never hand out a reference with a long lifetime
-    data: &'static BWAPI_UnitData,
+    pub(crate) inner: Projected<Game, BWAPI_UnitData>,
 }
 
 impl From<Unit> for UnitId {
@@ -66,22 +56,25 @@ impl<'a> fmt::Debug for Unit {
 
 impl Unit {
     pub fn get_type(&self) -> UnitType {
-        UnitType::new(self.data.type_)
+        UnitType::new(self.inner.type_)
     }
-    pub(crate) fn new(id: UnitId, game: Game, data: &'static BWAPI_UnitData) -> Self {
-        Unit { id, game, data }
+    pub(crate) fn new(id: UnitId, game: Game, data: *const BWAPI_UnitData) -> Self {
+        Unit {
+            id,
+            inner: unsafe { Projected::new(game, data) },
+        }
     }
 
-    fn info(&self) -> Ref<'_, Option<UnitInfo>> {
-        Ref::map(self.game.inner.borrow(), |d| &d.unit_infos[self.id])
+    fn info(&self) -> UnitInfo {
+        self.inner.game().inner.unit_infos.borrow()[self.id].expect("UnitInfo missing")
     }
 
-    fn info_mut(&self) -> RefMut<'_, Option<UnitInfo>> {
-        RefMut::map(self.game.inner.borrow_mut(), |d| &mut d.unit_infos[self.id])
+    fn set_info(&self, unit_info: UnitInfo) {
+        (*self.inner.game().inner.unit_infos.borrow_mut())[self.id] = Some(unit_info);
     }
 
     pub(crate) fn get_buttonset(&self) -> i32 {
-        self.data.buttonset
+        self.inner.buttonset
     }
 
     pub fn get_closest_unit<R: Into<Option<u32>>>(
@@ -89,36 +82,37 @@ impl Unit {
         pred: impl Fn(&Unit) -> bool,
         radius: R,
     ) -> Option<Unit> {
-        self.game
+        self.inner
+            .game()
             .get_closest_unit(self.get_position(), pred, radius)
     }
 
     pub fn is_accelerating(&self) -> bool {
-        self.data.isAccelerating
+        self.inner.isAccelerating
     }
 
     pub fn is_attacking(&self) -> bool {
-        self.data.isAttacking
+        self.inner.isAttacking
     }
 
     pub fn is_attack_game(&self) -> bool {
-        self.data.isAttackFrame
+        self.inner.isAttackFrame
     }
 
     pub fn get_acid_spore_count(&self) -> i32 {
-        self.data.acidSporeCount
+        self.inner.acidSporeCount
     }
 
     pub fn get_addon(&self) -> Option<Unit> {
-        self.game.get_unit(self.data.addon as usize)
+        self.inner.game().get_unit(self.inner.addon as usize)
     }
 
     pub fn get_air_weapon_cooldown(&self) -> i32 {
-        self.data.airWeaponCooldown
+        self.inner.airWeaponCooldown
     }
 
     pub fn get_angle(&self) -> f64 {
-        self.data.angle
+        self.inner.angle
     }
 
     pub fn get_bottom(&self) -> i32 {
@@ -126,26 +120,27 @@ impl Unit {
     }
 
     pub fn get_build_type(&self) -> UnitType {
-        UnitType::new(self.data.buildType)
+        UnitType::new(self.inner.buildType)
     }
 
     pub fn get_build_unit(&self) -> Option<Unit> {
-        self.game.get_unit(self.data.buildUnit as usize)
+        self.inner.game().get_unit(self.inner.buildUnit as usize)
     }
 
     pub fn get_carrier(&self) -> Option<Unit> {
-        self.game.get_unit(self.data.carrier as usize)
+        self.inner.game().get_unit(self.inner.carrier as usize)
     }
 
     pub fn get_defense_matrix_points(&self) -> i32 {
-        self.data.defenseMatrixPoints
+        self.inner.defenseMatrixPoints
     }
 
     pub fn get_defense_matrix_timer(&self) -> i32 {
-        self.data.defenseMatrixTimer
+        self.inner.defenseMatrixTimer
     }
 
-    pub fn get_distance(&self, target: &Unit) -> i32 {
+    pub fn get_distance(&self, target: impl Borrow<Unit>) -> i32 {
+        let target = target.borrow();
         if !self.exists() || !target.exists() {
             return i32::MAX;
         }
@@ -176,31 +171,31 @@ impl Unit {
     }
 
     pub fn get_energy(&self) -> i32 {
-        self.data.energy
+        self.inner.energy
     }
 
     pub fn get_ensnare_timer(&self) -> i32 {
-        self.data.ensnareTimer
+        self.inner.ensnareTimer
     }
 
     pub fn get_ground_weapon_cooldown(&self) -> i32 {
-        self.data.groundWeaponCooldown
+        self.inner.groundWeaponCooldown
     }
 
     pub fn get_hatchery(&self) -> Option<Unit> {
-        self.game.get_unit(self.data.hatchery as usize)
+        self.inner.game().get_unit(self.inner.hatchery as usize)
     }
 
     pub fn get_hit_points(&self) -> i32 {
-        self.data.hitPoints
+        self.inner.hitPoints
     }
 
     pub fn get_initial_hit_points(&self) -> i32 {
-        self.info().expect("UnitInfo missing").initial_hit_points
+        self.info().initial_hit_points
     }
 
     pub fn get_initial_resources(&self) -> i32 {
-        self.info().expect("UnitInfo missing").initial_resources
+        self.info().initial_resources
     }
 
     pub fn get_initial_tile_position(&self) -> TilePosition {
@@ -209,15 +204,15 @@ impl Unit {
     }
 
     pub fn get_initial_position(&self) -> Position {
-        self.info().expect("UnitInfo missing").initial_position
+        self.info().initial_position
     }
 
     pub fn get_initial_type(&self) -> UnitType {
-        self.info().expect("UnitInfo missing").initial_type
+        self.info().initial_type
     }
 
     pub fn get_interceptor_count(&self) -> i32 {
-        self.data.interceptorCount
+        self.inner.interceptorCount
     }
 
     pub fn get_interceptors(&self) -> Vec<Unit> {
@@ -226,64 +221,40 @@ impl Unit {
         {
             return vec![];
         }
-        let borrowed_map = &self.game.inner.borrow().connected_units;
-        let interceptors = borrowed_map.get(&self.id);
-        if let Some(interceptors) = interceptors {
-            return interceptors
-                .iter()
-                .map(|&i| self.game.get_unit(i).expect("Interceptor to be present"))
-                .collect();
-        }
-        let interceptors: Vec<Unit> = self
-            .game
+        self.inner
+            .game()
             .get_all_units()
             .iter()
             .filter(|u| u.get_carrier().as_ref() == Some(self))
             .cloned()
-            .collect();
-        self.game
-            .inner
-            .borrow_mut()
-            .connected_units
-            .insert(self.id, interceptors.iter().map(|u| u.id).collect());
-        interceptors
+            .collect()
     }
 
     pub fn get_irradiate_timer(&self) -> i32 {
-        self.data.irradiateTimer
+        self.inner.irradiateTimer
     }
 
     pub fn get_kill_count(&self) -> i32 {
-        self.data.killCount
+        self.inner.killCount
     }
 
     pub fn get_larva(&self) -> Vec<Unit> {
         if !self.get_type().produces_larva() {
             return vec![];
         }
-        if let Some(larva) = self.game.inner.borrow().connected_units.get(&self.id) {
-            return larva
-                .iter()
-                .map(|&i| self.game.get_unit(i).expect("Larva to be present"))
-                .collect();
-        }
-        let larva: Vec<Unit> = self
-            .game
+        self.inner
+            .game()
             .get_all_units()
             .iter()
             .filter(|u| u.get_hatchery().as_ref() == Some(self))
             .cloned()
-            .collect();
-        self.game
-            .inner
-            .borrow_mut()
-            .connected_units
-            .insert(self.id, larva.iter().map(|u| u.id).collect());
-        larva
+            .collect()
     }
 
     pub fn get_last_attacking_player(&self) -> Option<Player> {
-        self.game.get_player(self.data.lastAttackerPlayer as usize)
+        self.inner
+            .game()
+            .get_player(self.inner.lastAttackerPlayer as usize)
     }
 
     pub fn get_left(&self) -> i32 {
@@ -291,120 +262,105 @@ impl Unit {
     }
 
     pub fn get_loaded_units(&self) -> Vec<Unit> {
-        let map = &self.game.inner.borrow().loaded_units;
-        let loaded_units = map.get(&self.id);
-        if let Some(loaded_units) = loaded_units {
-            loaded_units
-                .iter()
-                .map(|&i| self.game.get_unit(i).expect("Loaded unit to be present"))
-                .collect()
-        } else {
-            let loaded_units: Vec<Unit> = self
-                .game
-                .get_all_units()
-                .iter()
-                .filter(|u| {
-                    if let Some(transport) = u.get_transport() {
-                        transport == *self
-                    } else {
-                        false
-                    }
-                })
-                .cloned()
-                .collect();
-            self.game
-                .inner
-                .borrow_mut()
-                .loaded_units
-                .insert(self.id, loaded_units.iter().map(|u| u.id).collect());
-            loaded_units
-        }
+        self.inner
+            .game()
+            .get_all_units()
+            .iter()
+            .filter(|u| {
+                if let Some(transport) = u.get_transport() {
+                    transport == *self
+                } else {
+                    false
+                }
+            })
+            .cloned()
+            .collect()
     }
 
     pub fn get_lockdown_timer(&self) -> i32 {
-        self.data.lockdownTimer
+        self.inner.lockdownTimer
     }
 
     pub fn get_maelstrom_timer(&self) -> i32 {
-        self.data.maelstromTimer
+        self.inner.maelstromTimer
     }
 
     pub fn get_nydus_exit(&self) -> Option<Unit> {
-        self.game.get_unit(self.data.nydusExit as usize)
+        self.inner.game().get_unit(self.inner.nydusExit as usize)
     }
 
     pub fn get_order(&self) -> Order {
-        Order::new(self.data.order)
+        Order::new(self.inner.order)
     }
 
     pub fn get_order_target(&self) -> Option<Unit> {
-        self.game.get_unit(self.data.orderTarget as usize)
+        self.inner.game().get_unit(self.inner.orderTarget as usize)
     }
 
     pub fn get_order_target_position(&self) -> Option<Position> {
         Position::new_checked(
-            &self.game,
-            self.data.orderTargetPositionX,
-            self.data.orderTargetPositionY,
+            self.inner.game(),
+            self.inner.orderTargetPositionX,
+            self.inner.orderTargetPositionY,
         )
     }
 
     pub fn get_plague_timer(&self) -> i32 {
-        self.data.plagueTimer
+        self.inner.plagueTimer
     }
 
     pub fn get_position(&self) -> Position {
         Position {
-            x: self.data.positionX,
-            y: self.data.positionY,
+            x: self.inner.positionX,
+            y: self.inner.positionY,
         }
     }
 
     pub fn get_power_up(&self) -> Option<Unit> {
-        self.game.get_unit(self.data.powerUp as usize)
+        self.inner.game().get_unit(self.inner.powerUp as usize)
     }
 
     pub fn get_rally_position(&self) -> Option<Position> {
-        if self.data.rallyPositionX < 0 {
+        if self.inner.rallyPositionX < 0 {
             None
         } else {
             Some(Position {
-                x: self.data.rallyPositionX,
-                y: self.data.rallyPositionY,
+                x: self.inner.rallyPositionX,
+                y: self.inner.rallyPositionY,
             })
         }
     }
 
     pub fn get_rally_unit(&self) -> Option<Unit> {
-        self.game.get_unit(self.data.rallyUnit as usize)
+        self.inner.game().get_unit(self.inner.rallyUnit as usize)
     }
 
     pub fn get_remaining_build_time(&self) -> i32 {
-        self.data.remainingBuildTime
+        self.inner.remainingBuildTime
     }
 
     pub fn get_remaining_research_time(&self) -> i32 {
-        self.data.remainingResearchTime
+        self.inner.remainingResearchTime
     }
 
     pub fn get_remaining_train_time(&self) -> i32 {
-        self.data.remainingTrainTime
+        self.inner.remainingTrainTime
     }
 
     pub fn get_remove_timer(&self) -> i32 {
-        self.data.removeTimer
+        self.inner.removeTimer
     }
 
     pub fn get_replay_id(&self) -> i32 {
-        self.data.replayID
+        self.inner.replayID
     }
 
     pub fn get_resource_group(&self) -> i32 {
-        self.data.resourceGroup
+        self.inner.resourceGroup
     }
 
     pub fn get_resources(&self) -> i32 {
-        self.data.resources
+        self.inner.resources
     }
 
     pub fn get_right(&self) -> i32 {
@@ -412,15 +368,15 @@ impl Unit {
     }
 
     pub fn get_scarab_count(&self) -> i32 {
-        self.data.scarabCount
+        self.inner.scarabCount
     }
 
     pub fn get_secondary_order(&self) -> Order {
-        Order::new(self.data.secondaryOrder)
+        Order::new(self.inner.secondaryOrder)
     }
 
     pub fn get_shields(&self) -> i32 {
-        self.data.shields
+        self.inner.shields
     }
 
     pub fn get_space_remaining(&self) -> i32 {
@@ -433,35 +389,35 @@ impl Unit {
     }
 
     pub fn get_spell_cooldown(&self) -> i32 {
-        self.data.spellCooldown
+        self.inner.spellCooldown
     }
 
     pub fn get_spider_mine_count(&self) -> i32 {
-        self.data.spiderMineCount
+        self.inner.spiderMineCount
     }
 
     pub fn get_stasis_timer(&self) -> i32 {
-        self.data.stasisTimer
+        self.inner.stasisTimer
     }
 
     pub fn get_stim_timer(&self) -> i32 {
-        self.data.stimTimer
+        self.inner.stimTimer
     }
 
     pub fn get_target(&self) -> Option<Unit> {
-        self.game.get_unit(self.data.target as usize)
+        self.inner.game().get_unit(self.inner.target as usize)
     }
 
     pub fn get_target_position(&self) -> Option<Position> {
         Position::new_checked(
-            &self.game,
-            self.data.targetPositionX,
-            self.data.targetPositionY,
+            self.inner.game(),
+            self.inner.targetPositionX,
+            self.inner.targetPositionY,
         )
     }
 
     pub fn get_tech(&self) -> TechType {
-        TechType::new(self.data.tech)
+        TechType::new(self.inner.tech)
     }
 
     pub fn get_tile_position(&self) -> TilePosition {
@@ -479,18 +435,18 @@ impl Unit {
     }
 
     pub fn get_training_queue(&self) -> Vec<UnitType> {
-        (0..self.data.trainingQueueCount as usize)
-            .map(|i| self.data.trainingQueue[i])
+        (0..self.inner.trainingQueueCount as usize)
+            .map(|i| self.inner.trainingQueue[i])
             .map(UnitType::new)
             .collect()
     }
 
     pub fn get_transport(&self) -> Option<Unit> {
-        self.game.get_unit(self.data.transport as usize)
+        self.inner.game().get_unit(self.inner.transport as usize)
     }
 
     pub fn get_upgrade(&self) -> UpgradeType {
-        UpgradeType::new(self.data.upgrade)
+        UpgradeType::new(self.inner.upgrade)
     }
 
     pub fn get_units_in_radius<Pred: IntoPredicate<Unit>>(
@@ -498,7 +454,8 @@ impl Unit {
         radius: i32,
         pred: Pred,
     ) -> Vec<Unit> {
-        self.game
+        self.inner
+            .game()
             .get_units_in_radius(self.get_position(), radius, pred)
     }
 
@@ -513,7 +470,7 @@ impl Unit {
 
         let pred = pred.into_predicate();
         let max = self.get_player().weapon_max_range(weapon);
-        self.game.get_units_in_rectangle(
+        self.inner.game().get_units_in_rectangle(
             (self.get_left() - max, self.get_top() - max),
             (self.get_right() + max, self.get_bottom() * max),
             |u: &Unit| -> bool {
@@ -545,49 +502,49 @@ impl Unit {
 
     pub fn get_velocity(&self) -> Vector2D {
         Vector2D {
-            x: self.data.velocityX,
-            y: self.data.velocityY,
+            x: self.inner.velocityX,
+            y: self.inner.velocityY,
         }
     }
 
     pub fn has_nuke(&self) -> bool {
-        self.data.hasNuke
+        self.inner.hasNuke
     }
 
     pub fn is_blind(&self) -> bool {
-        self.data.isBlind
+        self.inner.isBlind
     }
 
     pub fn is_braking(&self) -> bool {
-        self.data.isBraking
+        self.inner.isBraking
     }
 
     pub fn is_burrowed(&self) -> bool {
-        self.data.isBurrowed
+        self.inner.isBurrowed
     }
 
     pub fn is_carrying_gas(&self) -> bool {
-        self.data.carryResourceType == 1
+        self.inner.carryResourceType == 1
     }
 
     pub fn is_carrying_minerals(&self) -> bool {
-        self.data.carryResourceType == 2
+        self.inner.carryResourceType == 2
     }
 
     pub fn is_constructing(&self) -> bool {
-        self.data.isConstructing
+        self.inner.isConstructing
     }
 
     pub fn is_defense_matrixed(&self) -> bool {
-        self.data.defenseMatrixTimer > 0
+        self.inner.defenseMatrixTimer > 0
     }
 
     pub fn is_detected(&self) -> bool {
-        self.data.isDetected
+        self.inner.isDetected
     }
 
     pub fn is_ensnared(&self) -> bool {
-        self.data.ensnareTimer > 0
+        self.inner.ensnareTimer > 0
     }
 
     pub fn is_flying(&self) -> bool {
@@ -599,7 +556,7 @@ impl Unit {
     }
 
     pub fn is_gathering_gas(&self) -> bool {
-        if !self.data.isGathering {
+        if !self.inner.isGathering {
             return false;
         }
 
@@ -615,7 +572,7 @@ impl Unit {
         }
 
         if self.get_order() == Order::ResetCollision {
-            return self.data.carryResourceType == 1;
+            return self.inner.carryResourceType == 1;
         }
 
         //return true if BWOrder is WaitForGas, HarvestGas, or ReturnGas
@@ -651,7 +608,7 @@ impl Unit {
     }
 
     pub fn is_gathering_minerals(&self) -> bool {
-        if !self.data.isGathering {
+        if !self.inner.isGathering {
             return false;
         }
         if self.get_order() != Order::Harvest1
@@ -666,7 +623,7 @@ impl Unit {
         }
 
         if self.get_order() == Order::ResetCollision {
-            return self.data.carryResourceType == 2;
+            return self.inner.carryResourceType == 2;
         }
 
         //return true if BWOrder is WaitForMinerals, MiningMinerals, or ReturnMinerals
@@ -702,7 +659,7 @@ impl Unit {
     }
 
     pub fn is_hallucination(&self) -> bool {
-        self.data.isHallucination
+        self.inner.isHallucination
     }
 
     pub fn is_holding_position(&self) -> bool {
@@ -710,15 +667,15 @@ impl Unit {
     }
 
     pub fn is_idle(&self) -> bool {
-        self.data.isIdle
+        self.inner.isIdle
     }
 
     pub fn is_interruptible(&self) -> bool {
-        self.data.isInterruptible
+        self.inner.isInterruptible
     }
 
     pub fn is_invincible(&self) -> bool {
-        self.data.isInvincible
+        self.inner.isInvincible
     }
 
     pub fn is_in_weapon_range(&self, target: &Unit) -> bool {
@@ -745,11 +702,11 @@ impl Unit {
     }
 
     pub fn is_irradiated(&self) -> bool {
-        self.data.irradiateTimer != 0
+        self.inner.irradiateTimer != 0
     }
 
     pub fn is_lifted(&self) -> bool {
-        self.data.isLifted
+        self.inner.isLifted
     }
 
     pub fn is_loaded(&self) -> bool {
@@ -757,15 +714,15 @@ impl Unit {
     }
 
     pub fn is_locked_down(&self) -> bool {
-        self.data.lockdownTimer != 0
+        self.inner.lockdownTimer != 0
     }
 
     pub fn is_maelstrommed(&self) -> bool {
-        self.data.maelstromTimer != 0
+        self.inner.maelstromTimer != 0
     }
 
     pub fn is_parasited(&self) -> bool {
-        self.data.isParasited
+        self.inner.isParasited
     }
 
     pub fn is_patrolling(&self) -> bool {
@@ -773,11 +730,11 @@ impl Unit {
     }
 
     pub fn is_plagued(&self) -> bool {
-        self.data.plagueTimer != 0
+        self.inner.plagueTimer != 0
     }
 
     pub fn is_powered(&self) -> bool {
-        self.data.isPowered
+        self.inner.isPowered
     }
 
     pub fn is_repairing(&self) -> bool {
@@ -789,7 +746,7 @@ impl Unit {
     }
 
     pub fn is_selected(&self) -> bool {
-        self.data.isSelected
+        self.inner.isSelected
     }
 
     pub fn is_sieged(&self) -> bool {
@@ -800,34 +757,39 @@ impl Unit {
     }
 
     pub fn is_moving(&self) -> bool {
-        self.data.isMoving
+        self.inner.isMoving
     }
 
     pub fn last_command_frame(&self) -> i32 {
-        self.info().expect("UnitInfo missing").last_command_frame
+        self.info().last_command_frame
     }
 
     pub fn is_starting_attack(&self) -> bool {
-        self.data.isStartingAttack
+        self.inner.isStartingAttack
     }
 
     pub fn is_stasised(&self) -> bool {
-        self.data.stasisTimer != 0
+        self.inner.stasisTimer != 0
     }
 
     pub fn is_stimmed(&self) -> bool {
-        self.data.stimTimer != 0
+        self.inner.stimTimer != 0
     }
 
     pub fn is_stuck(&self) -> bool {
-        self.data.isStuck
+        self.inner.isStuck
     }
 
     pub fn is_targetable(&self) -> bool {
         if !self.exists() {
             return false;
         }
-        if !self.is_visible() && !self.game.is_flag_enabled(Flag::CompleteMapInformation) {
+        if !self.is_visible()
+            && !self
+                .inner
+                .game()
+                .is_flag_enabled(Flag::CompleteMapInformation)
+        {
             return false;
         }
 
@@ -849,23 +811,23 @@ impl Unit {
     }
 
     pub fn is_training(&self) -> bool {
-        self.data.isTraining
+        self.inner.isTraining
     }
 
     pub fn is_under_attack(&self) -> bool {
-        self.data.recentlyAttacked
+        self.inner.recentlyAttacked
     }
 
     pub fn is_under_dark_swarm(&self) -> bool {
-        self.data.isUnderDarkSwarm
+        self.inner.isUnderDarkSwarm
     }
 
     pub fn is_under_disruption_web(&self) -> bool {
-        self.data.isUnderDWeb
+        self.inner.isUnderDWeb
     }
 
     pub fn is_under_storm(&self) -> bool {
-        self.data.isUnderStorm
+        self.inner.isUnderStorm
     }
 
     pub fn is_upgrading(&self) -> bool {
@@ -877,26 +839,30 @@ impl Unit {
     }
 
     pub fn exists(&self) -> bool {
-        self.data.exists
+        self.inner.exists
     }
 
     pub fn has_path<P: UnitOrPosition>(&self, target: P) -> bool {
         if let Ok(target) = target.to_position() {
             self.is_flying()
                 || self.exists()
-                    && target.is_valid(&self.game)
-                    && (self.game.has_path(self.get_position(), target)
+                    && target.is_valid(&self.inner.game())
+                    && (self.inner.game().has_path(self.get_position(), target)
                         || self
-                            .game
+                            .inner
+                            .game()
                             .has_path((self.get_left(), self.get_top()), target)
                         || self
-                            .game
+                            .inner
+                            .game()
                             .has_path((self.get_right(), self.get_top()), target)
                         || self
-                            .game
+                            .inner
+                            .game()
                             .has_path((self.get_left(), self.get_bottom()), target)
                         || self
-                            .game
+                            .inner
+                            .game()
                             .has_path((self.get_right(), self.get_top()), target))
         } else {
             false
@@ -904,11 +870,11 @@ impl Unit {
     }
 
     pub fn is_visible_to(&self, player: &Player) -> bool {
-        self.data.isVisible[player.id as usize]
+        self.inner.isVisible[player.id as usize]
     }
 
     pub fn is_visible(&self) -> bool {
-        self.is_visible_to(&self.game.self_().unwrap())
+        self.is_visible_to(&self.inner.game().self_().unwrap())
     }
 
     pub fn is_being_constructed(&self) -> bool {
@@ -925,27 +891,28 @@ impl Unit {
     }
 
     pub fn is_being_gathered(&self) -> bool {
-        self.data.isBeingGathered
+        self.inner.isBeingGathered
     }
 
     pub fn is_being_healed(&self) -> bool {
         self.get_type().get_race() == Race::Terran
             && self.is_completed()
-            && self.get_hit_points() > self.data.lastHitPoints
+            && self.get_hit_points() > self.inner.lastHitPoints
     }
 
     pub fn is_completed(&self) -> bool {
-        self.data.isCompleted
+        self.inner.isCompleted
     }
 
     pub fn is_morphing(&self) -> bool {
-        self.data.isMorphing
+        self.inner.isMorphing
     }
 
     pub fn get_player(&self) -> Player {
-        self.game
-            .get_player(self.data.player as usize)
-            .unwrap_or_else(|| self.game.neutral())
+        self.inner
+            .game()
+            .get_player(self.inner.player as usize)
+            .unwrap_or_else(|| self.inner.game().neutral())
     }
 }
 
@@ -1279,10 +1246,10 @@ impl<'a> Unit {
         } else {
             cmd
         };
-        self.game.issue_command(cmd);
-        self.info_mut()
-            .expect("UnitInfo missing")
-            .last_command_frame = self.game.get_frame_count();
+        self.inner.game().issue_command(cmd);
+        let mut info = self.info();
+        info.last_command_frame = self.inner.game().get_frame_count();
+        self.set_info(info);
         Ok(true)
     }
 }

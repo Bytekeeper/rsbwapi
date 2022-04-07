@@ -1,72 +1,68 @@
+use crate::projected::Projected;
 use crate::{Game, Position};
 use bwapi_wrapper::*;
-use std::cell::Ref;
 
 #[derive(Clone)]
 pub struct Region {
-    id: usize,
-    game: Game,
+    inner: Projected<Game, BWAPI_RegionData>,
 }
 
 impl Region {
     pub(crate) fn new(id: u16, game: Game) -> Self {
+        let region = &game.inner.data.regions[id as usize] as *const BWAPI_RegionData;
         Self {
-            id: id as usize,
-            game,
+            inner: unsafe { Projected::new(game, region) },
         }
     }
 
-    fn data(&self) -> Ref<'_, BWAPI_RegionData> {
-        Ref::map(self.game.inner.borrow(), |d| &d.data.regions[self.id])
-    }
-
     pub fn get_region_group_id(&self) -> i32 {
-        self.data().islandID
+        self.inner.islandID
     }
 
     pub fn get_center(&self) -> Position {
         Position {
-            x: self.data().center_x,
-            y: self.data().center_y,
+            x: self.inner.center_x,
+            y: self.inner.center_y,
         }
     }
 
     pub fn is_higher_ground(&self) -> bool {
-        self.data().isHigherGround
+        self.inner.isHigherGround
     }
 
     pub fn get_defense_priority(&self) -> i32 {
-        self.data().priority
+        self.inner.priority
     }
 
     pub fn is_accessible(&self) -> bool {
-        self.data().isAccessible
+        self.inner.isAccessible
     }
 
     pub fn get_id(&self) -> i32 {
-        self.data().id
+        self.inner.id
     }
 
     pub fn get_bounds_left(&self) -> i32 {
-        self.data().leftMost
+        self.inner.leftMost
     }
 
     pub fn get_bounds_top(&self) -> i32 {
-        self.data().topMost
+        self.inner.topMost
     }
 
     pub fn get_bounds_right(&self) -> i32 {
-        self.data().rightMost
+        self.inner.rightMost
     }
 
     pub fn get_bounds_bottom(&self) -> i32 {
-        self.data().bottomMost
+        self.inner.bottomMost
     }
 
     pub fn get_neighbors(&self) -> Vec<Region> {
-        (0..self.data().neighborCount as usize)
+        (0..self.inner.neighborCount as usize)
             .map(|idx| {
-                self.game
+                self.inner
+                    .game()
                     .get_region(idx as u16)
                     .expect("neighbor region to exist")
             })

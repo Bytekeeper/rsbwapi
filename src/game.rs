@@ -1,6 +1,5 @@
 use crate::aimodule::AiModule;
 use crate::bullet::Bullet;
-use crate::cell::Wrap;
 use crate::command::Commands;
 use crate::force::Force;
 use crate::player::Player;
@@ -11,10 +10,8 @@ use crate::shm::Shm;
 use crate::types::c_str_to_str;
 use crate::unit::{Unit, UnitId, UnitInfo};
 use crate::*;
-use ahash::AHashMap;
 use bwapi_wrapper::*;
-use core::cell::{Ref, RefCell};
-use delegate::delegate;
+use core::cell::RefCell;
 #[cfg(feature = "metrics")]
 use metered::{hdr_histogram::HdrHistogram, measure, time_source::StdInstantMicros, ResponseTime};
 use rstar::primitives::Rectangle;
@@ -32,7 +29,9 @@ pub struct RsBwapiMetrics {
 pub struct Game {
     #[cfg(feature = "metrics")]
     metrics: std::rc::Rc<RsBwapiMetrics>,
-    pub(crate) inner: Rc<RefCell<GameInternal>>,
+    // inner: Projected<Rc<RefCell<GameInternal>>, BWAPI_GameData>,
+    pub(crate) inner: Rc<GameInternal>,
+    data: &'static BWAPI_GameData,
 }
 
 pub struct UnitLocation {
@@ -56,20 +55,18 @@ impl PointDistance for UnitLocation {
 
 pub(crate) struct GameInternal {
     pub(crate) data: Shm<BWAPI_GameData>,
-    units: Vec<Unit>,
-    pub(crate) unit_infos: [Option<UnitInfo>; 10000],
-    rtree: RTree<UnitLocation>,
-    pub(crate) cmd: Commands,
-    pub(crate) connected_units: AHashMap<usize, Vec<usize>>,
-    pub(crate) loaded_units: AHashMap<usize, Vec<usize>>,
-    pylons: Option<Vec<Unit>>,
-    static_neutrals: Vec<Unit>,
-    static_minerals: Vec<Unit>,
-    static_geysers: Vec<Unit>,
-    visible_units: Vec<Unit>,
+    units: RefCell<Vec<Unit>>,
+    pub(crate) unit_infos: RefCell<[Option<UnitInfo>; 10000]>,
+    rtree: RefCell<RTree<UnitLocation>>,
+    pub(crate) cmd: RefCell<Commands>,
+    pylons: RefCell<Option<Vec<Unit>>>,
+    static_neutrals: RefCell<Vec<Unit>>,
+    static_minerals: RefCell<Vec<Unit>>,
+    static_geysers: RefCell<Vec<Unit>>,
+    visible_units: RefCell<Vec<Unit>>,
 }
 
-impl PositionValidator for GameInternal {
+impl PositionValidator for &Game {
     fn is_valid<const N: i32>(&self, pos: ScaledPosition<N>) -> bool {
         pos.x >= 0
             && pos.y >= 0
@@ -78,50 +75,44 @@ impl PositionValidator for GameInternal {
     }
 }
 
-impl PositionValidator for Game {
-    fn is_valid<const N: i32>(&self, pos: ScaledPosition<N>) -> bool {
-        self.inner.borrow().is_valid(pos)
-    }
-}
-
-impl Wrap<&Game, &mut GameInternal> {
-    fn match_start(&mut self) {
-        self.inner.visible_units = (0..self.inner.data.initialUnitCount as usize)
+impl Game {
+    pub(crate) fn match_start(&mut self) {
+        *self.inner.visible_units.borrow_mut() = (0..self.data.initialUnitCount as usize)
             .filter(|&i| {
-                self.inner.data.units[i].exists
-                    && self.inner.data.units[i].type_ != UnitType::Unknown as i32
+                self.data.units[i].exists && self.data.units[i].type_ != UnitType::Unknown as i32
             })
             .map(|id| {
-                Unit::new(id, self.outer.clone(), unsafe {
-                    &*(&self.inner.data.units[id] as *const BWAPI_UnitData)
+                Unit::new(id, self.clone(), unsafe {
+                    &*(&self.data.units[id] as *const BWAPI_UnitData)
                 })
             })
             .collect();
+        let inner = &mut self.inner;
 
-        for i in self.inner.visible_units.iter() {
+        for i in inner.visible_units.borrow().iter() {
             let id = i.get_id();
-            self.inner.unit_infos[id] = Some(UnitInfo::new(&self.inner.data.units[id]));
+            inner.unit_infos.borrow_mut()[id] = Some(UnitInfo::new(&self.data.units[id]));
             let ut = i.get_type();
             if ut == UnitType::Resource_Vespene_Geyser {
-                self.inner.static_geysers.push(i.clone());
+                inner.static_geysers.borrow_mut().push(i.clone());
             }
             if ut.is_mineral_field() {
-                self.inner.static_minerals.push(i.clone());
+                inner.static_minerals.borrow_mut().push(i.clone());
             }
             if i.get_player().is_neutral() {
-                self.inner.static_neutrals.push(i.clone());
+                inner.static_neutrals.borrow_mut().push(i.clone());
             }
         }
     }
 
     fn refresh(&mut self) {
-        self.inner.units = self.inner.visible_units.clone();
-        self.inner.loaded_units.clear();
-        self.inner.connected_units.clear();
-        self.inner.pylons = None;
-        self.inner.rtree = RTree::bulk_load(
-            self.inner
+        let inner = &self.inner;
+        *inner.units.borrow_mut() = inner.visible_units.borrow().clone();
+        *inner.pylons.borrow_mut() = None;
+        *inner.rtree.borrow_mut() = RTree::bulk_load(
+            inner
                 .units
+                .borrow()
                 .iter()
                 .map(|u| UnitLocation {
                     id: u.get_id(),
@@ -133,40 +124,32 @@ impl Wrap<&Game, &mut GameInternal> {
                 .collect(),
         );
     }
-}
 
-impl Wrap<&Game, &GameInternal> {
-    pub fn is_replay(&self) -> bool {
-        self.inner.data.isReplay
-    }
-
-    /// Returns a unit, if it exists or could exist still.
-    /// For known dead units, it will return None.
     pub fn get_unit(&self, id: UnitId) -> Option<Unit> {
-        self.inner.data.units[id].exists.then(|| {
-            Unit::new(id, self.outer.clone(), unsafe {
-                &*(&self.inner.data.units[id] as *const BWAPI_UnitData)
-            })
-        })
+        if id == usize::MAX {
+            return None;
+        }
+        Some(Unit::new(id, self.clone(), unsafe {
+            &*(&self.data.units[id] as *const BWAPI_UnitData)
+        }))
     }
 
     pub fn get_static_geysers(&self) -> Vec<Unit> {
-        self.inner.static_geysers.clone()
+        self.inner.static_geysers.borrow().clone()
     }
 
     pub fn get_static_minerals(&self) -> Vec<Unit> {
-        self.inner.static_minerals.clone()
+        self.inner.static_minerals.borrow().clone()
     }
 
     pub fn get_static_neutral_units(&self) -> Vec<Unit> {
-        self.inner.static_neutrals.clone()
+        self.inner.static_neutrals.borrow().clone()
     }
 
     pub fn get_all_units(&self) -> Vec<Unit> {
-        self.inner.units.clone()
+        self.inner.units.borrow().clone()
     }
-
-    fn get_selected_units(&self) -> Vec<Unit> {
+    pub fn get_selected_units(&self) -> Vec<Unit> {
         self.inner
             .data
             .selectedUnits
@@ -178,7 +161,7 @@ impl Wrap<&Game, &GameInternal> {
             .collect()
     }
 
-    fn get_closest_unit<P: Into<Position>, Pred: IntoPredicate<Unit>, R: Into<Option<u32>>>(
+    pub fn get_closest_unit<P: Into<Position>, Pred: IntoPredicate<Unit>, R: Into<Option<u32>>>(
         &self,
         center: P,
         pred: Pred,
@@ -189,7 +172,9 @@ impl Wrap<&Game, &GameInternal> {
         let radius = radius.into().unwrap_or(32000);
         let radius_squared = radius * radius;
         self.inner
+            .deref()
             .rtree
+            .borrow()
             .nearest_neighbor_iter_with_distance_2(&[center.x, center.y])
             .take_while(|&(_, d_2)| d_2 <= radius_squared as i32)
             .map(|(ul, _)| self.get_unit(ul.id).expect("Unit from RTree to be present"))
@@ -207,21 +192,23 @@ impl Wrap<&Game, &GameInternal> {
         let pred = pred.into_predicate();
         self.inner
             .rtree
+            .borrow()
             .locate_in_envelope_intersecting(&AABB::from_corners([lt.x, lt.y], [rb.x, rb.y]))
             .map(|ul| self.get_unit(ul.id).expect("Unit from RTree to be present"))
             .filter(|u| pred.test(u))
             .collect()
     }
 
-    fn get_player(&self, i: PlayerId) -> Option<Player> {
-        if i >= self.inner.data.playerCount as usize {
+    pub fn get_player(&self, i: PlayerId) -> Option<Player> {
+        if i >= self.data.playerCount as usize {
             None
         } else {
-            Some(Player::new(i, self.outer.clone()))
+            Some(Player::new(i, self.clone(), unsafe {
+                &*(&self.data.players[i] as *const BWAPI_PlayerData)
+            }))
         }
     }
-
-    fn get_closest_unit_in_rectangle<
+    pub fn get_closest_unit_in_rectangle<
         P: Into<Position>,
         Pred: IntoPredicate<Unit>,
         R: Into<crate::Rectangle<Position>>,
@@ -247,17 +234,24 @@ impl Wrap<&Game, &GameInternal> {
         .envelope();
         let radius_2 = dx * dx + dy * dy;
         self.inner
+            .deref()
             .rtree
+            .borrow()
             .nearest_neighbor_iter_with_distance_2(&[center.x, center.y])
             .take_while(|&(_, d_2)| d_2 <= radius_2)
             .filter(|(ul, _)| ul.location.envelope().intersects(&query_envelope))
             .map(|(ul, _)| self.get_unit(ul.id).expect("Unit from RTree to be present"))
             .find(|u| pred.test(u))
     }
-
-    fn get_bullets(&self) -> Vec<Bullet> {
-        (0..self.inner.data.bullets.len())
-            .map(|id| Bullet::new(id, self.outer.clone()))
+    pub fn get_bullets(&self) -> Vec<Bullet> {
+        (0..self.data.bullets.len())
+            .map(|id| {
+                Bullet::new(
+                    id,
+                    self.clone(),
+                    &self.data.bullets[id] as *const BWAPI_BulletData,
+                )
+            })
             .filter(|b| b.exists())
             .collect()
     }
@@ -265,42 +259,40 @@ impl Wrap<&Game, &GameInternal> {
     pub fn get_region_at<P: Into<Position>>(&self, p: P) -> Option<Region> {
         let Position { x, y } = p.into();
 
-        let idx = self.inner.data.mapTileRegionId[x as usize / 32][y as usize / 32];
+        let idx = self.data.mapTileRegionId[x as usize / 32][y as usize / 32];
         let region_code = if idx & 0x2000 != 0 {
             let minitile_pos_x = (x & 0x1F) / 8;
             let minitile_pos_y = (y & 0x1F) / 8;
             let index = (idx & 0x1FFF) as usize;
-            if index >= self.inner.data.mapSplitTilesMiniTileMask.len() {
+            if index >= self.data.mapSplitTilesMiniTileMask.len() {
                 return None;
             }
 
-            let mini_tile_mask = self.inner.data.mapSplitTilesMiniTileMask[index];
-            if mini_tile_mask as usize >= self.inner.data.mapSplitTilesRegion1.len() {
+            let mini_tile_mask = self.data.mapSplitTilesMiniTileMask[index];
+            if mini_tile_mask as usize >= self.data.mapSplitTilesRegion1.len() {
                 return None;
             }
 
             let minitile_shift = minitile_pos_x + minitile_pos_y * 4;
             if (mini_tile_mask >> minitile_shift) & 1 != 0 {
-                self.inner.data.mapSplitTilesRegion2[index]
+                self.data.mapSplitTilesRegion2[index]
             } else {
-                self.inner.data.mapSplitTilesRegion1[index]
+                self.data.mapSplitTilesRegion1[index]
             }
         } else {
             idx
         };
         self.get_region(region_code)
     }
-
-    fn get_region(&self, id: u16) -> Option<Region> {
-        if id >= self.inner.data.regionCount as u16 {
+    pub fn get_region(&self, id: u16) -> Option<Region> {
+        if id >= self.data.regionCount as u16 {
             None
         } else {
-            Some(Region::new(id, self.outer.clone()))
+            Some(Region::new(id, self.clone()))
         }
     }
-
-    fn get_force(&self, force_id: i32) -> Force {
-        if !(0..self.inner.data.forceCount).contains(&force_id) {
+    pub fn get_force(&self, force_id: i32) -> Force {
+        if !(0..self.data.forceCount).contains(&force_id) {
             panic!("Invalid force id {}", force_id);
         }
         let force_players = self
@@ -311,101 +303,36 @@ impl Wrap<&Game, &GameInternal> {
             .collect();
         Force::new(
             force_id as usize,
-            &self.inner.data.forces[force_id as usize],
+            &self.data.forces[force_id as usize],
             force_players,
         )
     }
-
-    fn get_forces(&self) -> Vec<Force> {
-        (0..self.inner.data.forceCount)
+    pub fn get_forces(&self) -> Vec<Force> {
+        (0..self.data.forceCount)
             .map(|i| self.get_force(i))
             .collect()
     }
 
-    fn neutral(&self) -> Player {
-        self.get_player(self.inner.data.neutral as PlayerId)
+    pub fn neutral(&self) -> Player {
+        self.get_player(self.data.neutral as PlayerId)
             .expect("Neutral player to exist")
     }
 
-    fn get_players(&self) -> Vec<Player> {
-        (0..self.inner.data.playerCount as usize)
-            .map(|i| Player::new(i, self.outer.clone()))
+    pub fn get_players(&self) -> Vec<Player> {
+        (0..self.data.playerCount as usize)
+            .map(|i| {
+                Player::new(i, self.clone(), unsafe {
+                    &*(&self.data.players[i] as *const BWAPI_PlayerData)
+                })
+            })
             .collect()
-    }
-}
-
-impl Game {
-    delegate! {
-        to self.inner.deref().borrow() {
-            pub fn get_frame_count(&self) -> i32;
-            pub fn is_flag_enabled(&self, flag: Flag) -> bool;
-            pub fn is_walkable<P: Into<WalkPosition>>(&self, wp: P) -> bool;
-            pub fn is_in_game(&self) -> bool;
-            pub fn is_buildable<P: Into<TilePosition>>(&self, tp: P) -> bool;
-            pub fn is_explored<P: Into<TilePosition>>(&self, tp: P) -> bool;
-            pub fn has_creep<P: Into<TilePosition>>(&self, tp: P) -> bool;
-            pub fn is_visible<P: Into<TilePosition>>(&self, tp: P) -> bool;
-            fn event_str(&self, i: usize) -> String;
-        }
-        to self.inner.deref().borrow_mut() {
-            fn ensure_unit_info(&mut self, id: UnitId);
-            fn unit_invisible(&mut self, id: UnitId);
-        }
-        to Wrap::new(self, &*self.inner.deref().borrow()) {
-            pub fn is_replay(&self) -> bool;
-            pub fn get_unit(&self, id: UnitId) -> Option<Unit>;
-            pub fn get_static_geysers(&self) -> Vec<Unit>;
-            pub fn get_static_minerals(&self) -> Vec<Unit>;
-            pub fn get_static_neutral_units(&self) -> Vec<Unit>;
-            pub fn get_all_units(&self) -> Vec<Unit>;
-            pub fn get_selected_units(&self) -> Vec<Unit>;
-            pub fn get_closest_unit<P: Into<Position>, Pred: IntoPredicate<Unit>, R: Into<Option<u32>>>(
-                &self,
-                center: P,
-                pred: Pred,
-                radius: R,
-            ) -> Option<Unit>;
-            pub fn get_units_in_rectangle<A: Into<Position>, B: Into<Position>, P: IntoPredicate<Unit>>(
-                &self,
-                lt: A,
-                rb: B,
-                pred: P,
-            ) -> Vec<Unit>;
-            pub fn get_player(&self, i: PlayerId) -> Option<Player>;
-            pub fn get_closest_unit_in_rectangle<
-                P: Into<Position>,
-                Pred: IntoPredicate<Unit>,
-                R: Into<crate::Rectangle<Position>>,
-            >(
-                &self,
-                center: P,
-                pred: Pred,
-                rectangle: R,
-            ) -> Option<Unit>;
-            pub fn get_bullets(&self) -> Vec<Bullet>;
-            pub fn get_region_at<P: Into<Position>>(&self, p: P) -> Option<Region>;
-            pub(crate) fn get_region(&self, id: u16) -> Option<Region>;
-            pub fn get_force(&self, force_id: i32) -> Force;
-            pub fn get_forces(&self) -> Vec<Force>;
-            pub fn neutral(&self) -> Player;
-            pub fn get_players(&self) -> Vec<Player>;
-        }
-
-        to Wrap::new(self, &mut *self.inner.deref().borrow_mut()) {
-            pub(crate) fn match_start(&self);
-            fn refresh(&self);
-        }
-    }
-
-    fn data(&self) -> Ref<'_, BWAPI_GameData> {
-        Ref::map(self.inner.borrow(), |d| &*d.data)
     }
 
     pub(crate) fn handle_events(&mut self, module: &mut impl AiModule) {
         measure!(&self.metrics.clone().frame_time, {
-            let event_count = self.data().eventCount;
+            let event_count = self.data.eventCount;
             for i in 0..event_count {
-                let event: BWAPIC_Event = self.inner.borrow().data.events[i as usize];
+                let event: BWAPIC_Event = self.inner.data.events[i as usize];
                 use BWAPI_EventType_Enum::*;
                 match event.type_ {
                     MatchStart => {
@@ -413,7 +340,7 @@ impl Game {
                         self.refresh();
                         module.on_start(self);
                         // // No longer visible after the start event
-                        self.inner.borrow_mut().visible_units.clear();
+                        self.inner.visible_units.borrow_mut().clear();
                     }
                     MatchFrame => {
                         self.refresh();
@@ -436,7 +363,7 @@ impl Game {
                             self,
                             self.get_unit(id).expect("Destroyed unit already removed"),
                         );
-                        self.inner.borrow_mut().unit_infos[id as usize] = Option::None;
+                        self.inner.unit_infos.borrow_mut()[id as usize] = Option::None;
                     }
                     UnitDiscover => {
                         let id = event.v1 as usize;
@@ -454,7 +381,7 @@ impl Game {
                     UnitShow => {
                         let id = event.v1 as usize;
                         let unit = self.get_unit(id).expect("Shown unit does not exist");
-                        self.inner.borrow_mut().visible_units.push(unit.clone());
+                        self.inner.visible_units.borrow_mut().push(unit.clone());
                         self.refresh();
                         self.ensure_unit_info(id);
                         module.on_unit_show(self, unit);
@@ -525,8 +452,8 @@ impl Game {
                     None => {}
                 }
             }
-            let mut inner = self.inner.borrow_mut();
-            std::mem::take(&mut inner.cmd).commit(&mut inner.data);
+            let cmd = self.inner.cmd.take();
+            cmd.commit(unsafe { &mut *(self.inner.data.as_ptr() as *mut BWAPI_GameData) });
         })
     }
     pub fn get_geysers(&self) -> Vec<Unit> {
@@ -557,9 +484,11 @@ impl Game {
     }
 
     pub(crate) fn get_unit_ex(&self, id: UnitId) -> Unit {
-        let data =
-            unsafe { &*(&self.inner.deref().borrow().data.units[id] as *const BWAPI_UnitData) };
-        Unit::new(id, self.clone(), data)
+        Unit::new(
+            id,
+            self.clone(),
+            &self.inner.data.units[id] as *const BWAPI_UnitData,
+        )
     }
 
     pub fn get_units_on_tile<TP: Into<TilePosition>, P: IntoPredicate<Unit>>(
@@ -932,31 +861,27 @@ impl Game {
     }
 
     pub fn enemy(&self) -> Option<Player> {
-        self.get_player(self.data().enemy as PlayerId)
+        self.get_player(self.data.enemy as PlayerId)
     }
 
     pub fn self_(&self) -> Option<Player> {
-        self.get_player(self.data().self_ as PlayerId)
+        self.get_player(self.data.self_ as PlayerId)
     }
 
     #[cfg(feature = "metrics")]
     pub fn get_metrics(&self) -> &RsBwapiMetrics {
         &self.metrics
     }
-}
 
-impl GameInternal {
     pub fn is_in_game(&self) -> bool {
         self.data.isInGame
     }
 
-    fn unit_invisible(&mut self, id: UnitId) {
-        let index = self
-            .visible_units
-            .iter()
-            .position(|u| u.get_id() as usize == id);
+    fn unit_invisible(&self, id: UnitId) {
+        let mut visible_units = self.inner.visible_units.borrow_mut();
+        let index = visible_units.iter().position(|u| u.get_id() as usize == id);
         if let Some(index) = index {
-            self.visible_units.swap_remove(index);
+            visible_units.swap_remove(index);
         }
     }
 
@@ -995,16 +920,15 @@ impl GameInternal {
             [0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0],
         ];
 
-        let pylons = self.pylons.get_or_insert_with(|| {
-            self.units
-                .iter()
-                .filter(|u| u.get_type() == UnitType::Protoss_Pylon)
-                .cloned()
-                .collect()
-        });
         let Position { x, y } = position.into();
 
-        for i in pylons {
+        for i in self
+            .inner
+            .units
+            .borrow()
+            .iter()
+            .filter(|u| u.get_type() == UnitType::Protoss_Pylon)
+        {
             if !i.exists() || !i.is_completed() {
                 continue;
             }
@@ -1253,30 +1177,31 @@ impl GameInternal {
     fn event_str(&self, i: usize) -> String {
         c_str_to_str(&self.data.eventStrings[i])
     }
-    fn ensure_unit_info(&mut self, id: UnitId) {
-        self.unit_infos[id] = Some(UnitInfo::new(&self.data.units[id]));
+
+    fn ensure_unit_info(&self, id: UnitId) {
+        (*self.inner.unit_infos.borrow_mut())[id] = Some(UnitInfo::new(&self.data.units[id]));
     }
 }
 
 impl Game {
-    pub(crate) fn new(data: Shm<BWAPI_GameData>) -> Self {
+    pub(crate) fn new(shm: Shm<BWAPI_GameData>) -> Self {
+        let data = unsafe { &*(&*shm as *const BWAPI_GameData) };
         Game {
+            data,
             #[cfg(feature = "metrics")]
             metrics: Default::default(),
-            inner: Rc::new(RefCell::new(GameInternal {
-                data,
-                connected_units: AHashMap::new(),
-                loaded_units: AHashMap::new(),
-                pylons: None,
-                rtree: RTree::new(),
-                cmd: Commands::new(),
-                static_geysers: vec![],
-                static_minerals: vec![],
-                static_neutrals: vec![],
-                unit_infos: [None; 10000],
-                visible_units: vec![],
-                units: vec![],
-            })),
+            inner: Rc::new(GameInternal {
+                data: shm,
+                pylons: RefCell::new(None),
+                rtree: RefCell::new(RTree::new()),
+                cmd: RefCell::new(Commands::new()),
+                static_geysers: RefCell::new(vec![]),
+                static_minerals: RefCell::new(vec![]),
+                static_neutrals: RefCell::new(vec![]),
+                unit_infos: RefCell::new([None; 10000]),
+                visible_units: RefCell::new(vec![]),
+                units: RefCell::new(vec![]),
+            }),
         }
     }
 }

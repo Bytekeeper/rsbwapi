@@ -6,7 +6,7 @@ macro_rules! measure {
 }
 
 // mod bwem;
-mod cell;
+mod projected;
 mod shm;
 
 pub use crate::types::*;
@@ -21,7 +21,7 @@ pub mod game;
 pub mod player;
 pub mod predicate;
 pub mod region;
-// pub mod sma;
+pub mod sma;
 pub mod types;
 pub mod unit;
 
@@ -31,10 +31,11 @@ pub use game::Game;
 pub use player::{Player, PlayerId};
 pub use unit::{Unit, UnitId};
 
-pub fn start(mut module: impl AiModule) {
+pub fn start<M: AiModule>(build_module: impl FnOnce(&Game) -> M) {
     let mut client = client::Client::default();
 
     println!("Waiting for frame to start");
+    let mut module = build_module(client.get_game());
 
     while !client.get_game().is_in_game() {
         client.update(&mut module);

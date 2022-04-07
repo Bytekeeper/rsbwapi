@@ -151,7 +151,7 @@ impl CanAttackUnit for (&Unit, bool, bool, bool) {
         if check_can_issue_command_type && !unit.can_attack_unit(false)? {
             return Ok(false);
         }
-        if check_can_target_unit && !unit.game.can_target_unit(target_unit)? {
+        if check_can_target_unit && !unit.inner.game().can_target_unit(target_unit)? {
             return Ok(false);
         }
 
@@ -231,7 +231,7 @@ impl CanBuild for (UnitType, bool, bool) {
             return Ok(false);
         }
 
-        if !unit.game.can_make(unit, u_type)? {
+        if !unit.inner.game().can_make(unit, u_type)? {
             return Ok(false);
         }
 
@@ -265,10 +265,14 @@ impl CanBuild for (UnitType, TilePosition, bool, bool, bool) {
         if check_target_unit_type && !unit.can_build((u_type, false, false))? {
             return Ok(false);
         }
-        if !tile_pos.is_valid(&unit.game) {
+        if !tile_pos.is_valid(&unit.inner.game()) {
             return Err(Error::Invalid_Tile_Position);
         }
-        if !unit.game.can_build_here(unit, tile_pos, u_type, true)? {
+        if !unit
+            .inner
+            .game()
+            .can_build_here(unit, tile_pos, u_type, true)?
+        {
             return Ok(false);
         }
         Ok(true)
@@ -312,7 +316,7 @@ impl CanBuildAddon for (UnitType, bool, bool) {
             return Ok(false);
         }
 
-        if !unit.game.can_make(unit, u_type)? {
+        if !unit.inner.game().can_make(unit, u_type)? {
             return Ok(false);
         }
 
@@ -321,7 +325,8 @@ impl CanBuildAddon for (UnitType, bool, bool) {
         }
 
         if !unit
-            .game
+            .inner
+            .game()
             .can_build_here(unit, unit.get_tile_position(), u_type, true)?
         {
             return Ok(false);
@@ -401,7 +406,7 @@ impl CanTrain for (UnitType, bool, bool) {
             unit
         };
 
-        if !unit.game.can_make(unit, u_type)? {
+        if !unit.inner.game().can_make(unit, u_type)? {
             return Ok(false);
         }
 
@@ -500,7 +505,7 @@ impl CanMorph for (UnitType, bool, bool) {
             unit
         };
 
-        if !unit.game.can_make(unit, u_type)? {
+        if !unit.inner.game().can_make(unit, u_type)? {
             return Ok(false);
         }
 
@@ -548,7 +553,12 @@ impl CanFollow for (&Unit, bool, bool, bool) {
         if check_can_issue_command_type && !unit.can_follow(false)? {
             return Ok(false);
         }
-        if check_can_target_unit && !unit.game.can_target_unit((unit, target_unit, false))? {
+        if check_can_target_unit
+            && !unit
+                .inner
+                .game()
+                .can_target_unit((unit, target_unit, false))?
+        {
             return Ok(false);
         }
 
@@ -592,7 +602,12 @@ impl CanSetRallyUnit for (&Unit, bool, bool, bool) {
         if check_can_issue_command_type && !unit.can_set_rally_unit(false)? {
             return Ok(false);
         }
-        if check_can_target_unit && !unit.game.can_target_unit((unit, target_unit, false))? {
+        if check_can_target_unit
+            && !unit
+                .inner
+                .game()
+                .can_target_unit((unit, target_unit, false))?
+        {
             return Ok(false);
         }
         Ok(true)
@@ -648,7 +663,12 @@ impl CanGather for (&Unit, bool, bool, bool) {
         if check_can_issue_command_type && !unit.can_gather(false)? {
             return Ok(false);
         }
-        if check_can_target_unit && !unit.game.can_target_unit((unit, target_unit, false))? {
+        if check_can_target_unit
+            && !unit
+                .inner
+                .game()
+                .can_target_unit((unit, target_unit, false))?
+        {
             return Ok(false);
         }
         let u_type = target_unit.get_type();
@@ -661,7 +681,7 @@ impl CanGather for (&Unit, bool, bool, bool) {
         if !unit.has_path(target_unit.get_position()) {
             return Err(Error::Unreachable_Location);
         }
-        if u_type.is_refinery() && Some(target_unit.get_player()) != unit.game.self_() {
+        if u_type.is_refinery() && Some(target_unit.get_player()) != unit.inner.game().self_() {
             return Err(Error::Unit_Not_Owned);
         }
         Ok(true)
@@ -711,7 +731,12 @@ impl CanRepair for (&Unit, bool, bool, bool) {
         if check_can_issue_command_type && !unit.can_repair(false)? {
             return Ok(false);
         }
-        if check_can_target_unit && !unit.game.can_target_unit((unit, target_unit, false))? {
+        if check_can_target_unit
+            && !unit
+                .inner
+                .game()
+                .can_target_unit((unit, target_unit, false))?
+        {
             return Ok(false);
         }
 
@@ -763,7 +788,8 @@ impl CanLand for (TilePosition, bool, bool) {
             return Ok(false);
         }
         if !unit
-            .game
+            .inner
+            .game()
             .can_build_here(None, target, unit.get_type(), true)?
         {
             return Ok(false);
@@ -790,7 +816,8 @@ impl CanLoad for bool {
         }
         if unit.get_type() == UnitType::Zerg_Overlord
             && unit
-                .game
+                .inner
+                .game()
                 .self_()
                 .expect("Player self to exist")
                 .get_upgrade_level(UpgradeType::Ventral_Sacs)
@@ -827,11 +854,16 @@ impl CanLoad for (&Unit, bool, bool, bool) {
             return Ok(false);
         }
 
-        if check_can_target_unit && !unit.game.can_target_unit((unit, target_unit, false))? {
+        if check_can_target_unit
+            && !unit
+                .inner
+                .game()
+                .can_target_unit((unit, target_unit, false))?
+        {
             return Ok(false);
         }
 
-        if Some(target_unit.get_player()) != unit.game.self_() {
+        if Some(target_unit.get_player()) != unit.inner.game().self_() {
             return Err(Error::Unit_Not_Owned);
         }
 
@@ -841,7 +873,8 @@ impl CanLoad for (&Unit, bool, bool, bool) {
 
         if target_unit.get_type() == UnitType::Zerg_Overlord
             && unit
-                .game
+                .inner
+                .game()
                 .self_()
                 .expect("Self to exist")
                 .get_upgrade_level(UpgradeType::Ventral_Sacs)
@@ -946,7 +979,12 @@ impl CanUnload for (&Unit, bool, bool, bool, bool) {
             return Ok(false);
         }
 
-        if check_can_target_unit && !unit.game.can_target_unit((unit, target_unit, false))? {
+        if check_can_target_unit
+            && !unit
+                .inner
+                .game()
+                .can_target_unit((unit, target_unit, false))?
+        {
             return Ok(false);
         }
 
@@ -1042,7 +1080,12 @@ impl CanRightClickUnit for (&Unit, bool, bool, bool) {
             return Ok(false);
         }
 
-        if check_can_target_unit && !unit.game.can_target_unit((unit, target_unit, false))? {
+        if check_can_target_unit
+            && !unit
+                .inner
+                .game()
+                .can_target_unit((unit, target_unit, false))?
+        {
             return Ok(false);
         }
 
@@ -1122,7 +1165,8 @@ impl CanUseTechWithOrWithoutTarget for (TechType, bool, bool) {
 
         if !unit.get_type().is_hero()
             && !unit
-                .game
+                .inner
+                .game()
                 .self_()
                 .expect("Self to exist")
                 .has_researched(tech)
@@ -1217,7 +1261,12 @@ impl CanUseTechUnit for (TechType, &Unit, bool, bool, bool, bool) {
         if check_targets_units && !unit.can_use_tech_unit((tech, false, false))? {
             return Ok(false);
         }
-        if check_can_target_unit && !unit.game.can_target_unit((unit, target_unit, false))? {
+        if check_can_target_unit
+            && !unit
+                .inner
+                .game()
+                .can_target_unit((unit, target_unit, false))?
+        {
             return Ok(false);
         }
         let target_type = target_unit.get_type();
@@ -1520,7 +1569,8 @@ impl CanPlaceCop for (TilePosition, bool, bool) {
         }
 
         if !unit
-            .game
+            .inner
+            .game()
             .can_build_here(unit, target, unit.get_type(), true)?
         {
             return Ok(false);
@@ -1583,7 +1633,7 @@ impl Unit {
     }
 
     pub fn can_command(&self) -> Result<bool, Error> {
-        if self.get_player() != self.game.self_().expect("Self to exist") {
+        if self.get_player() != self.inner.game().self_().expect("Self to exist") {
             return Err(Error::Unit_Not_Owned);
         }
 
@@ -1735,7 +1785,8 @@ impl Unit {
         }
 
         let target = || {
-            self.game
+            self.inner
+                .game()
                 .get_unit(arg.c.targetIndex as usize)
                 .expect("Target to exist")
         };
@@ -1761,11 +1812,13 @@ impl Unit {
             UnitCommandType::Train => self.can_train((arg.c.get_unit_type(), false, false)),
             UnitCommandType::Morph => self.can_morph((arg.c.get_unit_type(), false, false)),
             UnitCommandType::Research => {
-                self.game
+                self.inner
+                    .game()
                     .can_research((Some(self), arg.c.get_tech_type(), false))
             }
             UnitCommandType::Upgrade => {
-                self.game
+                self.inner
+                    .game()
                     .can_upgrade((Some(self), arg.c.get_upgrade_type(), false))
             }
             UnitCommandType::Set_Rally_Position => Ok(true),
@@ -1860,8 +1913,8 @@ impl Unit {
             UnitCommandType::Build_Addon => self.can_build_addon(false),
             UnitCommandType::Train => self.can_train(false),
             UnitCommandType::Morph => self.can_morph(false),
-            UnitCommandType::Research => self.game.can_research((self, false)),
-            UnitCommandType::Upgrade => self.game.can_upgrade((self, false)),
+            UnitCommandType::Research => self.inner.game().can_research((self, false)),
+            UnitCommandType::Upgrade => self.inner.game().can_upgrade((self, false)),
             UnitCommandType::Set_Rally_Position => self.can_set_rally_position(false),
             UnitCommandType::Set_Rally_Unit => self.can_set_rally_unit(false),
             UnitCommandType::Move => self.can_move(false),
@@ -2153,7 +2206,8 @@ impl Unit {
         }
         if self.get_type() == UnitType::Zerg_Overlord
             && self
-                .game
+                .inner
+                .game()
                 .self_()
                 .expect("Player self to exist")
                 .get_upgrade_level(UpgradeType::Ventral_Sacs)
@@ -2184,9 +2238,9 @@ impl Unit {
 
         if self.get_type() != UnitType::Terran_Bunker {
             let wp = targ_drop_pos.to_walk_position();
-            if !wp.is_valid(&self.game) {
+            if !wp.is_valid(&self.inner.game()) {
                 return Err(Error::Invalid_Tile_Position);
-            } else if !self.game.is_walkable(wp) {
+            } else if !self.inner.game().is_walkable(wp) {
                 return Err(Error::Unreachable_Location);
             }
         }
@@ -2375,7 +2429,12 @@ impl CanTargetUnit for &Unit {
         if !target_unit.exists() {
             return Err(Error::Unit_Does_Not_Exist);
         }
-        if !target_unit.is_visible() && !self.game.is_flag_enabled(Flag::CompleteMapInformation) {
+        if !target_unit.is_visible()
+            && !self
+                .inner
+                .game()
+                .is_flag_enabled(Flag::CompleteMapInformation)
+        {
             return Ok(false);
         }
         if !target_unit.is_completed()

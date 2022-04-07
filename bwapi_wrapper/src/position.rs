@@ -116,7 +116,7 @@ pub trait PositionValidator {
 }
 
 impl<const N: i32> ScaledPosition<N> {
-    pub fn new_checked(validator: &impl PositionValidator, x: i32, y: i32) -> Option<Self> {
+    pub fn new_checked(validator: impl PositionValidator, x: i32, y: i32) -> Option<Self> {
         let pos = Self::new(x, y);
         if validator.is_valid(pos) {
             Some(pos)

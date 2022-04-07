@@ -166,7 +166,7 @@ impl Commands {
 
 impl Game {
     fn cmd(&self) -> RefMut<Commands> {
-        RefMut::map(self.inner.borrow_mut(), |d| &mut d.cmd)
+        self.inner.cmd.borrow_mut()
     }
 
     pub fn send_text_ex(&self, to_allies: bool, message: &str) {

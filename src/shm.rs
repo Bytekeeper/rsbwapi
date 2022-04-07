@@ -35,6 +35,10 @@ impl<T> DerefMut for Shm<T> {
 }
 
 impl<T> Shm<T> {
+    pub(crate) fn as_ptr(&self) -> *const T {
+        self.1.as_ptr()
+    }
+
     pub(crate) fn get(&self) -> &T {
         // Not safe at all
         unsafe { self.1.as_ref() }
