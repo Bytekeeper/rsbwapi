@@ -44,7 +44,7 @@ impl From<Unit> for UnitId {
     }
 }
 
-impl<'a> fmt::Debug for Unit {
+impl fmt::Debug for Unit {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Unit")
             .field("id", &self.id)
@@ -678,18 +678,35 @@ impl Unit {
         self.inner.isInvincible
     }
 
+    pub fn has_weapon_against(&self, target: &Unit) -> bool {
+        self.weapon_type_vs(target) != WeaponType::None
+    }
+
+    pub fn weapon_type_vs(&self, target: &Unit) -> WeaponType {
+        let this_type = self.get_type();
+        if target.is_flying() {
+            this_type.air_weapon()
+        } else {
+            this_type.ground_weapon()
+        }
+    }
+
+    pub fn weapon_range_vs(&self, target: &Unit) -> i32 {
+        self.weapon_type_vs(target).max_range()
+    }
+
+    pub fn cooldown(&self) -> i32 {
+        self.inner
+            .groundWeaponCooldown
+            .max(self.inner.airWeaponCooldown)
+    }
+
     pub fn is_in_weapon_range(&self, target: &Unit) -> bool {
         if !self.exists() || !target.exists() || self == target {
             return false;
         }
 
-        let this_type = self.get_type();
-
-        let wpn = if target.is_flying() {
-            this_type.air_weapon()
-        } else {
-            this_type.ground_weapon()
-        };
+        let wpn = self.weapon_type_vs(target);
 
         if wpn == WeaponType::None || wpn == WeaponType::Unknown {
             return false;

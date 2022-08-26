@@ -1,5 +1,8 @@
 use crate::*;
 use ahash::AHashMap;
+use std::cell::Cell;
+use std::cmp::Ordering;
+use std::collections::{BinaryHeap, VecDeque};
 
 const MINERAL_MIN: i32 = 500;
 const BASE_MIN: i32 = 400;
@@ -28,9 +31,10 @@ enum Altitude {
     Hole,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 struct MiniTile {
     area_id: u16,
+    mark: Cell<u16>,
     altitude: Altitude,
 }
 
@@ -38,6 +42,7 @@ impl Default for MiniTile {
     fn default() -> Self {
         Self {
             area_id: 0,
+            mark: Cell::new(0),
             altitude: Altitude::Invalid,
         }
     }
@@ -335,10 +340,45 @@ impl BaseFinder {
 }
 
 #[derive(Default)]
+pub struct ChokePoint {
+    index: usize,
+    area_a: u16,
+    area_b: u16,
+    top: WalkPosition,
+    walk_positions: Vec<WalkPosition>,
+    mark: Cell<u16>,
+    pred: Cell<usize>,
+}
+
+impl ChokePoint {
+    fn new(
+        index: usize,
+        area_a: u16,
+        area_b: u16,
+        top: WalkPosition,
+        walk_positions: Vec<WalkPosition>,
+    ) -> Self {
+        Self {
+            index,
+            top,
+            walk_positions,
+            area_a,
+            area_b,
+            mark: Cell::new(0),
+            pred: Cell::new(0),
+        }
+    }
+}
+
+#[derive(Default)]
 pub struct Map {
     mini_tiles: Vec<MiniTile>,
+    mini_tile_mark: u16,
     walk_size: WalkPosition,
     pub bases: Vec<Base>,
+    choke_points: Vec<ChokePoint>,
+    distances: Vec<Vec<u32>>,
+    paths: Vec<Vec<Vec<usize>>>,
 }
 
 impl Map {
@@ -348,13 +388,57 @@ impl Map {
         let mut result = Self {
             mini_tiles,
             walk_size,
-            bases: vec![],
+            ..Default::default()
         };
         result.assign_altitude_kind(game);
         result.find_bases(game);
         result.compute_altitude();
         result.assign_areas();
+        result.area_paths(game);
+        result.choke_point_paths();
         result
+    }
+
+    pub fn get_path(&self, from: WalkPosition, to: WalkPosition) -> (Vec<&ChokePoint>, u32) {
+        let src_area = self.get_mini_tile(from).area_id;
+        let target_area = self.get_mini_tile(to).area_id;
+        let mut best: Option<((usize, usize), u32)> = None;
+        if src_area != target_area {
+            for (i, cp_a) in self
+                .choke_points
+                .iter()
+                .enumerate()
+                .filter(|(_, cp)| cp.area_a == src_area || cp.area_b == src_area)
+            {
+                for (j, cp_b) in self
+                    .choke_points
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, cp)| cp.area_a == target_area || cp.area_b == target_area)
+                {
+                    let dist = from.distance(cp_a.top) as u32 * 8
+                        + self.distances[i][j]
+                        + to.distance(cp_b.top) as u32 * 8;
+                    if let Some(tmp) = best {
+                        if dist < tmp.1 {
+                            best = Some(((i, j), dist));
+                        }
+                    } else {
+                        best = Some(((i, j), dist));
+                    }
+                }
+            }
+        }
+        best.map(|((i, j), dist)| {
+            (
+                self.paths[i][j]
+                    .iter()
+                    .map(|&i| &self.choke_points[i])
+                    .collect(),
+                dist,
+            )
+        })
+        .unwrap_or_else(|| (vec![], from.distance(to) as u32))
     }
 
     fn find_bases(&mut self, game: &Game) {
@@ -501,6 +585,7 @@ impl Map {
         }
         let mut areas = vec![Area::default()];
         let mut horizon = vec![];
+        let mut frontiers = vec![];
         for (wp, _altitude) in walkpos_by_descending_altitude {
             let mut n = Neighbors::None;
             for &d in &WALK_POSITION_4_DIR {
@@ -537,6 +622,8 @@ impl Map {
                     {
                         areas[a as usize].mini_tiles += areas[b as usize].mini_tiles;
                         areas[b as usize].mini_tiles = 0;
+
+                        // Flood fill all tiles of b with id a
                         horizon.clear();
                         horizon.push(wp);
                         while let Some(wp) = horizon.pop() {
@@ -548,6 +635,16 @@ impl Map {
                                 }
                             }
                         }
+
+                        // Replace b with a in the frontiers
+                        for ((i, j), _) in frontiers.iter_mut() {
+                            if *i == b {
+                                *i = a;
+                            }
+                            if *j == b {
+                                *j = a;
+                            }
+                        }
                     } else {
                         if a > b {
                             std::mem::swap(&mut a, &mut b);
@@ -555,6 +652,205 @@ impl Map {
                         let counter = dist.entry((a, b)).or_insert(0);
                         self.get_mini_tile_mut(wp).area_id = if *counter % 2 == 0 { a } else { b };
                         *counter += 1;
+                        frontiers.push(((a, b), wp));
+                    }
+                }
+            }
+        }
+
+        struct Cluster {
+            a: u16,
+            b: u16,
+            top: WalkPosition,
+            wps: VecDeque<WalkPosition>,
+        }
+        let mut clusters = Vec::<Cluster>::new();
+        for ((mut a, mut b), wp) in frontiers {
+            // Part of merged border => continue
+            if areas[a as usize].mini_tiles == 0 || areas[b as usize].mini_tiles == 0 {
+                continue;
+            }
+
+            if a > b {
+                std::mem::swap(&mut a, &mut b);
+            }
+
+            let cluster = clusters
+                .iter_mut()
+                .filter(|c| c.a == a && c.b == b)
+                .map(|c| {
+                    (
+                        c.wps.front().unwrap().chebyshev_distance(wp),
+                        c.wps.back().unwrap().chebyshev_distance(wp),
+                        c,
+                    )
+                })
+                .min_by_key(|(df, db, c)| *df.min(db))
+                .filter(|(df, db, _)| df.min(db) < &20);
+            if let Some((df, db, cluster)) = cluster {
+                if df < db {
+                    cluster.wps.push_front(wp);
+                } else {
+                    cluster.wps.push_back(wp);
+                }
+            } else {
+                clusters.push(Cluster {
+                    a,
+                    b,
+                    top: wp,
+                    wps: VecDeque::from([wp]),
+                });
+            }
+        }
+        self.choke_points = clusters
+            .drain(..)
+            .enumerate()
+            .map(|(i, c)| ChokePoint::new(i, c.a, c.b, c.top, c.wps.into()))
+            .collect();
+    }
+
+    fn area_paths(&mut self, game: &Game) {
+        #[derive(Eq, PartialEq)]
+        struct Node {
+            cost: u32,
+            h: u32,
+            pos: WalkPosition,
+        }
+        impl Ord for Node {
+            fn cmp(&self, other: &Self) -> Ordering {
+                (self.cost + self.h).cmp(&(other.cost + other.h)).reverse()
+            }
+        }
+        impl PartialOrd for Node {
+            fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+                Some(self.cmp(other))
+            }
+        }
+        self.paths = vec![vec![vec![]; self.choke_points.len()]; self.choke_points.len()];
+        let mut distances = vec![vec![0; self.choke_points.len()]; self.choke_points.len()];
+        let mut to_visit = BinaryHeap::new();
+        for (i, cp) in self.choke_points.iter().enumerate() {
+            let targets: Vec<_> = self
+                .choke_points
+                .iter()
+                .enumerate()
+                .skip(i + 1)
+                .filter(|(_, t)| {
+                    (t.area_a == cp.area_a
+                        || t.area_a == cp.area_b
+                        || t.area_b == cp.area_a
+                        || t.area_b == cp.area_b)
+                })
+                .collect();
+            for (j, t) in targets.iter() {
+                to_visit.clear();
+                to_visit.push(Node {
+                    cost: 0,
+                    h: 0,
+                    pos: cp.top,
+                });
+                self.mini_tile_mark = self.mini_tile_mark.wrapping_add(1);
+                while let Some(current) = to_visit.pop() {
+                    if current.pos == t.top {
+                        let distance = (current.cost as f32 * 8.0 / 10000.0 + 0.5) as u32;
+                        distances[i][*j] = distance;
+                        distances[*j][i] = distance;
+                        break;
+                    }
+                    let mini_tile = self.get_mini_tile(current.pos);
+                    if mini_tile.mark.get() == self.mini_tile_mark {
+                        continue;
+                    }
+                    mini_tile.mark.set(self.mini_tile_mark);
+                    for d in WALK_POSITION_8_DIR.iter() {
+                        let next = current.pos + *d;
+                        if game.is_valid(next) {
+                            let diag_move = d.x != 0 && d.y != 0;
+                            let add_cost = if diag_move { 14142 } else { 10000 };
+                            to_visit.push(Node {
+                                pos: next,
+                                cost: current.cost + add_cost,
+                                h: next.chebyshev_distance(t.top) * 10000,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        self.distances = distances;
+    }
+
+    fn choke_point_paths(&mut self) {
+        #[derive(Eq, PartialEq)]
+        struct Node {
+            cost: u32,
+            h: u32,
+            cp_index: usize,
+            parent: usize,
+        }
+        impl Ord for Node {
+            fn cmp(&self, other: &Self) -> Ordering {
+                (self.cost + self.h).cmp(&(other.cost + other.h)).reverse()
+            }
+        }
+        impl PartialOrd for Node {
+            fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+                Some(self.cmp(other))
+            }
+        }
+        let mut to_visit = BinaryHeap::<Node>::new();
+        let mut mark = 0;
+        for (i, cp) in self.choke_points.iter().enumerate() {
+            for (j, t) in self.choke_points.iter().enumerate().skip(i + 1) {
+                if self.distances[i][j] != 0 {
+                    continue;
+                }
+                mark += 1;
+                to_visit.clear();
+                to_visit.push(Node {
+                    cost: 0,
+                    h: 0,
+                    cp_index: i,
+                    parent: 0,
+                });
+                while let Some(current) = to_visit.pop() {
+                    let current_cp = &self.choke_points[current.cp_index];
+                    if current_cp.mark.get() == mark {
+                        continue;
+                    }
+
+                    current_cp.mark.set(mark);
+                    current_cp.pred.set(current.parent);
+                    if current_cp.index == j {
+                        self.distances[i][j] = current.cost;
+                        self.distances[j][i] = current.cost;
+                        let mut path = vec![j];
+                        while let Some(prev) = path.last().cloned() {
+                            let pred = self.choke_points[prev].pred.get();
+                            path.push(pred);
+                            if pred == i {
+                                break;
+                            }
+                        }
+                        self.paths[j][i] = path.clone();
+                        path.reverse();
+                        self.paths[i][j] = path;
+                        break;
+                    }
+
+                    for (k, cp) in self.choke_points.iter().enumerate().filter(|(i, cp)| {
+                        i != &current_cp.index
+                            && (cp.area_a == current_cp.area_a
+                                || cp.area_a == current_cp.area_b
+                                || cp.area_b == current_cp.area_a
+                                || cp.area_b == current_cp.area_b)
+                    }) {
+                        to_visit.push(Node {
+                            cost: current.cost + self.distances[i][k],
+                            h: current_cp.top.chebyshev_distance(current_cp.top) * 10000,
+                            cp_index: k,
+                            parent: current_cp.index,
+                        });
                     }
                 }
             }
@@ -569,6 +865,7 @@ mod test {
     use super::*;
     use crate::{command::Commands, game::*};
     use image::*;
+    use imageproc::drawing::*;
     use inflate::inflate_bytes_zlib;
     use shm::Shm;
     use std::cell::RefCell;
@@ -579,10 +876,8 @@ mod test {
     #[test]
     fn test_maps() {
         let target = Path::new("target");
-        for entry in read_dir("resources/test")
-            .unwrap()
-            .flatten()
-            .filter(|e| e.path().to_str().unwrap().contains(&"Andro"))
+        for entry in read_dir("resources/test").unwrap().flatten()
+        // .filter(|e| e.path().to_str().unwrap().contains(&"Andro"))
         {
             let mut target = target.to_path_buf();
             println!("Reading map {:?}", entry.path());
@@ -595,8 +890,7 @@ mod test {
             let timer = Instant::now();
             let tm = Map::new(&game);
             println!("{}", timer.elapsed().as_micros());
-            let mut img: RgbImage =
-                ImageBuffer::new(4 * game.map_width() as u32, 4 * game.map_height() as u32);
+            let mut img = RgbImage::new(4 * game.map_width() as u32, 4 * game.map_height() as u32);
             for y in 0..tm.walk_size.y {
                 for x in 0..tm.walk_size.x {
                     let alt = tm.get_mini_tile(WalkPosition::new(x, y));
@@ -628,14 +922,39 @@ mod test {
                 img.put_pixel(1 + wp.x as u32, 1 + wp.y as u32, Rgb([255, 255, 255]));
                 img.put_pixel(wp.x as u32, 1 + wp.y as u32, Rgb([255, 255, 255]));
             }
+            for (i, targets) in tm.paths.iter().enumerate() {
+                for (j, path) in targets.iter().enumerate().skip(i + 1) {
+                    let mut p_i = path.iter();
+                    if let Some(last) = p_i.next() {
+                        let last = tm.choke_points[*last].top;
+                        let mut last = (last.x as f32, last.y as f32);
+                        for next in p_i {
+                            let next = tm.choke_points[*next].top;
+                            let next = (next.x as f32, next.y as f32);
+                            draw_line_segment_mut(&mut img, last, next, Rgb([255, 255, 255]));
+                            last = next;
+                        }
+                    }
+                }
+            }
+            for ChokePoint {
+                top,
+                walk_positions,
+                ..
+            } in &tm.choke_points
+            {
+                for wp in walk_positions {
+                    img.put_pixel(wp.x as u32, wp.y as u32, Rgb([255, 0, 0]));
+                }
+                img.put_pixel(top.x as u32, top.y as u32, Rgb([255, 255, 0]));
+            }
             target.push(format!(
                 "{}.png",
                 entry.path().file_name().unwrap().to_string_lossy()
             ));
             eprintln!("{}", target.to_string_lossy());
             img.save(target).unwrap();
-            break;
         }
-        panic!();
+        // panic!();
     }
 }

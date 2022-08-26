@@ -124,6 +124,13 @@ impl<const N: i32> Rectangle<ScaledPosition<N>> {
             && self.br.y * N >= other.br.y * M
     }
 
+    pub fn intersects<const M: i32>(&self, other: Rectangle<ScaledPosition<M>>) -> bool {
+        self.tl.x * N <= other.br.x * M
+            && self.tl.y * N <= other.br.y * M
+            && self.br.x * N >= other.tl.x * M
+            && self.br.y * N >= other.tl.y * M
+    }
+
     pub fn contains<const M: i32>(&self, pos: ScaledPosition<M>) -> bool {
         self.tl.x * N <= pos.x * M
             && self.tl.y * N <= pos.y * M

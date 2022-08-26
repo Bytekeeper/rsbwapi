@@ -6,6 +6,7 @@ use crate::unit::Unit;
 use bwapi_wrapper::prelude::*;
 use bwapi_wrapper::*;
 use num_traits::FromPrimitive;
+use std::fmt;
 
 pub type PlayerId = usize;
 
@@ -16,6 +17,11 @@ pub struct Player {
     data: &'static BWAPI_PlayerData,
 }
 
+impl fmt::Debug for Player {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Player").field("id", &self.id).finish()
+    }
+}
 impl Player {
     pub(crate) fn new(id: PlayerId, game: Game, data: &'static BWAPI_PlayerData) -> Self {
         Player { id, game, data }

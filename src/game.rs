@@ -363,7 +363,6 @@ impl Game {
                             self,
                             self.get_unit(id).expect("Destroyed unit already removed"),
                         );
-                        self.inner.unit_infos.borrow_mut()[id as usize] = Option::None;
                     }
                     UnitDiscover => {
                         let id = event.v1 as usize;
