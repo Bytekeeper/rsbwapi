@@ -1,3 +1,4 @@
+use crate::UnitType;
 use core::ops::{Add, Div, DivAssign, Index, IndexMut, Mul, MulAssign, Sub};
 use derive_more::{Add, AddAssign, Display, From, Sub, SubAssign};
 
@@ -103,6 +104,10 @@ impl WalkPosition {
     pub const fn to_position(self) -> Position {
         pos_to_pos(self)
     }
+
+    pub const fn center(self) -> Position {
+        Position::new(self.x * 8 + 4, self.y * 8 + 4)
+    }
 }
 
 impl Vector2D {
@@ -145,6 +150,12 @@ impl<const N: i32> ScaledPosition<N> {
 
     pub fn chebyshev_distance(&self, other: Self) -> u32 {
         (self.x - other.x).abs().max((self.y - other.y).abs()) as u32
+    }
+}
+
+impl From<UnitType> for TilePosition {
+    fn from(ut: UnitType) -> Self {
+        ut.tile_size()
     }
 }
 

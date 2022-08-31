@@ -535,6 +535,7 @@ impl Game {
                 }));
         }
 
+        // Tile buildability check
         for x in lt.x..rb.x {
             for y in lt.y..rb.y {
                 if !self.is_buildable((x, y)) || (check_explored && !self.is_explored((x, y))) {
@@ -556,6 +557,7 @@ impl Game {
             }
         }
 
+        // Ground unit dimension check
         if type_ != UnitType::Special_Start_Location {
             let targ_pos = lt.to_position() + type_.tile_size().to_position() / 2;
             let collides_with_units = self
@@ -565,7 +567,7 @@ impl Game {
                     !Unit::is_flying.into_predicate()
                         & !Unit::is_loaded.into_predicate()
                         & |u: &Unit| {
-                            builder.map_or(true, |b| b != u)
+                            builder.map_or(true, |b| b != u || type_ == UnitType::Zerg_Nydus_Canal)
                                 && u.get_left() <= targ_pos.x + type_.dimension_right()
                                 && u.get_top() <= targ_pos.y + type_.dimension_down()
                                 && u.get_right() >= targ_pos.x - type_.dimension_left()
@@ -578,6 +580,8 @@ impl Game {
                 return Ok(false);
             }
 
+            // Creep Check
+            // Note: Zerg structures that don't require creep can still be placed on creep
             let needs_creep = type_.requires_creep();
             if type_.get_race() != Race::Zerg || needs_creep {
                 for x in lt.x..rb.x {
@@ -589,10 +593,16 @@ impl Game {
                 }
             }
 
+            // Power Check
+            if type_.requires_psi() && !self.has_power(lt, type_) {
+                return Ok(false);
+            }
+
+            // Resource Check (CC, Nex, Hatch)
             if type_.is_resource_depot() {
                 for m in self.get_static_minerals() {
                     let tp = m.get_initial_tile_position();
-                    if self.is_visible(tp) || self.is_visible((tp.x + 1, tp.y)) && !m.exists() {
+                    if (self.is_visible(tp) || self.is_visible((tp.x + 1, tp.y))) && !m.exists() {
                         continue;
                     }
                     if tp.x > lt.x - 5 && tp.y > lt.y - 4 && tp.x < lt.x + 7 && tp.y < lt.y + 6 {
@@ -608,8 +618,11 @@ impl Game {
             }
         }
 
+        // A building can build an addon at a different location (i.e. automatically lifts (if not already lifted)
+        // then lands at the new location before building the addon), so we need to do similar checks for the
+        // location that the building will be when it builds the addon.
         if let Some(builder) = builder {
-            if builder.get_type().is_addon()
+            if !builder.get_type().is_addon()
                 && type_.is_addon()
                 && !self.can_build_here(
                     builder,
@@ -897,7 +910,7 @@ impl Game {
     }
 
     pub fn has_power<TP: Into<TilePosition>, TS: Into<TilePosition>>(
-        &mut self,
+        &self,
         position: TP,
         size: TS,
     ) -> bool {
@@ -905,7 +918,7 @@ impl Game {
         self.has_power_precise(position)
     }
 
-    pub fn has_power_precise<P: Into<Position>>(&mut self, position: P) -> bool {
+    pub fn has_power_precise<P: Into<Position>>(&self, position: P) -> bool {
         static B_PSI_FIELD_MASK: [[u8; 16]; 10] = [
             [0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0],
             [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0],

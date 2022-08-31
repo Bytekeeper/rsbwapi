@@ -344,8 +344,8 @@ pub struct ChokePoint {
     index: usize,
     area_a: u16,
     area_b: u16,
-    top: WalkPosition,
-    walk_positions: Vec<WalkPosition>,
+    pub top: WalkPosition,
+    pub walk_positions: Vec<WalkPosition>,
     mark: Cell<u16>,
     pred: Cell<usize>,
 }
@@ -376,7 +376,7 @@ pub struct Map {
     mini_tile_mark: u16,
     walk_size: WalkPosition,
     pub bases: Vec<Base>,
-    choke_points: Vec<ChokePoint>,
+    pub choke_points: Vec<ChokePoint>,
     distances: Vec<Vec<u32>>,
     paths: Vec<Vec<Vec<usize>>>,
 }
@@ -400,6 +400,17 @@ impl Map {
     }
 
     pub fn get_path(&self, from: WalkPosition, to: WalkPosition) -> (Vec<&ChokePoint>, u32) {
+        if from.x < 0
+            || from.y < 0
+            || to.x < 0
+            || to.y < 0
+            || from.x >= self.walk_size.x
+            || from.y >= self.walk_size.y
+            || to.x >= self.walk_size.x
+            || to.y >= self.walk_size.y
+        {
+            return (vec![], 0);
+        }
         let src_area = self.get_mini_tile(from).area_id;
         let target_area = self.get_mini_tile(to).area_id;
         let mut best: Option<((usize, usize), u32)> = None;
@@ -438,7 +449,7 @@ impl Map {
                 dist,
             )
         })
-        .unwrap_or_else(|| (vec![], from.distance(to) as u32))
+        .unwrap_or_else(|| (vec![], 8 * from.distance(to) as u32))
     }
 
     fn find_bases(&mut self, game: &Game) {
@@ -736,10 +747,10 @@ impl Map {
                 .enumerate()
                 .skip(i + 1)
                 .filter(|(_, t)| {
-                    (t.area_a == cp.area_a
+                    t.area_a == cp.area_a
                         || t.area_a == cp.area_b
                         || t.area_b == cp.area_a
-                        || t.area_b == cp.area_b)
+                        || t.area_b == cp.area_b
                 })
                 .collect();
             for (j, t) in targets.iter() {

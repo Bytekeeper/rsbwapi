@@ -35,13 +35,13 @@ pub fn start<M: AiModule>(build_module: impl FnOnce(&Game) -> M) {
     let mut client = client::Client::default();
 
     println!("Waiting for frame to start");
-    let mut module = build_module(client.get_game());
+    let mut module = Box::new(build_module(client.get_game()));
 
     while !client.get_game().is_in_game() {
-        client.update(&mut module);
+        client.update(&mut *module);
     }
 
     while client.get_game().is_in_game() {
-        client.update(&mut module);
+        client.update(&mut *module);
     }
 }
