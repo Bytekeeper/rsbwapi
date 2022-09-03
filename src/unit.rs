@@ -66,11 +66,11 @@ impl Unit {
     }
 
     fn info(&self) -> UnitInfo {
-        self.inner.game().inner.unit_infos.borrow()[self.id].expect("UnitInfo missing")
+        self.inner.game().inner.unit_infos.borrow()[self.id]
     }
 
     fn set_info(&self, unit_info: UnitInfo) {
-        (*self.inner.game().inner.unit_infos.borrow_mut())[self.id] = Some(unit_info);
+        (*self.inner.game().inner.unit_infos.borrow_mut())[self.id] = unit_info;
     }
 
     pub(crate) fn get_buttonset(&self) -> i32 {

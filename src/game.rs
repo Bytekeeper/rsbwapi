@@ -56,7 +56,7 @@ impl PointDistance for UnitLocation {
 pub(crate) struct GameInternal {
     pub(crate) data: Shm<BWAPI_GameData>,
     units: RefCell<Vec<Unit>>,
-    pub(crate) unit_infos: RefCell<[Option<UnitInfo>; 10000]>,
+    pub(crate) unit_infos: RefCell<Vec<UnitInfo>>,
     rtree: RefCell<RTree<UnitLocation>>,
     pub(crate) cmd: RefCell<Commands>,
     pylons: RefCell<Option<Vec<Unit>>>,
@@ -91,7 +91,7 @@ impl Game {
 
         for i in inner.visible_units.borrow().iter() {
             let id = i.get_id();
-            inner.unit_infos.borrow_mut()[id] = Some(UnitInfo::new(&self.data.units[id]));
+            inner.unit_infos.borrow_mut()[id] = UnitInfo::new(&self.data.units[id]);
             let ut = i.get_type();
             if ut == UnitType::Resource_Vespene_Geyser {
                 inner.static_geysers.borrow_mut().push(i.clone());
@@ -1191,7 +1191,7 @@ impl Game {
     }
 
     fn ensure_unit_info(&self, id: UnitId) {
-        (*self.inner.unit_infos.borrow_mut())[id] = Some(UnitInfo::new(&self.data.units[id]));
+        (*self.inner.unit_infos.borrow_mut())[id] = UnitInfo::new(&self.data.units[id]);
     }
 }
 
@@ -1210,7 +1210,16 @@ impl Game {
                 static_geysers: RefCell::new(vec![]),
                 static_minerals: RefCell::new(vec![]),
                 static_neutrals: RefCell::new(vec![]),
-                unit_infos: RefCell::new([None; 10000]),
+                unit_infos: RefCell::new(vec![
+                    UnitInfo {
+                        initial_hit_points: 0,
+                        initial_resources: 0,
+                        initial_position: Position::new(-1, -1),
+                        initial_type: UnitType::None,
+                        last_command_frame: -10
+                    };
+                    10000
+                ]),
                 visible_units: RefCell::new(vec![]),
                 units: RefCell::new(vec![]),
             }),
