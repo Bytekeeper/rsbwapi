@@ -936,7 +936,7 @@ impl Unit {
 /***
  * Unit Commands
  */
-impl<'a> Unit {
+impl Unit {
     pub fn attack<T: UnitOrPosition>(&self, target: T) -> BwResult<bool> {
         let mut cmd = self.command(false);
         target.assign_attack(&mut cmd);
@@ -1342,7 +1342,7 @@ impl<I: Into<Position> + Copy> UnitOrPosition for I {
     }
 }
 
-impl<'a> PartialEq for Unit {
+impl PartialEq for Unit {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }

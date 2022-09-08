@@ -59,6 +59,10 @@ impl<'a> CommandApplier<'a> {
                 SetMap(map_file_name) => self.set_map(map_file_name),
             }
         }
+
+        for shape in commands.shapes.iter() {
+            self.add_shape(*shape);
+        }
     }
 
     pub fn set_map(&mut self, map_file_name: &str) {
@@ -217,37 +221,31 @@ impl Game {
         });
     }
 
-    pub fn draw_line_screen<P: Into<Position>>(&self, a: P, b: P, color: Color, solid: bool) {
-        self.draw_line(CoordinateType::Screen, a, b, color, solid)
+    pub fn draw_line_screen<P: Into<Position>>(&self, a: P, b: P, color: Color) {
+        self.draw_line(CoordinateType::Screen, a, b, color)
     }
 
-    pub fn draw_line_map<P: Into<Position>>(&self, a: P, b: P, color: Color, solid: bool) {
-        self.draw_line(CoordinateType::Map, a, b, color, solid)
+    pub fn draw_line_map<P: Into<Position>>(&self, a: P, b: P, color: Color) {
+        self.draw_line(CoordinateType::Map, a, b, color)
     }
 
-    pub fn draw_line_mouse<P: Into<Position>>(&self, a: P, b: P, color: Color, solid: bool) {
-        self.draw_line(CoordinateType::Mouse, a, b, color, solid)
+    pub fn draw_line_mouse<P: Into<Position>>(&self, a: P, b: P, color: Color) {
+        self.draw_line(CoordinateType::Mouse, a, b, color)
     }
 
-    pub fn draw_dot_screen<P: Into<Position>>(&self, p: P, color: Color, solid: bool) {
-        self.draw_dot(CoordinateType::Screen, p, color, solid)
+    pub fn draw_dot_screen<P: Into<Position>>(&self, p: P, color: Color) {
+        self.draw_dot(CoordinateType::Screen, p, color)
     }
 
-    pub fn draw_dot_map<P: Into<Position>>(&self, p: P, color: Color, solid: bool) {
-        self.draw_dot(CoordinateType::Map, p, color, solid)
+    pub fn draw_dot_map<P: Into<Position>>(&self, p: P, color: Color) {
+        self.draw_dot(CoordinateType::Map, p, color)
     }
 
-    pub fn draw_dot_mouse<P: Into<Position>>(&self, p: P, color: Color, solid: bool) {
-        self.draw_dot(CoordinateType::Mouse, p, color, solid)
+    pub fn draw_dot_mouse<P: Into<Position>>(&self, p: P, color: Color) {
+        self.draw_dot(CoordinateType::Mouse, p, color)
     }
 
-    pub fn draw_dot<P: Into<Position>>(
-        &self,
-        ctype: CoordinateType,
-        p: P,
-        color: Color,
-        solid: bool,
-    ) {
+    pub fn draw_dot<P: Into<Position>>(&self, ctype: CoordinateType, p: P, color: Color) {
         let Position { x, y } = p.into();
         self.cmd().shapes.push(BWAPIC_Shape {
             type_: BWAPIC_ShapeType_Enum::Dot,
@@ -259,7 +257,7 @@ impl Game {
             extra1: 0,
             extra2: 0,
             color: color as i32,
-            isSolid: solid,
+            isSolid: false,
         })
     }
 
@@ -414,7 +412,7 @@ impl Game {
     ) {
         let Position { x, y } = p.into();
         self.cmd().shapes.push(BWAPIC_Shape {
-            type_: BWAPIC_ShapeType_Enum::Circle,
+            type_: BWAPIC_ShapeType_Enum::Ellipse,
             ctype,
             x1: x,
             y1: y,
@@ -427,18 +425,11 @@ impl Game {
         });
     }
 
-    pub fn draw_line<P: Into<Position>>(
-        &self,
-        ctype: CoordinateType,
-        a: P,
-        b: P,
-        color: Color,
-        solid: bool,
-    ) {
+    pub fn draw_line<P: Into<Position>>(&self, ctype: CoordinateType, a: P, b: P, color: Color) {
         let a = a.into();
         let b = b.into();
         self.cmd().shapes.push(BWAPIC_Shape {
-            type_: BWAPIC_ShapeType_Enum::Dot,
+            type_: BWAPIC_ShapeType_Enum::Line,
             ctype,
             x1: a.x,
             y1: a.y,
@@ -447,7 +438,7 @@ impl Game {
             extra1: 0,
             extra2: 0,
             color: color as i32,
-            isSolid: solid,
+            isSolid: false,
         });
     }
 
