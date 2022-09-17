@@ -27,7 +27,7 @@ fn main() {
         .default_enum_style(bindgen::EnumVariation::Rust {
             non_exhaustive: false,
         })
-        .whitelist_type("BWAPI::.*")
+        .allowlist_type("BWAPI::.*")
         //        .whitelist_type("BWAPI::.*GameTable")
         //      .whitelist_type("BWAPI::.*Enum")
         .ignore_methods()

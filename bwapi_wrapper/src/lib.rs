@@ -43,6 +43,12 @@ impl UnitType {
     }
 }
 
+impl Default for UnitType {
+    fn default() -> Self {
+        Self::None
+    }
+}
+
 // DEFAULTS
 const DEFAULT_ORE_COST_BASE: [i32; UpgradeType::MAX as usize] =
     // same as default gas cost base

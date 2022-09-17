@@ -23,6 +23,6 @@ derive_more = "0.99"
 
 
 [build-dependencies]
-bindgen = "0.53"
+bindgen = "0.60"
 regex = "1"
 
