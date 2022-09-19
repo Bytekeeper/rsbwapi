@@ -399,20 +399,20 @@ impl Map {
         result
     }
 
-    pub fn get_path(&self, from: WalkPosition, to: WalkPosition) -> (Vec<&ChokePoint>, u32) {
+    pub fn get_path(&self, from: Position, to: Position) -> (Vec<&ChokePoint>, u32) {
         if from.x < 0
             || from.y < 0
             || to.x < 0
             || to.y < 0
-            || from.x >= self.walk_size.x
-            || from.y >= self.walk_size.y
-            || to.x >= self.walk_size.x
-            || to.y >= self.walk_size.y
+            || from.x >= self.walk_size.x * 8
+            || from.y >= self.walk_size.y * 8
+            || to.x >= self.walk_size.x * 8
+            || to.y >= self.walk_size.y * 8
         {
             return (vec![], 0);
         }
-        let src_area = self.get_mini_tile(from).area_id;
-        let target_area = self.get_mini_tile(to).area_id;
+        let src_area = self.get_mini_tile(from.to_walk_position()).area_id;
+        let target_area = self.get_mini_tile(to.to_walk_position()).area_id;
         let mut best: Option<((usize, usize), u32)> = None;
         if src_area != target_area {
             for (i, cp_a) in self
@@ -427,9 +427,9 @@ impl Map {
                     .enumerate()
                     .filter(|(_, cp)| cp.area_a == target_area || cp.area_b == target_area)
                 {
-                    let dist = from.distance(cp_a.top) as u32 * 8
+                    let dist = from.distance(cp_a.top.center()) as u32
                         + self.distances[i][j]
-                        + to.distance(cp_b.top) as u32 * 8;
+                        + to.distance(cp_b.top.center()) as u32;
                     if let Some(tmp) = best {
                         if dist < tmp.1 {
                             best = Some(((i, j), dist));
@@ -449,7 +449,7 @@ impl Map {
                 dist,
             )
         })
-        .unwrap_or_else(|| (vec![], 8 * from.distance(to) as u32))
+        .unwrap_or_else(|| (vec![], from.distance(to) as u32))
     }
 
     fn find_bases(&mut self, game: &Game) {
