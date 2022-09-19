@@ -1,6 +1,8 @@
+[docs](https://docs.rs/rsbwapi/0.2.4/rsbwapi/)
+
 # RSBWAPI
 ## Getting Started
-If you're looking for documentation, sorry - we ain't there yet.
+If you're looking for documentation, sorry- we ain't there yet.
 The original documenation for [bwapi](https://bwapi.github.io/) should be good enough to get started.
 Other than that, you can take a look at [ExampleBot](https://github.com/Bytekeeper/rsbwapi/tree/master/example_bot).
 
