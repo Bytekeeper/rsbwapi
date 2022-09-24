@@ -23,7 +23,7 @@ fn norm(dx: i32, dy: i32) -> f32 {
 }
 
 #[derive(Debug, Clone, Copy)]
-enum Altitude {
+pub enum Altitude {
     Invalid,
     Border,
     Walkable(i16),
@@ -397,6 +397,10 @@ impl Map {
         result.area_paths(game);
         result.choke_point_paths();
         result
+    }
+
+    pub fn get_altitude(&self, at: WalkPosition) -> Altitude {
+        self.get_mini_tile(at).altitude
     }
 
     pub fn get_path(&self, from: Position, to: Position) -> (Vec<&ChokePoint>, u32) {
