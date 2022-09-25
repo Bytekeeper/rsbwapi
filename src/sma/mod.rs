@@ -341,7 +341,7 @@ impl BaseFinder {
 
 #[derive(Default)]
 pub struct ChokePoint {
-    index: usize,
+    pub index: usize,
     area_a: u16,
     area_b: u16,
     pub top: WalkPosition,
@@ -377,7 +377,7 @@ pub struct Map {
     walk_size: WalkPosition,
     pub bases: Vec<Base>,
     pub choke_points: Vec<ChokePoint>,
-    distances: Vec<Vec<u32>>,
+    pub distances: Vec<Vec<u32>>,
     paths: Vec<Vec<Vec<usize>>>,
 }
 
@@ -741,7 +741,6 @@ impl Map {
                 Some(self.cmp(other))
             }
         }
-        self.paths = vec![vec![vec![]; self.choke_points.len()]; self.choke_points.len()];
         let mut distances = vec![vec![0; self.choke_points.len()]; self.choke_points.len()];
         let mut to_visit = BinaryHeap::new();
         for (i, cp) in self.choke_points.iter().enumerate() {
@@ -767,7 +766,7 @@ impl Map {
                 self.mini_tile_mark = self.mini_tile_mark.wrapping_add(1);
                 while let Some(current) = to_visit.pop() {
                     if current.pos == t.top {
-                        let distance = (current.cost as f32 * 8.0 / 10000.0 + 0.5) as u32;
+                        let distance = (current.cost as f32 * 8.0 / 10000.0).round() as u32;
                         distances[i][*j] = distance;
                         distances[*j][i] = distance;
                         break;
@@ -799,13 +798,12 @@ impl Map {
         #[derive(Eq, PartialEq)]
         struct Node {
             cost: u32,
-            h: u32,
             cp_index: usize,
             parent: usize,
         }
         impl Ord for Node {
             fn cmp(&self, other: &Self) -> Ordering {
-                (self.cost + self.h).cmp(&(other.cost + other.h)).reverse()
+                self.cost.cmp(&other.cost).reverse()
             }
         }
         impl PartialOrd for Node {
@@ -815,58 +813,49 @@ impl Map {
         }
         let mut to_visit = BinaryHeap::<Node>::new();
         let mut mark = 0;
-        for (i, cp) in self.choke_points.iter().enumerate() {
-            for (j, t) in self.choke_points.iter().enumerate().skip(i + 1) {
-                if self.distances[i][j] != 0 {
+        self.paths = vec![vec![vec![]; self.choke_points.len()]; self.choke_points.len()];
+
+        // Dijkstra from each CP
+        for i in 0..self.choke_points.len() {
+            mark += 1;
+            to_visit.clear();
+            to_visit.push(Node {
+                cost: 0,
+                cp_index: i,
+                parent: i,
+            });
+            while let Some(current) = to_visit.pop() {
+                let current_cp = &self.choke_points[current.cp_index];
+                if current_cp.mark.get() == mark {
                     continue;
                 }
-                mark += 1;
-                to_visit.clear();
-                to_visit.push(Node {
-                    cost: 0,
-                    h: 0,
-                    cp_index: i,
-                    parent: 0,
-                });
-                while let Some(current) = to_visit.pop() {
-                    let current_cp = &self.choke_points[current.cp_index];
-                    if current_cp.mark.get() == mark {
-                        continue;
-                    }
 
-                    current_cp.mark.set(mark);
-                    current_cp.pred.set(current.parent);
-                    if current_cp.index == j {
-                        self.distances[i][j] = current.cost;
-                        self.distances[j][i] = current.cost;
-                        let mut path = vec![j];
-                        while let Some(prev) = path.last().cloned() {
-                            let pred = self.choke_points[prev].pred.get();
-                            path.push(pred);
-                            if pred == i {
-                                break;
-                            }
-                        }
-                        self.paths[j][i] = path.clone();
-                        path.reverse();
-                        self.paths[i][j] = path;
+                current_cp.mark.set(mark);
+                current_cp.pred.set(current.parent);
+                self.distances[i][current.cp_index] = current.cost;
+                let mut path = vec![current.cp_index];
+                while let Some(prev) = path.last().copied() {
+                    let pred = self.choke_points[prev].pred.get();
+                    path.push(pred);
+                    if pred == i {
                         break;
                     }
+                }
+                path.reverse();
+                self.paths[i][current.cp_index] = path;
 
-                    for (k, cp) in self.choke_points.iter().enumerate().filter(|(i, cp)| {
-                        i != &current_cp.index
-                            && (cp.area_a == current_cp.area_a
-                                || cp.area_a == current_cp.area_b
-                                || cp.area_b == current_cp.area_a
-                                || cp.area_b == current_cp.area_b)
-                    }) {
-                        to_visit.push(Node {
-                            cost: current.cost + self.distances[i][k],
-                            h: current_cp.top.chebyshev_distance(current_cp.top) * 10000,
-                            cp_index: k,
-                            parent: current_cp.index,
-                        });
-                    }
+                for (k, cp) in self.choke_points.iter().enumerate().filter(|(_, cp)| {
+                    cp.mark.get() != mark
+                        && (cp.area_a == current_cp.area_a
+                            || cp.area_a == current_cp.area_b
+                            || cp.area_b == current_cp.area_a
+                            || cp.area_b == current_cp.area_b)
+                }) {
+                    to_visit.push(Node {
+                        cost: current.cost + self.distances[current.cp_index][k],
+                        cp_index: k,
+                        parent: current_cp.index,
+                    });
                 }
             }
         }
@@ -882,6 +871,7 @@ mod test {
     use image::*;
     use imageproc::drawing::*;
     use inflate::inflate_bytes_zlib;
+    use rusttype::*;
     use shm::Shm;
     use std::cell::RefCell;
     use std::fs::*;
@@ -916,7 +906,11 @@ mod test {
                         Altitude::Walkable(a) => img.put_pixel(
                             x as u32,
                             y as u32,
-                            Rgb([255 - (a / 2) as u8, (27 * alt.area_id % 255) as u8, 255]),
+                            Rgb([
+                                255 - (a / 2) as u8,
+                                (27 * alt.area_id) as u8,
+                                (19 * alt.area_id) as u8,
+                            ]),
                         ),
                         Altitude::Border => img.put_pixel(x as u32, y as u32, Rgb([255, 255, 255])),
                         _ => (),
@@ -937,18 +931,48 @@ mod test {
                 img.put_pixel(1 + wp.x as u32, 1 + wp.y as u32, Rgb([255, 255, 255]));
                 img.put_pixel(wp.x as u32, 1 + wp.y as u32, Rgb([255, 255, 255]));
             }
+            let font = Font::try_from_bytes(include_bytes!("../../Hack-Regular.ttf")).unwrap();
             for (i, targets) in tm.paths.iter().enumerate() {
                 for (j, path) in targets.iter().enumerate().skip(i + 1) {
                     let mut p_i = path.iter();
                     if let Some(last) = p_i.next() {
+                        let l_i = *last;
                         let last = tm.choke_points[*last].top;
                         let mut last = (last.x as f32, last.y as f32);
-                        for next in p_i {
-                            let next = tm.choke_points[*next].top;
+                        for n_i in p_i {
+                            let next = tm.choke_points[*n_i].top;
                             let next = (next.x as f32, next.y as f32);
                             draw_line_segment_mut(&mut img, last, next, Rgb([255, 255, 255]));
+                            assert_eq!(
+                                tm.distances[l_i][*n_i], tm.distances[*n_i][l_i],
+                                "{n_i} {l_i}"
+                            );
+                            draw_text_mut(
+                                &mut img,
+                                Rgb([255, 255, 255]),
+                                (last.0 * 0.8 + next.0 * 0.2) as i32,
+                                (last.1 * 0.8 + next.1 * 0.2) as i32 - 8,
+                                Scale::uniform(16.0),
+                                &font,
+                                &format!("{}", tm.distances[l_i][*n_i]),
+                            );
                             last = next;
                         }
+                    }
+                }
+            }
+            for k in 0..tm.choke_points.len() {
+                for i in 0..tm.choke_points.len() {
+                    for j in 0..tm.choke_points.len() {
+                        assert!(
+                            tm.distances[i][j] <= tm.distances[i][k] + tm.distances[k][j],
+                            "{} -> {} = {} > {} {}",
+                            i,
+                            j,
+                            tm.distances[i][j],
+                            tm.distances[i][k],
+                            tm.distances[k][j]
+                        );
                     }
                 }
             }
