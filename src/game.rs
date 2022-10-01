@@ -735,10 +735,13 @@ impl Game {
         type_: UnitType,
     ) -> BwResult<bool> {
         if let Some(self_) = self.self_() {
+            // Check if the unit type is available (UMS game)
             if !self_.is_unit_available(type_) {
                 return Err(Error::Access_Denied);
             }
             let builder = builder.into();
+
+            // Get the required UnitType
             let required_type = type_.what_builds().0;
             if let Some(builder) = builder {
                 if builder.get_player() != self_ {
