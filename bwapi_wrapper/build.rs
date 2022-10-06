@@ -34,7 +34,7 @@ fn main() {
         .ignore_functions()
         .opaque_type("std::.*")
         .rustfmt_bindings(true)
-        .derive_default(true)
+        // .derive_default(true)
         .derive_eq(true)
         .derive_hash(true)
         //        .disable_name_namespacing()
