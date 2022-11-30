@@ -1,6 +1,6 @@
 [package]
 name = "rsbwapi"
-version = "0.2.5"
+version = "0.3.0"
 authors = ["Dennis Waldherr <bytekeeper@mailbox.org>"]
 description = "BWAPI client to write AI players for Starcraft Broodwar"
 edition = "2021"
@@ -9,11 +9,14 @@ homepage = "https://github.com/Bytekeeper/rsbwapi/"
 repository = "https://github.com/Bytekeeper/rsbwapi/"
 readme = "README.md"
 
+[workspace]
+members = ["bwapi_wrapper"]
+
 [package.metadata.docs.rs]
 targets = ["x86_64-pc-windows-msvc"]
 
 [dependencies]
-bwapi_wrapper = { path = "bwapi_wrapper", version = "0" }
+bwapi_wrapper = { path = "bwapi_wrapper", version = "0.3.0" }
 winapi = { version = "0.3", features = ["winbase", "memoryapi", "handleapi"] }
 memchr = "2.5"
 num-traits = "0.2"
