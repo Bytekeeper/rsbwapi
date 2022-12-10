@@ -344,23 +344,27 @@ impl Player {
     }
 
     pub fn weapon_max_range(&self, weapon: WeaponType) -> i32 {
-        let mut range = weapon.max_range();
+        weapon.max_range() + self.weapon_range_extension(weapon)
+    }
+
+    pub fn weapon_range_extension(&self, weapon: WeaponType) -> i32 {
         if (weapon == WeaponType::Gauss_Rifle
             && self.get_upgrade_level(UpgradeType::U_238_Shells) > 0)
             || (weapon == WeaponType::Needle_Spines
                 && self.get_upgrade_level(UpgradeType::Grooved_Spines) > 0)
         {
-            range += 32; // 1 *
+            32
         } else if weapon == WeaponType::Phase_Disruptor
             && self.get_upgrade_level(UpgradeType::Singularity_Charge) > 0
         {
-            range += 2 * 32;
+            2 * 32
         } else if weapon == WeaponType::Hellfire_Missile_Pack
             && self.get_upgrade_level(UpgradeType::Charon_Boosters) > 0
         {
-            range += 3 * 32;
+            3 * 32
+        } else {
+            0
         }
-        range
     }
 }
 
