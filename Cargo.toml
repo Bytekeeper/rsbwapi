@@ -1,6 +1,6 @@
 [package]
 name = "rsbwapi"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Dennis Waldherr <bytekeeper@mailbox.org>"]
 description = "BWAPI client to write AI players for Starcraft Broodwar"
 edition = "2021"
