@@ -26,6 +26,7 @@ pub mod types;
 pub mod unit;
 
 pub use aimodule::AiModule;
+pub use bullet::{Bullet, BulletType};
 pub use force::Force;
 pub use game::Game;
 pub use player::{Player, PlayerId};

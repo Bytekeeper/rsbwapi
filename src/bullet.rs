@@ -90,4 +90,4 @@ impl PartialEq for Bullet {
     }
 }
 
-type BulletType = BWAPI_BulletTypes_Enum_Enum;
+pub type BulletType = BWAPI_BulletTypes_Enum_Enum;
