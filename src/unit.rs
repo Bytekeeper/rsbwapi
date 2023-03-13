@@ -539,6 +539,10 @@ impl Unit {
         self.inner.defenseMatrixTimer > 0
     }
 
+    pub fn is_cloaked(&self) -> bool {
+        self.inner.isCloaked
+    }
+
     pub fn is_detected(&self) -> bool {
         self.inner.isDetected
     }

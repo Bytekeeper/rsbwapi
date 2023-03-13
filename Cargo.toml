@@ -22,7 +22,7 @@ memchr = "2.5"
 num-traits = "0.2"
 num-derive = "0.3"
 derive_more = "0.99"
-rstar = "0.9"
+rstar = "0.10"
 itertools="0.10"
 ahash = "0.8"
 
