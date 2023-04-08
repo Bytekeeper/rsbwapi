@@ -56,10 +56,6 @@ impl MiniTile {
         )
     }
 
-    fn is_walkable(&self) -> bool {
-        matches!(self.altitude, Altitude::Walkable(_))
-    }
-
     fn is_border(&self) -> bool {
         matches!(self.altitude, Altitude::Border)
     }
@@ -70,10 +66,6 @@ impl MiniTile {
             Altitude::Unwalkable(_) => self.altitude = Altitude::Unwalkable(altitude),
             _ => panic!(),
         }
-    }
-
-    fn set_border(&mut self) {
-        self.altitude = Altitude::Border;
     }
 }
 
@@ -99,8 +91,8 @@ impl BaseFinder {
         let mapy = game.map_height() as usize;
         let scanw = mapx + 2;
         let walk_grid = vec![true; scanw * (mapy + 2)];
-        let resblock = vec![false; ((mapx + 2) * (mapy + 2)) as usize];
-        let resval = vec![0; ((mapx + 2) * (mapy + 2)) as usize];
+        let resblock = vec![false; (mapx + 2) * (mapy + 2)];
+        let resval = vec![0; (mapx + 2) * (mapy + 2)];
         let mut finder = BaseFinder {
             mapx,
             mapy,
@@ -150,7 +142,7 @@ impl BaseFinder {
             res.push(u);
         }
 
-        let mut potbase = Vec::with_capacity((scanw * mapy / 8) as usize);
+        let mut potbase = Vec::with_capacity(scanw * mapy / 8);
         for off in scanw..scanw * (mapy + 1) {
             if finder.resval[off] > BASE_MIN && !finder.resblock[off] {
                 potbase.push(off)
@@ -345,27 +337,37 @@ pub struct ChokePoint {
     area_a: u16,
     area_b: u16,
     pub top: WalkPosition,
-    pub walk_positions: Vec<WalkPosition>,
+    pub area_border: Vec<WalkPosition>,
+    pub choke_area: Vec<WalkPosition>,
     mark: Cell<u16>,
     pred: Cell<usize>,
+    pub end_a: WalkPosition,
+    pub end_b: WalkPosition,
 }
 
 impl ChokePoint {
+    #[allow(clippy::too_many_arguments)]
     fn new(
         index: usize,
         area_a: u16,
         area_b: u16,
         top: WalkPosition,
-        walk_positions: Vec<WalkPosition>,
+        area_border: Vec<WalkPosition>,
+        choke_area: Vec<WalkPosition>,
+        end_a: WalkPosition,
+        end_b: WalkPosition,
     ) -> Self {
         Self {
             index,
             top,
-            walk_positions,
+            area_border,
             area_a,
             area_b,
             mark: Cell::new(0),
             pred: Cell::new(0),
+            choke_area,
+            end_a,
+            end_b,
         }
     }
 }
@@ -478,21 +480,23 @@ impl Map {
                         visited.clear();
                         horizon.clear();
                         horizon.push(wp);
-                        while visited.len() < 200 {
-                            if let Some(wp) = horizon.pop() {
-                                if !visited.contains(&wp) {
-                                    visited.push(wp);
-                                    for d in dir_4() {
-                                        if self.valid(wp + d) && !game.is_walkable(wp + d) {
-                                            horizon.push(wp + d);
-                                        }
+                        let mut tl = wp;
+                        let mut br = wp;
+                        while let Some(wp) = horizon.pop() {
+                            if !visited.contains(&wp) {
+                                tl.x = tl.x.min(wp.x);
+                                tl.y = tl.y.min(wp.y);
+                                br.x = br.x.max(wp.x);
+                                br.y = br.y.max(wp.y);
+                                visited.push(wp);
+                                for d in dir_4() {
+                                    if self.valid(wp + d) && !game.is_walkable(wp + d) {
+                                        horizon.push(wp + d);
                                     }
                                 }
-                            } else {
-                                break;
                             }
                         }
-                        if visited.len() < 200 {
+                        if visited.len() < 200 && br.x - tl.x < 20 && br.y - tl.y < 20 {
                             for &wp in &visited {
                                 self.get_mini_tile_mut(wp).altitude = Altitude::Hole;
                             }
@@ -521,6 +525,10 @@ impl Map {
 
     fn get_mini_tile_mut(&mut self, p: WalkPosition) -> &mut MiniTile {
         &mut self.mini_tiles[(p.y * self.walk_size.x + p.x) as usize]
+    }
+
+    pub fn get_area_id(&self, p: WalkPosition) -> u16 {
+        self.get_mini_tile(p).area_id
     }
 
     fn compute_altitude(&mut self) {
@@ -633,7 +641,7 @@ impl Map {
                         || self
                             .bases
                             .iter()
-                            .any(|b| b.position.distance(wp.to_tile_position()) < 5.0)
+                            .any(|b| b.position.distance_squared(wp.to_tile_position()) < 16)
                     {
                         areas[a as usize].mini_tiles += areas[b as usize].mini_tiles;
                         areas[b as usize].mini_tiles = 0;
@@ -685,6 +693,10 @@ impl Map {
             if areas[a as usize].mini_tiles == 0 || areas[b as usize].mini_tiles == 0 {
                 continue;
             }
+            if a == b {
+                // Merged areas left over borders
+                continue;
+            }
 
             if a > b {
                 std::mem::swap(&mut a, &mut b);
@@ -700,7 +712,7 @@ impl Map {
                         c,
                     )
                 })
-                .min_by_key(|(df, db, c)| *df.min(db))
+                .min_by_key(|(df, db, _)| *df.min(db))
                 .filter(|(df, db, _)| df.min(db) < &20);
             if let Some((df, db, cluster)) = cluster {
                 if df < db {
@@ -720,7 +732,61 @@ impl Map {
         self.choke_points = clusters
             .drain(..)
             .enumerate()
-            .map(|(i, c)| ChokePoint::new(i, c.a, c.b, c.top, c.wps.into()))
+            .map(|(i, c)| {
+                let mut end_a = None;
+                let mut end_b = None;
+                self.mini_tile_mark = self.mini_tile_mark.wrapping_add(1);
+                let Altitude::Walkable(top_alt) = self.get_mini_tile(c.top).altitude else
+                    { panic!("Chokepoint top not walkable")};
+                // TODO: Determine a good "buffer" value
+                let area_border: Vec<_> = c.wps.into();
+                // Minimum altitude to break of BFS
+                let alt_support = top_alt + 6;
+                let mut choke_area = area_border.clone();
+                for wp in area_border.iter() {
+                    self.get_mini_tile(*wp).mark.set(self.mini_tile_mark);
+                }
+                let mut j = 0;
+                while j < choke_area.len() && (end_a.is_none() || end_b.is_none()) {
+                    let next = choke_area[j];
+                    j += 1;
+                    let mini_tile = self.get_mini_tile(next);
+                    let Altitude::Walkable(altitude) = mini_tile.altitude else { continue };
+                    for &d in &WALK_POSITION_4_DIR {
+                        let neigh = next + d;
+                        if !self.valid(neigh) {
+                            continue;
+                        }
+                        let mt = self.get_mini_tile(neigh);
+                        if matches!(mt.altitude, Altitude::Walkable(_))
+                            && mt.mark.get() != self.mini_tile_mark
+                        {
+                            if mt.area_id == c.a {
+                                if end_a.is_none() && altitude > alt_support {
+                                    end_a = Some(neigh);
+                                    continue;
+                                } else if end_a.is_some() {
+                                    continue;
+                                }
+                            }
+                            if mt.area_id == c.b {
+                                if end_b.is_none() && altitude > alt_support {
+                                    end_b = Some(neigh);
+                                    continue;
+                                } else if end_b.is_some() {
+                                    continue;
+                                }
+                            }
+                            mt.mark.set(self.mini_tile_mark);
+                            choke_area.push(neigh);
+                        }
+                    }
+                }
+
+                let Some(end_a) = end_a else { unreachable!("Could not reach area a") };
+                let Some(end_b) = end_b else { unreachable!("Could not reach area b") };
+                ChokePoint::new(i, c.a, c.b, c.top, area_border, choke_area, end_a, end_b)
+            })
             .collect();
     }
 
@@ -844,7 +910,7 @@ impl Map {
                 path.reverse();
                 self.paths[i][current.cp_index] = path;
 
-                for (k, cp) in self.choke_points.iter().enumerate().filter(|(_, cp)| {
+                for (k, _) in self.choke_points.iter().enumerate().filter(|(_, cp)| {
                     cp.mark.get() != mark
                         && (cp.area_a == current_cp.area_a
                             || cp.area_a == current_cp.area_b
@@ -860,6 +926,119 @@ impl Map {
             }
         }
     }
+
+    #[cfg(any(test, feature = "debug_draw"))]
+    pub fn render_map(&self, game: &Game) -> image::RgbImage {
+        use image::*;
+        use imageproc::drawing::*;
+        use rusttype::*;
+
+        let mut img = RgbImage::new(4 * game.map_width() as u32, 4 * game.map_height() as u32);
+        for y in 0..self.walk_size.y {
+            for x in 0..self.walk_size.x {
+                let alt = self.get_mini_tile(WalkPosition::new(x, y));
+                match alt.altitude {
+                    Altitude::Unwalkable(a) => {
+                        img.put_pixel(x as u32, y as u32, Rgb([0, 0, 255 - a as u8]))
+                    }
+                    Altitude::Walkable(a) => img.put_pixel(
+                        x as u32,
+                        y as u32,
+                        Rgb([
+                            255 - (a / 2) as u8,
+                            37_u16.wrapping_mul(alt.area_id) as u8,
+                            19_u16.wrapping_mul(alt.area_id) as u8,
+                        ]),
+                    ),
+                    Altitude::Border => img.put_pixel(x as u32, y as u32, Rgb([255, 255, 255])),
+                    _ => (),
+                }
+            }
+        }
+        for base in game.get_start_locations() {
+            let wp = base.to_walk_position();
+            img.put_pixel(wp.x as u32, wp.y as u32, Rgb([255, 0, 0]));
+            img.put_pixel(1 + wp.x as u32, wp.y as u32, Rgb([255, 0, 0]));
+            img.put_pixel(1 + wp.x as u32, 1 + wp.y as u32, Rgb([255, 0, 0]));
+            img.put_pixel(wp.x as u32, 1 + wp.y as u32, Rgb([255, 0, 0]));
+        }
+        for &Base { position: tp, .. } in &self.bases {
+            let wp = tp.to_walk_position();
+            img.put_pixel(wp.x as u32, wp.y as u32, Rgb([0, 255, 0]));
+            img.put_pixel(1 + wp.x as u32, wp.y as u32, Rgb([0, 255, 0]));
+            img.put_pixel(1 + wp.x as u32, 1 + wp.y as u32, Rgb([0, 255, 0]));
+            img.put_pixel(wp.x as u32, 1 + wp.y as u32, Rgb([0, 255, 0]));
+        }
+        let font = Font::try_from_bytes(include_bytes!("../../Hack-Regular.ttf")).unwrap();
+        for (i, targets) in self.paths.iter().enumerate() {
+            for (j, path) in targets.iter().enumerate().skip(i + 1) {
+                let mut p_i = path.iter();
+                if let Some(last) = p_i.next() {
+                    let l_i = *last;
+                    let last = self.choke_points[*last].top;
+                    let mut last = (last.x as f32, last.y as f32);
+                    for n_i in p_i {
+                        let next = self.choke_points[*n_i].top;
+                        let next = (next.x as f32, next.y as f32);
+                        draw_line_segment_mut(&mut img, last, next, Rgb([255, 255, 255]));
+                        debug_assert_eq!(
+                            self.distances[l_i][*n_i], self.distances[*n_i][l_i],
+                            "{n_i} {l_i}"
+                        );
+                        // draw_text_mut(
+                        //     &mut img,
+                        //     Rgb([255, 255, 255]),
+                        //     (last.0 * 0.8 + next.0 * 0.2) as i32,
+                        //     (last.1 * 0.8 + next.1 * 0.2) as i32 - 8,
+                        //     Scale::uniform(16.0),
+                        //     &font,
+                        //     &format!("{}", tm.distances[l_i][*n_i]),
+                        // );
+                        last = next;
+                    }
+                }
+            }
+        }
+        for k in 0..self.choke_points.len() {
+            for i in 0..self.choke_points.len() {
+                for j in 0..self.choke_points.len() {
+                    debug_assert!(
+                        self.distances[i][j] <= self.distances[i][k] + self.distances[k][j],
+                        "{} -> {} = {} > {} {}",
+                        i,
+                        j,
+                        self.distances[i][j],
+                        self.distances[i][k],
+                        self.distances[k][j]
+                    );
+                }
+            }
+        }
+        for ChokePoint {
+            top,
+            area_border,
+            choke_area,
+            end_a,
+            end_b,
+            ..
+        } in &self.choke_points
+        {
+            for wp in choke_area {
+                img.put_pixel(wp.x as u32, wp.y as u32, Rgb([255, 255, 255]));
+            }
+            img.put_pixel(end_a.x as u32, end_a.y as u32, Rgb([0, 0, 255]));
+            img.put_pixel(end_b.x as u32, end_b.y as u32, Rgb([0, 0, 255]));
+            for wp in area_border {
+                img.put_pixel(wp.x as u32, wp.y as u32, Rgb([255, 0, 0]));
+            }
+            if end_a == &WalkPosition::new(0, 0) || end_b == &WalkPosition::new(0, 0) {
+                img.put_pixel(top.x as u32, top.y as u32, Rgb([0, 255, 255]));
+            } else {
+                img.put_pixel(top.x as u32, top.y as u32, Rgb([0, 0, 255]));
+            }
+        }
+        img
+    }
 }
 
 #[cfg(test)]
@@ -868,10 +1047,7 @@ mod test {
 
     use super::*;
     use crate::{command::Commands, game::*};
-    use image::*;
-    use imageproc::drawing::*;
     use inflate::inflate_bytes_zlib;
-    use rusttype::*;
     use shm::Shm;
     use std::cell::RefCell;
     use std::fs::*;
@@ -895,98 +1071,7 @@ mod test {
             let timer = Instant::now();
             let tm = Map::new(&game);
             println!("{}", timer.elapsed().as_micros());
-            let mut img = RgbImage::new(4 * game.map_width() as u32, 4 * game.map_height() as u32);
-            for y in 0..tm.walk_size.y {
-                for x in 0..tm.walk_size.x {
-                    let alt = tm.get_mini_tile(WalkPosition::new(x, y));
-                    match alt.altitude {
-                        Altitude::Unwalkable(a) => {
-                            img.put_pixel(x as u32, y as u32, Rgb([0, 0, 255 - a as u8]))
-                        }
-                        Altitude::Walkable(a) => img.put_pixel(
-                            x as u32,
-                            y as u32,
-                            Rgb([
-                                255 - (a / 2) as u8,
-                                (27 * alt.area_id) as u8,
-                                (19 * alt.area_id) as u8,
-                            ]),
-                        ),
-                        Altitude::Border => img.put_pixel(x as u32, y as u32, Rgb([255, 255, 255])),
-                        _ => (),
-                    }
-                }
-            }
-            for base in game.get_start_locations() {
-                let wp = base.to_walk_position();
-                img.put_pixel(wp.x as u32, wp.y as u32, Rgb([255, 0, 0]));
-                img.put_pixel(1 + wp.x as u32, wp.y as u32, Rgb([255, 0, 0]));
-                img.put_pixel(1 + wp.x as u32, 1 + wp.y as u32, Rgb([255, 0, 0]));
-                img.put_pixel(wp.x as u32, 1 + wp.y as u32, Rgb([255, 0, 0]));
-            }
-            for &Base { position: tp, .. } in &tm.bases {
-                let wp = tp.to_walk_position();
-                img.put_pixel(wp.x as u32, wp.y as u32, Rgb([255, 255, 255]));
-                img.put_pixel(1 + wp.x as u32, wp.y as u32, Rgb([255, 255, 255]));
-                img.put_pixel(1 + wp.x as u32, 1 + wp.y as u32, Rgb([255, 255, 255]));
-                img.put_pixel(wp.x as u32, 1 + wp.y as u32, Rgb([255, 255, 255]));
-            }
-            let font = Font::try_from_bytes(include_bytes!("../../Hack-Regular.ttf")).unwrap();
-            for (i, targets) in tm.paths.iter().enumerate() {
-                for (j, path) in targets.iter().enumerate().skip(i + 1) {
-                    let mut p_i = path.iter();
-                    if let Some(last) = p_i.next() {
-                        let l_i = *last;
-                        let last = tm.choke_points[*last].top;
-                        let mut last = (last.x as f32, last.y as f32);
-                        for n_i in p_i {
-                            let next = tm.choke_points[*n_i].top;
-                            let next = (next.x as f32, next.y as f32);
-                            draw_line_segment_mut(&mut img, last, next, Rgb([255, 255, 255]));
-                            assert_eq!(
-                                tm.distances[l_i][*n_i], tm.distances[*n_i][l_i],
-                                "{n_i} {l_i}"
-                            );
-                            draw_text_mut(
-                                &mut img,
-                                Rgb([255, 255, 255]),
-                                (last.0 * 0.8 + next.0 * 0.2) as i32,
-                                (last.1 * 0.8 + next.1 * 0.2) as i32 - 8,
-                                Scale::uniform(16.0),
-                                &font,
-                                &format!("{}", tm.distances[l_i][*n_i]),
-                            );
-                            last = next;
-                        }
-                    }
-                }
-            }
-            for k in 0..tm.choke_points.len() {
-                for i in 0..tm.choke_points.len() {
-                    for j in 0..tm.choke_points.len() {
-                        assert!(
-                            tm.distances[i][j] <= tm.distances[i][k] + tm.distances[k][j],
-                            "{} -> {} = {} > {} {}",
-                            i,
-                            j,
-                            tm.distances[i][j],
-                            tm.distances[i][k],
-                            tm.distances[k][j]
-                        );
-                    }
-                }
-            }
-            for ChokePoint {
-                top,
-                walk_positions,
-                ..
-            } in &tm.choke_points
-            {
-                for wp in walk_positions {
-                    img.put_pixel(wp.x as u32, wp.y as u32, Rgb([255, 0, 0]));
-                }
-                img.put_pixel(top.x as u32, top.y as u32, Rgb([255, 255, 0]));
-            }
+            let img = tm.render_map(&game);
             target.push(format!(
                 "{}.png",
                 entry.path().file_name().unwrap().to_string_lossy()
@@ -994,6 +1079,5 @@ mod test {
             eprintln!("{}", target.to_string_lossy());
             img.save(target).unwrap();
         }
-        // panic!();
     }
 }

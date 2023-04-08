@@ -891,7 +891,7 @@ impl Unit {
     }
 
     pub fn is_visible_to(&self, player: &Player) -> bool {
-        self.inner.isVisible[player.id as usize]
+        self.inner.isVisible[player.id]
     }
 
     pub fn is_visible(&self) -> bool {
@@ -908,7 +908,7 @@ impl Unit {
         if self.get_type().get_race() != Race::Terran {
             return true;
         }
-        self.get_build_unit() != None
+        self.get_build_unit().is_some()
     }
 
     pub fn is_being_gathered(&self) -> bool {

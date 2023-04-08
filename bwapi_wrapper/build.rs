@@ -63,7 +63,7 @@ fn should_replace1() {
 
     // WHEN
     let re = Regex::new(r"#\s*\[\s*derive\s*\((?P<d>[^)]+)\)\s*\]\s*pub\s+enum").unwrap();
-    let changed = re.replace_all(&test, "#[derive($d, FromPrimitive)]\npub enum");
+    let changed = re.replace_all(test, "#[derive($d, FromPrimitive)]\npub enum");
 
     // THEN
     assert_eq!("#[derive( Debug , Copy , Clone , PartialEq , Eq , Hash , FromPrimitive)]\npub enum std_deque__bindgen_ty_1", changed);
@@ -75,7 +75,7 @@ fn should_replace2() {
 
     // WHEN
     let re = Regex::new(r"#\s*\[\s*derive\s*\((?P<d>[^)]+)\)\s*\]\s*pub\s+enum").unwrap();
-    let changed = re.replace_all(&test, "#[derive($d, FromPrimitive)]\npub enum");
+    let changed = re.replace_all(test, "#[derive($d, FromPrimitive)]\npub enum");
 
     // THEN
     assert_eq!("#[derive( Debug , Copy , Clone , PartialEq , Eq , Hash , FromPrimitive)]\npub enum BWAPI_Text_Size_Enum #[derive( Debug , Copy , Clone , PartialEq , Eq , Hash , FromPrimitive)]\npub enum BWAPIC_CommandType_Enum ", changed);

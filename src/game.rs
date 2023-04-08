@@ -908,7 +908,7 @@ impl Game {
 
     fn unit_invisible(&self, id: UnitId) {
         let mut visible_units = self.inner.visible_units.borrow_mut();
-        let index = visible_units.iter().position(|u| u.get_id() as usize == id);
+        let index = visible_units.iter().position(|u| u.get_id() == id);
         if let Some(index) = index {
             visible_units.swap_remove(index);
         }

@@ -45,7 +45,7 @@ impl Default for Client {
             {
                 let game_table = game_table.get();
                 for game_instance in game_table.gameInstances.iter() {
-                    if game_instance.serverProcessID != 0 {
+                    if game_instance.serverProcessID != 0 && !game_instance.isConnected {
                         let pid = game_instance.serverProcessID;
                         let mut file: File = OpenOptions::new()
                             .read(true)
