@@ -45,7 +45,7 @@ impl AiModule for MyModule {
         for (i, name) in names.iter().enumerate() {
             game.draw_text_screen((10, (i as i32) * 10 + 20), name);
         }
-        game.draw_text_screen((10, 10), game.enemy().unwrap().get_name());
+        game.draw_text_screen((10, 10), &game.enemy().unwrap().get_name());
         let units = game.get_all_units();
         let my_units = self_.get_units();
 
@@ -134,7 +134,7 @@ impl AiModule for MyModule {
                 //                    .filter(|u| u.get_type() == UnitType::Zerg_Drone)
                 .for_each(|u| {
                     //                        println!("Sending {} to attack {:?}", u.id, enemy.get_type());
-                    if let Err(err) = u.attack(&enemy) {
+                    if let Err(err) = u.attack(enemy) {
                         println!(
                             "{:?} cannot hit {:?}: {:?}",
                             u.get_type(),
@@ -160,5 +160,5 @@ impl AiModule for MyModule {
 }
 
 fn main() {
-    rsbwapi::start(MyModule);
+    rsbwapi::start(|_game| MyModule);
 }
