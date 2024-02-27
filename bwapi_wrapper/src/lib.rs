@@ -15,7 +15,8 @@ pub mod prelude;
 #[allow(clippy::all)]
 mod bindings {
     use num_derive::FromPrimitive;
-    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+    include!("bindings.rs");
+    // include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
 pub use bindings::*;
 
