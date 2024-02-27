@@ -1,5 +1,4 @@
-extern crate bindgen;
-
+use bindgen::Formatter;
 use regex::Regex;
 use std::env;
 use std::fs::File;
@@ -33,7 +32,7 @@ fn main() {
         .ignore_methods()
         .ignore_functions()
         .opaque_type("std::.*")
-        .rustfmt_bindings(true)
+        .formatter(Formatter::Rustfmt)
         // .derive_default(true)
         .derive_eq(true)
         .derive_hash(true)

@@ -10,20 +10,20 @@ repository = "https://github.com/Bytekeeper/rsbwapi/"
 readme = "README.md"
 
 [workspace]
-members = ["bwapi_wrapper"]
+members = ["bwapi_wrapper", "example_bot"]
 
 [package.metadata.docs.rs]
 targets = ["x86_64-pc-windows-msvc"]
 
 [dependencies]
-bwapi_wrapper = { path = "bwapi_wrapper", version = "0.3.2" }
+bwapi_wrapper = { path = "bwapi_wrapper", version = "0.3.3" }
 winapi = { version = "0.3", features = ["winbase", "memoryapi", "handleapi"] }
 memchr = "2.5"
 num-traits = "0.2"
-num-derive = "0.3"
+num-derive = "0.4"
 derive_more = "0.99"
-rstar = "0.10"
-itertools="0.10"
+rstar = "0.12"
+itertools="0.12"
 ahash = "0.8"
 image = { version = "0.24", optional = true }
 imageproc = { version = "0.23", optional = true }
