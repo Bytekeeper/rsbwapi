@@ -9,12 +9,6 @@ fn main() {
     should_replace1();
     should_replace2();
 
-    let host_target = std::env::var("HOST").unwrap();
-    std::env::set_var(
-        "BINDGEN_EXTRA_CLANG_ARGS",
-        format!("--target={}", host_target),
-    );
-
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
     // the resulting bindings.
