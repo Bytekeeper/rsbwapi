@@ -18,7 +18,7 @@ targets = ["x86_64-pc-windows-msvc"]
 [dependencies]
 bwapi_wrapper = { path = "bwapi_wrapper", version = "0.3.3" }
 winapi = { version = "0.3", features = ["winbase", "memoryapi", "handleapi"] }
-memchr = "2.5"
+memchr = "2.7"
 num-traits = "0.2"
 num-derive = "0.4"
 derive_more = "0.99"
