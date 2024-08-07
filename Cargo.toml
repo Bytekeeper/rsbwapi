@@ -26,7 +26,7 @@ rstar = "0.12"
 itertools="0.13"
 ahash = "0.8"
 image = { version = "0.24", optional = true }
-imageproc = { version = "0.23", optional = true }
+imageproc = { version = "0.25", optional = true }
 rusttype = { version = "0.9", optional = true }
 
 metered = { version = "0.9", optional = true}
@@ -40,7 +40,7 @@ debug_draw = ["image", "imageproc", "rusttype"]
 [dev-dependencies]
 inflate = "0.4"
 image = "0.24"
-imageproc = "0.23"
+imageproc = "0.25"
 rusttype = "0.9"
 
 [profile.dev.package."*"]
