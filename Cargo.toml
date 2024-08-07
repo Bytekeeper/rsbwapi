@@ -23,7 +23,7 @@ num-traits = "0.2"
 num-derive = "0.4"
 derive_more = "0.99"
 rstar = "0.12"
-itertools="0.12"
+itertools="0.13"
 ahash = "0.8"
 image = { version = "0.24", optional = true }
 imageproc = { version = "0.23", optional = true }
