@@ -19,7 +19,7 @@ targets = ["x86_64-pc-windows-msvc"]
 [dependencies]
 num-traits = "0.2"
 num-derive = "0.4"
-derive_more = "0.99"
+derive_more = { version = "1.0", features = ["full"] }
 
 
 [build-dependencies]

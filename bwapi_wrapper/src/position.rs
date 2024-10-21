@@ -1,11 +1,11 @@
 use crate::UnitType;
-use core::ops::{Add, Div, DivAssign, Index, IndexMut, Mul, MulAssign, Sub};
+use core::ops::{Div, DivAssign, Index, IndexMut, Mul, MulAssign};
 use derive_more::{Add, AddAssign, Display, From, Sub, SubAssign};
 
 #[derive(
     Default, Debug, Display, Copy, Clone, Eq, PartialEq, Add, Sub, AddAssign, SubAssign, From, Hash,
 )]
-#[display(fmt = "Position<{}> ({}, {})", N, x, y)]
+#[display("Position<{}> ({}, {})", N, x, y)]
 pub struct ScaledPosition<const N: i32> {
     pub x: i32,
     pub y: i32,
