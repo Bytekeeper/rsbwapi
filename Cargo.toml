@@ -21,7 +21,7 @@ winapi = { version = "0.3", features = ["winbase", "memoryapi", "handleapi"] }
 memchr = "2.7"
 num-traits = "0.2"
 num-derive = "0.4"
-derive_more = "1.0"
+derive_more = { version = "1.0", features = ["full"] }
 rstar = "0.12"
 itertools="0.13"
 ahash = "0.8"
