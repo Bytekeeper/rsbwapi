@@ -1,6 +1,6 @@
 [package]
 name = "bwapi_wrapper"
-version = "0.3.3"
+version.workspace = true
 authors = ["Dennis Waldherr <bytekeeper@mailbox.org>"]
 edition = "2021"
 homepage = "https://github.com/Bytekeeper/rsbwapi/"
@@ -17,9 +17,9 @@ readme = "README.md"
 targets = ["x86_64-pc-windows-msvc"]
 
 [dependencies]
-num-traits = "0.2"
-num-derive = "0.4"
-derive_more = { version = "1.0", features = ["full"] }
+num-traits.workspace = true
+num-derive.workspace = true
+derive_more.workspace = true
 
 
 [build-dependencies]

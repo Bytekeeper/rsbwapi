@@ -1,6 +1,6 @@
 [package]
 name = "rsbwapi"
-version = "0.3.3"
+version.workspace = true
 authors = ["Dennis Waldherr <bytekeeper@mailbox.org>"]
 description = "BWAPI client to write AI players for Starcraft Broodwar"
 edition = "2021"
@@ -12,21 +12,33 @@ readme = "README.md"
 [workspace]
 members = ["bwapi_wrapper", "example_bot"]
 
+[workspace.package]
+version = "0.3.4"
+
+[workspace.dependencies]
+num-traits = "0.2"
+num-derive = "0.4"
+derive_more = { version = "1.0.0", features = ["full"] }
+image = "0.25"
+imageproc = "0.25"
+
+
 [package.metadata.docs.rs]
 targets = ["x86_64-pc-windows-msvc"]
 
+
 [dependencies]
+num-traits.workspace = true
+num-derive.workspace = true
+derive_more.workspace = true
 bwapi_wrapper = { path = "bwapi_wrapper", version = "0.3.3" }
 winapi = { version = "0.3", features = ["winbase", "memoryapi", "handleapi"] }
 memchr = "2.7"
-num-traits = "0.2"
-num-derive = "0.4"
-derive_more = { version = "1.0", features = ["full"] }
 rstar = "0.12"
-itertools="0.13"
+itertools = "0.13"
 ahash = "0.8"
-image = { version = "0.24", optional = true }
-imageproc = { version = "0.23", optional = true }
+image = { workspace = true, optional = true }
+imageproc = { workspace = true, optional = true }
 rusttype = { version = "0.9", optional = true }
 
 metered = { version = "0.9", optional = true}
@@ -39,8 +51,8 @@ debug_draw = ["image", "imageproc", "rusttype"]
 
 [dev-dependencies]
 inflate = "0.4"
-image = "0.24"
-imageproc = "0.23"
+image.workspace = true
+imageproc.workspace = true
 rusttype = "0.9"
 
 [profile.dev.package."*"]

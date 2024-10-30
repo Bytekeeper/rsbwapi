@@ -338,7 +338,7 @@ impl Player {
             // Divide cooldown by 2
             cooldown /= 2;
             // Prevent cooldown from going out of bounds
-            cooldown = cooldown.max(5).min(250);
+            cooldown = cooldown.clamp(5, 250);
         }
         cooldown
     }

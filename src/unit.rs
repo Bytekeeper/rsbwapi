@@ -1351,7 +1351,3 @@ impl PartialEq for Unit {
         self.id == other.id
     }
 }
-
-trait UnitCommandExt {
-    fn get_target(&self) -> Option<Unit>;
-}

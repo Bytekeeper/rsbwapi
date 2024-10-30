@@ -18,7 +18,7 @@ use winapi::um::winnt::HANDLE;
 pub(crate) struct Shm<T: ?Sized>(HANDLE, NonNull<T>);
 
 #[cfg(not(windows))]
-pub(crate) struct Shm<T: ?Sized>(usize, NonNull<T>);
+pub(crate) struct Shm<T: ?Sized>((), NonNull<T>);
 
 impl<T> Deref for Shm<T> {
     type Target = T;
@@ -46,13 +46,13 @@ impl<T> Shm<T> {
 
     #[cfg(test)]
     pub fn from_mut_slice(data: &mut [u8]) -> Shm<T> {
-        Self(data.len(), NonNull::new(data.as_mut_ptr()).unwrap().cast())
+        Self((), NonNull::new(data.as_mut_ptr()).unwrap().cast())
     }
 }
 
+#[cfg(windows)]
 impl<T: ?Sized> Drop for Shm<T> {
     fn drop(&mut self) {
-        #[cfg(windows)]
         unsafe {
             CloseHandle(self.0);
         }
