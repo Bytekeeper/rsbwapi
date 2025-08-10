@@ -35,7 +35,7 @@ bwapi_wrapper = { path = "bwapi_wrapper", version = "0.3.3" }
 winapi = { version = "0.3", features = ["winbase", "memoryapi", "handleapi"] }
 memchr = "2.7"
 rstar = "0.12"
-itertools = "0.13"
+itertools = "0.14"
 ahash = "0.8"
 image = { workspace = true, optional = true }
 imageproc = { workspace = true, optional = true }
