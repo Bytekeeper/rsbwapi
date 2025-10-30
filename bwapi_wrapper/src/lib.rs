@@ -15,8 +15,8 @@ pub mod prelude;
 #[allow(clippy::all)]
 mod bindings {
     use num_derive::FromPrimitive;
-    include!("bindings.rs");
-    // include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+    // include!("bindings.rs");
+    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
 pub use bindings::*;
 
@@ -68,8 +68,8 @@ const DEFAULT_TIME_COST_BASE: [i32; UpgradeType::MAX as usize] = [
 ];
 
 mod upgrade_internals {
-    use crate::prelude::{UnitType, UpgradeType};
     use crate::BWAPI_UnitTypes_Enum_Enum::*;
+    use crate::prelude::{UnitType, UpgradeType};
 
     pub(crate) const REQUIREMENTS: [[UnitType; UpgradeType::MAX as usize]; 3] = [
         // Level 1

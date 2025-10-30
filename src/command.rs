@@ -169,7 +169,7 @@ impl Commands {
 }
 
 impl Game {
-    fn cmd(&self) -> RefMut<Commands> {
+    fn cmd(&'_ self) -> RefMut<'_, Commands> {
         self.inner.cmd.borrow_mut()
     }
 
@@ -513,11 +513,7 @@ impl Game {
             type_: BWAPIC_CommandType_Enum::SetAllies,
             value1: other.id as i32,
             value2: if allied {
-                if allied_victory {
-                    2
-                } else {
-                    1
-                }
+                if allied_victory { 2 } else { 1 }
             } else {
                 0
             },

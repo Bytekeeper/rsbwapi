@@ -2,7 +2,7 @@
 name = "bwapi_wrapper"
 version.workspace = true
 authors = ["Dennis Waldherr <bytekeeper@mailbox.org>"]
-edition = "2021"
+edition = "2024"
 homepage = "https://github.com/Bytekeeper/rsbwapi/"
 license = "LGPL-3.0-or-later"
 repository = "https://github.com/Bytekeeper/rsbwapi/"
@@ -23,6 +23,5 @@ derive_more.workspace = true
 
 
 [build-dependencies]
-# bindgen = "0.69"
-# regex = "1"
-
+bindgen = "0.72"
+regex = "1"
