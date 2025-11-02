@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 3.6.1 - 2025-11-02
+#### Miscellaneous Chores
+- Updated dependencies and use workspace version for example bot - (323caa6) - Dennis Waldherr
+
+- - -
+
 ## 3.6.0 - 2025-11-02
 #### Miscellaneous Chores
 - Added cog.toml - (048c3b6) - Dennis Waldherr
