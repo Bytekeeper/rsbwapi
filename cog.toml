@@ -8,4 +8,4 @@ pre_bump_hooks = [
   "cargo check --release",
   "git add :/Cargo.lock",          # stage version bump in Cargo.lock
 ]
-post_bump_hooks = ["git push", "git push {{version}}"]
+post_bump_hooks = ["git push --tags"]

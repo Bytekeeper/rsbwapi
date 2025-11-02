@@ -248,7 +248,7 @@ checksum = "46c5e41b57b8bba42a04676d81cb89e9ee8e859a1a66f80a5a72e1cb76b34d43"
 
 [[package]]
 name = "bwapi_wrapper"
-version = "0.3.4"
+version = "3.6.2"
 dependencies = [
  "bindgen",
  "derive_more",
@@ -454,7 +454,7 @@ checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
 
 [[package]]
 name = "example_bot"
-version = "0.0.0"
+version = "3.6.2"
 dependencies = [
  "rsbwapi",
 ]
@@ -1368,7 +1368,7 @@ checksum = "0c6a884d2998352bb4daf0183589aec883f16a6da1f4dde84d8e2e9a5409a1ce"
 
 [[package]]
 name = "rsbwapi"
-version = "0.3.4"
+version = "3.6.2"
 dependencies = [
  "ahash",
  "bwapi_wrapper",
