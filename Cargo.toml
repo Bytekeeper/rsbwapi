@@ -13,7 +13,7 @@ readme = "README.md"
 members = ["bwapi_wrapper", "example_bot"]
 
 [workspace.package]
-version = "0.3.4"
+version = "3.6.2"
 
 [workspace.dependencies]
 num-traits = "0.2"
@@ -31,7 +31,7 @@ targets = ["x86_64-pc-windows-msvc"]
 num-traits.workspace = true
 num-derive.workspace = true
 derive_more.workspace = true
-bwapi_wrapper = { path = "bwapi_wrapper", version = "0.3.3" }
+bwapi_wrapper = { path = "bwapi_wrapper", version = "3.6.2" }
 winapi = { version = "0.3", features = ["winbase", "memoryapi", "handleapi"] }
 memchr = "2.7"
 rstar = "0.12"

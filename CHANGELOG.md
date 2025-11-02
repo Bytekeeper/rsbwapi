@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 3.6.2 - 2025-11-02
+#### Miscellaneous Chores
+- cog should update the workspace version - (9d5b1c5) - Dennis Waldherr
+
+- - -
+
 ## 3.6.1 - 2025-11-02
 #### Miscellaneous Chores
 - Updated dependencies and use workspace version for example bot - (323caa6) - Dennis Waldherr
