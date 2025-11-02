@@ -1,6 +1,5 @@
 [package]
 name = "example_bot"
-version = "0.1.0"
 authors = ["Bytekeeper <bytekeeper@mailbox.org>"]
 edition = "2024"
 
