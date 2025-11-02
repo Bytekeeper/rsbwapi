@@ -1,3 +1,11 @@
 # Basic settings
 from_latest_tag = true
 ignore_merge_commits = true
+
+pre_bump_hooks = [
+  "cargo build --release",         # verify the project builds
+  "cargo set-version {{version}}", # bump version in Cargo.toml
+  "cargo check --release",
+  "git add :/Cargo.lock",          # stage version bump in Cargo.lock
+]
+post_bump_hooks = ["git push", "git push {{version}}"]
