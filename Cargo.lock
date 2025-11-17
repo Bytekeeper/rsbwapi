@@ -254,7 +254,6 @@ dependencies = [
  "derive_more",
  "num-derive",
  "num-traits",
- "regex",
 ]
 
 [[package]]
