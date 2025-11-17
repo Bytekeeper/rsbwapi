@@ -588,25 +588,23 @@ impl Unit {
         }
 
         //if BWOrder is MoveToGas, Harvest1, or Harvest2 we need to do some additional checks to make sure the unit is really gathering
-        if let Some(targ) = self.get_target() {
-            if targ.exists()
-                && targ.is_completed()
-                && targ.get_player() == self.get_player()
-                && targ.get_type() != UnitType::Resource_Vespene_Geyser
-                && (targ.get_type().is_refinery() || targ.get_type().is_resource_depot())
-            {
-                return true;
-            }
+        if let Some(targ) = self.get_target()
+            && targ.exists()
+            && targ.is_completed()
+            && targ.get_player() == self.get_player()
+            && targ.get_type() != UnitType::Resource_Vespene_Geyser
+            && (targ.get_type().is_refinery() || targ.get_type().is_resource_depot())
+        {
+            return true;
         }
-        if let Some(targ) = self.get_order_target() {
-            if targ.exists()
-                && targ.is_completed()
-                && targ.get_player() == self.get_player()
-                && targ.get_type() != UnitType::Resource_Vespene_Geyser
-                && (targ.get_type().is_refinery() || targ.get_type().is_resource_depot())
-            {
-                return true;
-            }
+        if let Some(targ) = self.get_order_target()
+            && targ.exists()
+            && targ.is_completed()
+            && targ.get_player() == self.get_player()
+            && targ.get_type() != UnitType::Resource_Vespene_Geyser
+            && (targ.get_type().is_refinery() || targ.get_type().is_resource_depot())
+        {
+            return true;
         }
         false
     }
@@ -639,25 +637,23 @@ impl Unit {
         }
 
         //if BWOrder is MoveToMinerals, Harvest1, or Harvest2 we need to do some additional checks to make sure the unit is really gathering
-        if let Some(target) = self.get_target() {
-            if target.exists()
-                && (target.get_type().is_mineral_field()
-                    || (target.is_completed()
-                        && target.get_player() == self.get_player()
-                        && target.get_type().is_resource_depot()))
-            {
-                return true;
-            }
+        if let Some(target) = self.get_target()
+            && target.exists()
+            && (target.get_type().is_mineral_field()
+                || (target.is_completed()
+                    && target.get_player() == self.get_player()
+                    && target.get_type().is_resource_depot()))
+        {
+            return true;
         }
-        if let Some(order_target) = self.get_order_target() {
-            if order_target.exists()
-                && (order_target.get_type().is_mineral_field()
-                    || (order_target.is_completed()
-                        && order_target.get_player() == self.get_player()
-                        && order_target.get_type().is_resource_depot()))
-            {
-                return true;
-            }
+        if let Some(order_target) = self.get_order_target()
+            && order_target.exists()
+            && (order_target.get_type().is_mineral_field()
+                || (order_target.is_completed()
+                    && order_target.get_player() == self.get_player()
+                    && order_target.get_type().is_resource_depot()))
+        {
+            return true;
         }
         false
     }

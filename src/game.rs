@@ -13,9 +13,9 @@ use crate::*;
 use bwapi_wrapper::*;
 use core::cell::RefCell;
 #[cfg(feature = "metrics")]
-use metered::{hdr_histogram::HdrHistogram, measure, time_source::StdInstantMicros, ResponseTime};
+use metered::{ResponseTime, hdr_histogram::HdrHistogram, measure, time_source::StdInstantMicros};
 use rstar::primitives::Rectangle;
-use rstar::{Envelope, PointDistance, RTree, RTreeObject, AABB};
+use rstar::{AABB, Envelope, PointDistance, RTree, RTreeObject};
 use std::ops::Deref;
 use std::rc::Rc;
 
@@ -530,7 +530,7 @@ impl Game {
                 .get_geysers()
                 .iter()
                 .find(|x| x.get_tile_position() == position)
-                .map_or(false, |x| {
+                .is_some_and(|x| {
                     !(x.is_visible() && x.get_type() != UnitType::Resource_Vespene_Geyser)
                 }));
         }
@@ -567,7 +567,7 @@ impl Game {
                     !Unit::is_flying.into_predicate()
                         & !Unit::is_loaded.into_predicate()
                         & |u: &Unit| {
-                            builder.map_or(true, |b| b != u || type_ == UnitType::Zerg_Nydus_Canal)
+                            builder.is_none_or(|b| b != u || type_ == UnitType::Zerg_Nydus_Canal)
                                 && u.get_left() <= targ_pos.x + type_.dimension_right()
                                 && u.get_top() <= targ_pos.y + type_.dimension_down()
                                 && u.get_right() >= targ_pos.x - type_.dimension_left()
@@ -635,18 +635,17 @@ impl Game {
         // A building can build an addon at a different location (i.e. automatically lifts (if not already lifted)
         // then lands at the new location before building the addon), so we need to do similar checks for the
         // location that the building will be when it builds the addon.
-        if let Some(builder) = builder {
-            if !builder.get_type().is_addon()
-                && type_.is_addon()
-                && !self.can_build_here(
-                    builder,
-                    lt - TilePosition { x: 4, y: 1 },
-                    builder.get_type(),
-                    check_explored,
-                )?
-            {
-                return Ok(false);
-            }
+        if let Some(builder) = builder
+            && !builder.get_type().is_addon()
+            && type_.is_addon()
+            && !self.can_build_here(
+                builder,
+                lt - TilePosition { x: 4, y: 1 },
+                builder.get_type(),
+                check_explored,
+            )?
+        {
+            return Ok(false);
         }
         Ok(true)
     }
@@ -860,14 +859,13 @@ impl Game {
                 return Err(Error::Insufficient_Tech);
             }
 
-            if let Some(builder) = builder {
-                if addon != UnitType::None
-                    && addon.what_builds().0 == type_.what_builds().0
-                    && (builder.get_addon().is_none()
-                        || builder.get_addon().map(|a| a.get_type()) == Some(addon))
-                {
-                    return Err(Error::Insufficient_Tech);
-                }
+            if let Some(builder) = builder
+                && addon != UnitType::None
+                && addon.what_builds().0 == type_.what_builds().0
+                && (builder.get_addon().is_none()
+                    || builder.get_addon().map(|a| a.get_type()) == Some(addon))
+            {
+                return Err(Error::Insufficient_Tech);
             }
 
             Ok(true)
@@ -1130,10 +1128,10 @@ impl Game {
             wpn.damage_amount() * wpn.damage_factor()
         };
 
-        if wpn.damage_type() != DamageType::Ignore_Armor {
-            if let Some(to_player) = to_player.into() {
-                dmg -= dmg.min(to_player.armor(to_type));
-            }
+        if wpn.damage_type() != DamageType::Ignore_Armor
+            && let Some(to_player) = to_player.into()
+        {
+            dmg -= dmg.min(to_player.armor(to_type));
         }
         dmg * DAMAGE_RATIO[wpn.damage_type() as usize][to_type.size() as usize] / 256
     }

@@ -44,6 +44,8 @@ impl UnitType {
     }
 }
 
+// No, we can't derive this "cleanly".
+#[allow(clippy::derivable_impls)]
 impl Default for UnitType {
     fn default() -> Self {
         Self::None
