@@ -13,3 +13,43 @@ You may want to join the [SSCAIT Discord](https://discord.gg/frDVAwk), which is 
 For more information on Starcraft AI development, you can visit the [SSCAIT website](http://www.sscaitournament.com/). There should be enough information to get you started.
 
 If you have any questions or feedback, feel free to create an issue on the `rsbwapi` GitHub repository.
+
+# Usage
+
+## Windows
+You should be fine to just compile your bot. The resulting x64 executable should run fine in all current tournaments/ladders.
+
+## Linux
+Note: These instructions will create a 32-bit executable. There are no 32-bit tournaments and the result is not a DLL, so you can choose to create a 64-bit executable.
+
+### Windows-GNU target
+Install support for the target:
+```
+rustup target add i686-pc-windows-gnu
+```
+
+Create the file '.cargo/config.toml':
+```toml
+[build]
+target="i686-pc-windows-gnu"
+```
+
+### Windows MSVC target
+Follow the installation instructions for xwin: https://github.com/rust-cross/cargo-xwin
+
+Create the file '.cargo/config.toml':
+```toml
+[build]
+target="i686-pc-windows-msvc"
+
+[target.i686-pc-windows-msvc]
+linker = "lld"
+rustflags = [
+  "-Lnative=/home/<youruser>/.xwin/crt/lib/x86",
+  "-Lnative=/home/<youruser/.xwin/sdk/lib/um/x86",
+  "-Lnative=/home/<youruser/.xwin/sdk/lib/ucrt/x86"
+]
+
+
+## Mac
+It should work the same way as with Linux - but it's untested.
