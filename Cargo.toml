@@ -20,7 +20,7 @@ num-traits = "0.2"
 num-derive = "0.4"
 derive_more = { version = "1.0.0", features = ["full"] }
 image = "0.25"
-imageproc = "0.25"
+imageproc = "0.26"
 
 
 [package.metadata.docs.rs]
