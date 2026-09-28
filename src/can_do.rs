@@ -1679,7 +1679,7 @@ impl Unit {
         {
             return Err(Error::Incompatible_State);
         }
-        if !self.is_completed() && !u_type.is_building() && self.is_morphing() {
+        if !self.is_completed() && !u_type.is_building() && !self.is_morphing() {
             return Err(Error::Incompatible_State);
         }
         Ok(true)
@@ -2297,7 +2297,7 @@ impl Unit {
             return Ok(false);
         }
 
-        if self.get_type().is_building() {
+        if !self.get_type().is_building() {
             return Err(Error::Incompatible_UnitType);
         }
         if self.is_completed()
