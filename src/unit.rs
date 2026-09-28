@@ -343,6 +343,10 @@ impl Unit {
         self.inner.remainingResearchTime
     }
 
+    pub fn get_remaining_upgrade_time(&self) -> i32 {
+        self.inner.remainingUpgradeTime
+    }
+
     pub fn get_remaining_train_time(&self) -> i32 {
         self.inner.remainingTrainTime
     }
