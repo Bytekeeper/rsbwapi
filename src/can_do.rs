@@ -1283,7 +1283,7 @@ impl CanUseTechUnit for (TechType, &Unit, bool, bool, bool, bool) {
                 if target_type != UnitType::Protoss_Dark_Templar {
                     return Err(Error::Incompatible_UnitType);
                 }
-                if target_unit.get_player() == unit.get_player() {
+                if target_unit.get_player() != unit.get_player() {
                     return Err(Error::Unit_Not_Owned);
                 }
             }
