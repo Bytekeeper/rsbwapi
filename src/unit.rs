@@ -973,7 +973,7 @@ impl Unit {
     pub fn build_addon(&self, type_: UnitType) -> BwResult<bool> {
         self.issue_command(UnitCommand {
             extra: type_ as i32,
-            ..self.command_type(UnitCommandType::Build, false)
+            ..self.command_type(UnitCommandType::Build_Addon, false)
         })
     }
 

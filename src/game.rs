@@ -863,7 +863,7 @@ impl Game {
                 && addon != UnitType::None
                 && addon.what_builds().0 == type_.what_builds().0
                 && (builder.get_addon().is_none()
-                    || builder.get_addon().map(|a| a.get_type()) == Some(addon))
+                    || builder.get_addon().map(|a| a.get_type()) != Some(addon))
             {
                 return Err(Error::Insufficient_Tech);
             }

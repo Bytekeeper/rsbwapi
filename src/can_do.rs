@@ -2371,7 +2371,7 @@ impl CanResearch for (&Unit, bool) {
             return Ok(false);
         }
 
-        if unit.is_lifted() || !unit.is_idle() || unit.is_completed() {
+        if unit.is_lifted() || !unit.is_idle() || !unit.is_completed() {
             return Err(Error::Unit_Busy);
         }
         Ok(true)
@@ -2390,9 +2390,8 @@ impl CanResearch for (Option<&Unit>, TechType, bool) {
             if !unit.get_type().is_successor_of(type_.what_researches()) {
                 return Err(Error::Incompatible_UnitType);
             }
-            if check_can_issue_command_type && unit.is_lifted()
-                || !unit.is_idle()
-                || !unit.is_completed()
+            if check_can_issue_command_type
+                && (unit.is_lifted() || !unit.is_idle() || !unit.is_completed())
             {
                 return Err(Error::Unit_Busy);
             }
@@ -2403,7 +2402,7 @@ impl CanResearch for (Option<&Unit>, TechType, bool) {
         if self_.has_researched(type_) {
             return Err(Error::Already_Researched);
         }
-        if self_.is_research_available(type_) {
+        if !self_.is_research_available(type_) {
             return Err(Error::Access_Denied);
         }
         if self_.minerals() < type_.mineral_price() {
