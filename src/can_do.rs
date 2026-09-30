@@ -1170,7 +1170,7 @@ impl CanUseTechWithOrWithoutTarget for (TechType, bool, bool) {
                 .self_()
                 .expect("Self to exist")
                 .has_researched(tech)
-            && unit.get_type() == UnitType::Zerg_Lurker
+            && unit.get_type() != UnitType::Zerg_Lurker
         {
             return Err(Error::Insufficient_Tech);
         }
