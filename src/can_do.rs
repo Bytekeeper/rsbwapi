@@ -1203,7 +1203,7 @@ impl CanUseTechWithOrWithoutTarget for (TechType, bool, bool) {
                 }
             }
             TechType::Burrowing => {
-                if unit.get_type().is_burrowable() {
+                if !unit.get_type().is_burrowable() {
                     return Err(Error::Incompatible_UnitType);
                 }
                 if unit.is_burrowed()
@@ -1232,6 +1232,9 @@ impl CanUseTechUnit for (TechType, bool, bool) {
         }
 
         if check_can_issue_command_type && !unit.can_use_tech_with_or_without_target(false)? {
+            return Ok(false);
+        }
+        if !unit.can_use_tech_with_or_without_target((tech, false, false))? {
             return Ok(false);
         }
 
