@@ -2125,7 +2125,7 @@ impl Unit {
         if self.get_type().cloaking_tech() == TechType::None {
             return Err(Error::Incompatible_UnitType);
         }
-        if self.get_secondary_order() != Order::Cloak {
+        if self.get_secondary_order() == Order::Cloak {
             return Err(Error::Incompatible_State);
         }
         Ok(true)
