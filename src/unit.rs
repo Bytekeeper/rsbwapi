@@ -1303,7 +1303,7 @@ impl UnitOrPosition for &Unit {
     fn assign_use_tech(&self, tech: TechType, cmd: &mut UnitCommand) {
         cmd.targetIndex = self.id as i32;
         cmd.extra = tech as i32;
-        cmd.type_._base = UnitCommandType::Use_Tech as u32;
+        cmd.type_._base = UnitCommandType::Use_Tech_Unit as u32;
     }
     fn to_position(&self) -> Result<Position, PathErr> {
         if self.exists() {
@@ -1338,7 +1338,7 @@ impl<I: Into<Position> + Copy> UnitOrPosition for I {
         cmd.x = pos.x;
         cmd.y = pos.y;
         cmd.extra = tech as i32;
-        cmd.type_._base = UnitCommandType::Use_Tech as u32;
+        cmd.type_._base = UnitCommandType::Use_Tech_Position as u32;
     }
 
     fn to_position(&self) -> Result<Position, PathErr> {
