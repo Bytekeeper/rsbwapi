@@ -929,7 +929,9 @@ impl Game {
         position: TP,
         size: TS,
     ) -> bool {
-        let position = position.into().to_position() + size.into().to_position() * 16;
+        // BWAPI checks the building's center: half its size in tiles, i.e. 16 pixels per tile.
+        let size = size.into();
+        let position = position.into().to_position() + Position::new(size.x * 16, size.y * 16);
         self.has_power_precise(position)
     }
 
