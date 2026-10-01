@@ -634,10 +634,13 @@ impl Game {
 
         // A building can build an addon at a different location (i.e. automatically lifts (if not already lifted)
         // then lands at the new location before building the addon), so we need to do similar checks for the
-        // location that the building will be when it builds the addon.
+        // location that the building will be when it builds the addon. A landed building already stands
+        // there, so re-checking would apply new-building rules (e.g. the resource depot spacing) to it.
         if let Some(builder) = builder
             && !builder.get_type().is_addon()
             && type_.is_addon()
+            && (builder.is_lifted()
+                || builder.get_tile_position() != lt - TilePosition { x: 4, y: 1 })
             && !self.can_build_here(
                 builder,
                 lt - TilePosition { x: 4, y: 1 },
