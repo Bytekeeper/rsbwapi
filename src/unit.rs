@@ -1127,18 +1127,17 @@ impl Unit {
     }
 
     pub fn unload_all<P: Into<Position>, OP: Into<Option<P>>>(&self, target: OP) -> BwResult<bool> {
-        let target = target.into();
-        if let Some(target) = target {
-            let target = target.into();
-            self.issue_command(UnitCommand {
+        self.issue_command(self.unload_all_command(target.into().map(Into::into)))
+    }
+
+    pub(crate) fn unload_all_command(&self, target: Option<Position>) -> UnitCommand {
+        match target {
+            Some(target) => UnitCommand {
                 x: target.x,
                 y: target.y,
-                ..self.command_type(UnitCommandType::Unload_All, false)
-            })
-        } else {
-            self.issue_command(UnitCommand {
-                ..self.command_type(UnitCommandType::Unload_All, false)
-            })
+                ..self.command_type(UnitCommandType::Unload_All_Position, false)
+            },
+            None => self.command_type(UnitCommandType::Unload_All, false),
         }
     }
 
