@@ -75,6 +75,24 @@ impl PositionValidator for &Game {
     }
 }
 
+/// Whether a ground unit of type `other` in the way stops `placed` being built; an addon pushes
+/// units that can move aside.
+fn blocks_placement(placed: UnitType, other: UnitType) -> bool {
+    !(placed.is_addon() && other.can_move())
+}
+
+#[cfg(test)]
+mod placement_tests {
+    use super::*;
+
+    #[test]
+    fn an_addon_pushes_mobile_units_aside_but_a_building_does_not() {
+        assert!(!blocks_placement(UnitType::Terran_Comsat_Station, UnitType::Terran_SCV));
+        assert!(blocks_placement(UnitType::Terran_Comsat_Station, UnitType::Terran_Supply_Depot));
+        assert!(blocks_placement(UnitType::Terran_Barracks, UnitType::Terran_SCV));
+    }
+}
+
 impl Game {
     pub(crate) fn match_start(&mut self) {
         *self.inner.visible_units.borrow_mut() = (0..self.data.initialUnitCount as usize)
@@ -575,7 +593,7 @@ impl Game {
                         },
                 )
                 .iter()
-                .any(|u| !(u.get_type().is_addon() && u.get_type().can_move()));
+                .any(|u| blocks_placement(type_, u.get_type()));
             if collides_with_units {
                 return Ok(false);
             }
