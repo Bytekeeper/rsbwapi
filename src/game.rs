@@ -81,9 +81,27 @@ fn blocks_placement(placed: UnitType, other: UnitType) -> bool {
     !(placed.is_addon() && other.can_move())
 }
 
+/// Index into a `width` x `height` grid, or `None` when (x, y) is outside it.
+fn grid_index(x: i32, y: i32, width: i32, height: i32) -> Option<(usize, usize)> {
+    if x < 0 || y < 0 || x >= width || y >= height {
+        None
+    } else {
+        Some((x as usize, y as usize))
+    }
+}
+
 #[cfg(test)]
 mod placement_tests {
     use super::*;
+
+    #[test]
+    fn grid_index_rejects_positions_outside_the_map() {
+        assert_eq!(grid_index(-4, 0, 10, 10), None);
+        assert_eq!(grid_index(0, -1, 10, 10), None);
+        assert_eq!(grid_index(10, 0, 10, 10), None);
+        assert_eq!(grid_index(0, 10, 10, 10), None);
+        assert_eq!(grid_index(9, 9, 10, 10), Some((9, 9)));
+    }
 
     #[test]
     fn an_addon_pushes_mobile_units_aside_but_a_building_does_not() {
@@ -1013,22 +1031,34 @@ impl Game {
 
     pub fn is_walkable<P: Into<WalkPosition>>(&self, wp: P) -> bool {
         let p = wp.into();
-        self.data.isWalkable[p.x as usize][p.y as usize]
+        match grid_index(p.x, p.y, self.map_width() * 4, self.map_height() * 4) {
+            Some((x, y)) => self.data.isWalkable[x][y],
+            None => false,
+        }
     }
 
     pub fn is_visible<P: Into<TilePosition>>(&self, tp: P) -> bool {
         let p = tp.into();
-        self.data.isVisible[p.x as usize][p.y as usize]
+        match grid_index(p.x, p.y, self.map_width(), self.map_height()) {
+            Some((x, y)) => self.data.isVisible[x][y],
+            None => false,
+        }
     }
 
     pub fn is_buildable<P: Into<TilePosition>>(&self, tp: P) -> bool {
         let p = tp.into();
-        self.data.isBuildable[p.x as usize][p.y as usize]
+        match grid_index(p.x, p.y, self.map_width(), self.map_height()) {
+            Some((x, y)) => self.data.isBuildable[x][y],
+            None => false,
+        }
     }
 
     pub fn is_explored<P: Into<TilePosition>>(&self, tp: P) -> bool {
         let p = tp.into();
-        self.data.isExplored[p.x as usize][p.y as usize]
+        match grid_index(p.x, p.y, self.map_width(), self.map_height()) {
+            Some((x, y)) => self.data.isExplored[x][y],
+            None => false,
+        }
     }
 
     pub fn is_gui_enabled(&self) -> bool {
@@ -1053,12 +1083,18 @@ impl Game {
 
     pub fn has_creep<P: Into<TilePosition>>(&self, tp: P) -> bool {
         let p = tp.into();
-        self.data.hasCreep[p.x as usize][p.y as usize]
+        match grid_index(p.x, p.y, self.map_width(), self.map_height()) {
+            Some((x, y)) => self.data.hasCreep[x][y],
+            None => false,
+        }
     }
 
     pub fn get_ground_height<P: Into<TilePosition>>(&self, tp: P) -> i32 {
         let p = tp.into();
-        self.data.getGroundHeight[p.x as usize][p.y as usize]
+        match grid_index(p.x, p.y, self.map_width(), self.map_height()) {
+            Some((x, y)) => self.data.getGroundHeight[x][y],
+            None => 0,
+        }
     }
 
     pub fn get_instance_number(&self) -> i32 {
