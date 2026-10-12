@@ -227,7 +227,7 @@ impl CanBuild for (UnitType, bool, bool) {
             return Ok(false);
         }
 
-        if check_can_issue_command_type && unit.can_build(false)? {
+        if check_can_issue_command_type && !unit.can_build(false)? {
             return Ok(false);
         }
 
@@ -437,7 +437,7 @@ impl CanMorph for bool {
         if unit.get_type().produces_larva() {
             if !unit.is_constructing()
                 && unit.is_completed()
-                && !(unit.get_type().is_building() || unit.is_idle())
+                && (!unit.get_type().is_building() || unit.is_idle())
             {
                 return Ok(true);
             }
@@ -1028,7 +1028,7 @@ impl CanUnloadAllPosition for (Position, bool, bool) {
             return Ok(false);
         }
 
-        if check_can_issue_command_type && unit.can_unload_all_position(false)? {
+        if check_can_issue_command_type && !unit.can_unload_all_position(false)? {
             return Ok(false);
         }
 
@@ -1170,7 +1170,7 @@ impl CanUseTechWithOrWithoutTarget for (TechType, bool, bool) {
                 .self_()
                 .expect("Self to exist")
                 .has_researched(tech)
-            && unit.get_type() == UnitType::Zerg_Lurker
+            && unit.get_type() != UnitType::Zerg_Lurker
         {
             return Err(Error::Insufficient_Tech);
         }
@@ -1203,7 +1203,7 @@ impl CanUseTechWithOrWithoutTarget for (TechType, bool, bool) {
                 }
             }
             TechType::Burrowing => {
-                if unit.get_type().is_burrowable() {
+                if !unit.get_type().is_burrowable() {
                     return Err(Error::Incompatible_UnitType);
                 }
                 if unit.is_burrowed()
@@ -1232,6 +1232,9 @@ impl CanUseTechUnit for (TechType, bool, bool) {
         }
 
         if check_can_issue_command_type && !unit.can_use_tech_with_or_without_target(false)? {
+            return Ok(false);
+        }
+        if !unit.can_use_tech_with_or_without_target((tech, false, false))? {
             return Ok(false);
         }
 
@@ -1283,7 +1286,7 @@ impl CanUseTechUnit for (TechType, &Unit, bool, bool, bool, bool) {
                 if target_type != UnitType::Protoss_Dark_Templar {
                     return Err(Error::Incompatible_UnitType);
                 }
-                if target_unit.get_player() == unit.get_player() {
+                if target_unit.get_player() != unit.get_player() {
                     return Err(Error::Unit_Not_Owned);
                 }
             }
@@ -1679,7 +1682,7 @@ impl Unit {
         {
             return Err(Error::Incompatible_State);
         }
-        if !self.is_completed() && !u_type.is_building() && self.is_morphing() {
+        if !self.is_completed() && !u_type.is_building() && !self.is_morphing() {
             return Err(Error::Incompatible_State);
         }
         Ok(true)
@@ -2125,7 +2128,7 @@ impl Unit {
         if self.get_type().cloaking_tech() == TechType::None {
             return Err(Error::Incompatible_UnitType);
         }
-        if self.get_secondary_order() != Order::Cloak {
+        if self.get_secondary_order() == Order::Cloak {
             return Err(Error::Incompatible_State);
         }
         Ok(true)
@@ -2297,7 +2300,7 @@ impl Unit {
             return Ok(false);
         }
 
-        if self.get_type().is_building() {
+        if !self.get_type().is_building() {
             return Err(Error::Incompatible_UnitType);
         }
         if self.is_completed()
@@ -2313,7 +2316,7 @@ impl Unit {
             return Ok(false);
         }
 
-        if !self.get_addon().map(|a| a.is_completed()).unwrap_or(false) {
+        if self.get_addon().is_none_or(|addon| addon.is_completed()) {
             return Err(Error::Incompatible_UnitType);
         }
         Ok(true)
@@ -2324,7 +2327,7 @@ impl Unit {
             return Ok(false);
         }
 
-        if self.get_order() == Order::ResearchTech {
+        if self.get_order() != Order::ResearchTech {
             return Err(Error::Incompatible_State);
         }
         Ok(true)
@@ -2371,7 +2374,7 @@ impl CanResearch for (&Unit, bool) {
             return Ok(false);
         }
 
-        if unit.is_lifted() || !unit.is_idle() || unit.is_completed() {
+        if unit.is_lifted() || !unit.is_idle() || !unit.is_completed() {
             return Err(Error::Unit_Busy);
         }
         Ok(true)
@@ -2390,9 +2393,8 @@ impl CanResearch for (Option<&Unit>, TechType, bool) {
             if !unit.get_type().is_successor_of(type_.what_researches()) {
                 return Err(Error::Incompatible_UnitType);
             }
-            if check_can_issue_command_type && unit.is_lifted()
-                || !unit.is_idle()
-                || !unit.is_completed()
+            if check_can_issue_command_type
+                && (unit.is_lifted() || !unit.is_idle() || !unit.is_completed())
             {
                 return Err(Error::Unit_Busy);
             }
@@ -2403,7 +2405,7 @@ impl CanResearch for (Option<&Unit>, TechType, bool) {
         if self_.has_researched(type_) {
             return Err(Error::Already_Researched);
         }
-        if self_.is_research_available(type_) {
+        if !self_.is_research_available(type_) {
             return Err(Error::Access_Denied);
         }
         if self_.minerals() < type_.mineral_price() {
@@ -2547,5 +2549,114 @@ impl Game {
 
     pub(crate) fn can_target_unit(&self, checker: impl CanTargetUnit) -> BwResult<bool> {
         checker.can_target_unit(self)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::game::Game;
+    use crate::shm::Shm;
+    use bwapi_wrapper::BWAPI_GameData;
+    use crate::*;
+
+    const SCV: usize = 0;
+    const HATCHERY: usize = 1;
+    const FACTORY: usize = 2;
+    const MACHINE_SHOP: usize = 3;
+    const ACADEMY: usize = 4;
+
+    /// A game where player 0 owns idle, completed, powered units of the given types.
+    fn game(setup: impl FnOnce(&mut BWAPI_GameData)) -> Game {
+        let types = [
+            UnitType::Terran_SCV,
+            UnitType::Zerg_Hatchery,
+            UnitType::Terran_Factory,
+            UnitType::Terran_Machine_Shop,
+            UnitType::Terran_Academy,
+        ];
+        let words = std::mem::size_of::<BWAPI_GameData>().div_ceil(8);
+        let buffer: &'static mut [u64] = Box::leak(vec![0u64; words].into_boxed_slice());
+        let bytes =
+            unsafe { std::slice::from_raw_parts_mut(buffer.as_mut_ptr().cast::<u8>(), words * 8) };
+        let data = unsafe { &mut *bytes.as_mut_ptr().cast::<BWAPI_GameData>() };
+        data.playerCount = 2;
+        data.self_ = 0;
+        data.players[0].minerals = 1000;
+        data.players[0].isUnitAvailable = [true; 234];
+        for (index, &unit_type) in types.iter().enumerate() {
+            let unit = &mut data.units[index];
+            unit.player = 0;
+            unit.type_ = unit_type as i32;
+            unit.exists = true;
+            unit.isCompleted = true;
+            unit.isIdle = true;
+            unit.isInterruptible = true;
+            unit.isPowered = true;
+            unit.order = Order::Nothing as i32;
+            unit.addon = -1;
+            unit.hatchery = -1;
+            unit.transport = -1;
+            data.players[0].allUnitCount[unit_type as usize] += 1;
+            data.players[0].completedUnitCount[unit_type as usize] += 1;
+        }
+        setup(data);
+        Game::new(Shm::from_mut_slice(bytes))
+    }
+
+    #[test]
+    fn an_idle_hatchery_without_larva_can_morph() {
+        let game = game(|_| {});
+        assert_eq!(game.get_unit(HATCHERY).unwrap().can_morph(true), Ok(true));
+    }
+
+    #[test]
+    fn research_can_be_cancelled_only_while_researching() {
+        let researching = game(|data| data.units[ACADEMY].order = Order::ResearchTech as i32);
+        assert_eq!(
+            researching.get_unit(ACADEMY).unwrap().can_cancel_research(true),
+            Ok(true)
+        );
+        let idle = game(|_| {});
+        assert_eq!(
+            idle.get_unit(ACADEMY).unwrap().can_cancel_research(true),
+            Err(Error::Incompatible_State)
+        );
+    }
+
+    #[test]
+    fn only_an_unfinished_addon_can_be_cancelled() {
+        let building = game(|data| {
+            data.units[FACTORY].addon = MACHINE_SHOP as i32;
+            data.units[MACHINE_SHOP].isCompleted = false;
+        });
+        assert_eq!(building.get_unit(FACTORY).unwrap().can_cancel_addon(true), Ok(true));
+        let finished = game(|data| data.units[FACTORY].addon = MACHINE_SHOP as i32);
+        assert_eq!(
+            finished.get_unit(FACTORY).unwrap().can_cancel_addon(true),
+            Err(Error::Incompatible_UnitType)
+        );
+        let none = game(|_| {});
+        assert_eq!(
+            none.get_unit(FACTORY).unwrap().can_cancel_addon(true),
+            Err(Error::Incompatible_UnitType)
+        );
+    }
+
+    #[test]
+    fn a_worker_able_to_build_passes_the_command_type_check() {
+        let game = game(|_| {});
+        let scv = game.get_unit(SCV).unwrap();
+        assert_eq!(scv.can_build(true), Ok(true));
+        assert_eq!(scv.can_build((UnitType::Terran_Supply_Depot, true, true)), Ok(true));
+    }
+
+    #[test]
+    fn unloading_at_a_position_sends_the_positional_command() {
+        let game = game(|_| {});
+        let unit = game.get_unit(SCV).unwrap();
+        let command = unit.unload_all_command(Some(Position::new(64, 96)));
+        assert_eq!(command.get_type(), UnitCommandType::Unload_All_Position);
+        assert_eq!((command.x, command.y), (64, 96));
+        assert_eq!(unit.unload_all_command(None).get_type(), UnitCommandType::Unload_All);
     }
 }

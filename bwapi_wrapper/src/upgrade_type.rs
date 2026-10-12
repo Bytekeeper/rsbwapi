@@ -9,7 +9,7 @@ pub(crate) struct UpgradeTypeData {
     pub(crate) upgrade_time_factor: i32,
     pub(crate) name: &'static str,
 }
-pub(crate) static UPGRADE_TYPE_DATA: [UpgradeTypeData; 54] = [
+pub(crate) static UPGRADE_TYPE_DATA: [UpgradeTypeData; 63] = [
     UpgradeTypeData {
         what_uses: &[
             UnitType::Terran_Marine,
@@ -655,6 +655,26 @@ pub(crate) static UPGRADE_TYPE_DATA: [UpgradeTypeData; 54] = [
         name: "Khaydarin_Core",
     },
     UpgradeTypeData {
+        what_uses: &[],
+        gas_price_factor: 0,
+        max_repeats: 0,
+        race: Race::None,
+        mineral_price_factor: 0,
+        what_upgrades: UnitType::None,
+        upgrade_time_factor: 0,
+        name: "Upgrade_45",
+    },
+    UpgradeTypeData {
+        what_uses: &[],
+        gas_price_factor: 0,
+        max_repeats: 0,
+        race: Race::None,
+        mineral_price_factor: 0,
+        what_upgrades: UnitType::None,
+        upgrade_time_factor: 0,
+        name: "Upgrade_46",
+    },
+    UpgradeTypeData {
         what_uses: &[UnitType::Protoss_Corsair],
         gas_price_factor: 0,
         max_repeats: 1,
@@ -665,6 +685,16 @@ pub(crate) static UPGRADE_TYPE_DATA: [UpgradeTypeData; 54] = [
         name: "Argus_Jewel",
     },
     UpgradeTypeData {
+        what_uses: &[],
+        gas_price_factor: 0,
+        max_repeats: 0,
+        race: Race::None,
+        mineral_price_factor: 0,
+        what_upgrades: UnitType::None,
+        upgrade_time_factor: 0,
+        name: "Upgrade_48",
+    },
+    UpgradeTypeData {
         what_uses: &[UnitType::Protoss_Dark_Archon],
         gas_price_factor: 0,
         max_repeats: 1,
@@ -673,6 +703,16 @@ pub(crate) static UPGRADE_TYPE_DATA: [UpgradeTypeData; 54] = [
         what_upgrades: UnitType::Protoss_Templar_Archives,
         upgrade_time_factor: 0,
         name: "Argus_Talisman",
+    },
+    UpgradeTypeData {
+        what_uses: &[],
+        gas_price_factor: 0,
+        max_repeats: 0,
+        race: Race::None,
+        mineral_price_factor: 0,
+        what_upgrades: UnitType::None,
+        upgrade_time_factor: 0,
+        name: "Upgrade_50",
     },
     UpgradeTypeData {
         what_uses: &[UnitType::Terran_Medic],
@@ -713,6 +753,56 @@ pub(crate) static UPGRADE_TYPE_DATA: [UpgradeTypeData; 54] = [
         what_upgrades: UnitType::Terran_Machine_Shop,
         upgrade_time_factor: 0,
         name: "Charon_Boosters",
+    },
+    UpgradeTypeData {
+        what_uses: &[],
+        gas_price_factor: 0,
+        max_repeats: 0,
+        race: Race::None,
+        mineral_price_factor: 0,
+        what_upgrades: UnitType::None,
+        upgrade_time_factor: 0,
+        name: "Upgrade_55",
+    },
+    UpgradeTypeData {
+        what_uses: &[],
+        gas_price_factor: 0,
+        max_repeats: 0,
+        race: Race::None,
+        mineral_price_factor: 0,
+        what_upgrades: UnitType::None,
+        upgrade_time_factor: 0,
+        name: "Upgrade_56",
+    },
+    UpgradeTypeData {
+        what_uses: &[],
+        gas_price_factor: 0,
+        max_repeats: 0,
+        race: Race::None,
+        mineral_price_factor: 0,
+        what_upgrades: UnitType::None,
+        upgrade_time_factor: 0,
+        name: "Upgrade_57",
+    },
+    UpgradeTypeData {
+        what_uses: &[],
+        gas_price_factor: 0,
+        max_repeats: 0,
+        race: Race::None,
+        mineral_price_factor: 0,
+        what_upgrades: UnitType::None,
+        upgrade_time_factor: 0,
+        name: "Upgrade_58",
+    },
+    UpgradeTypeData {
+        what_uses: &[],
+        gas_price_factor: 0,
+        max_repeats: 0,
+        race: Race::None,
+        mineral_price_factor: 0,
+        what_upgrades: UnitType::None,
+        upgrade_time_factor: 0,
+        name: "Upgrade_59",
     },
     UpgradeTypeData {
         what_uses: &[
@@ -787,5 +877,30 @@ impl UpgradeType {
     }
     pub fn name(&self) -> &'static str {
         self.d().name
+    }
+}
+
+#[cfg(test)]
+mod row_tests {
+    use super::*;
+    use num_traits::FromPrimitive;
+
+    #[test]
+    fn every_upgrade_and_tech_reads_its_own_row() {
+        for id in 0..UpgradeType::MAX as i32 {
+            if let Some(upgrade) = UpgradeType::from_i32(id) {
+                assert_eq!(upgrade.name(), format!("{upgrade:?}"));
+            }
+        }
+        for id in 0..TechType::MAX as i32 {
+            if let Some(tech) = TechType::from_i32(id) {
+                assert_eq!(tech.name(), format!("{tech:?}"));
+            }
+        }
+        for id in 0..WeaponType::MAX as i32 {
+            if let Some(weapon) = WeaponType::from_i32(id) {
+                assert_eq!(weapon.name(), format!("{weapon:?}"));
+            }
+        }
     }
 }

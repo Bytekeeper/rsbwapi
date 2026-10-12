@@ -33,6 +33,7 @@ num-derive.workspace = true
 derive_more.workspace = true
 bwapi_wrapper = { path = "bwapi_wrapper", version = "3.6.3" }
 winapi = { version = "0.3", features = ["winbase", "memoryapi", "handleapi"] }
+libc = "0.2"
 memchr = "2.7"
 rstar = "0.12"
 itertools = "0.14"

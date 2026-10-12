@@ -343,6 +343,10 @@ impl Unit {
         self.inner.remainingResearchTime
     }
 
+    pub fn get_remaining_upgrade_time(&self) -> i32 {
+        self.inner.remainingUpgradeTime
+    }
+
     pub fn get_remaining_train_time(&self) -> i32 {
         self.inner.remainingTrainTime
     }
@@ -969,7 +973,7 @@ impl Unit {
     pub fn build_addon(&self, type_: UnitType) -> BwResult<bool> {
         self.issue_command(UnitCommand {
             extra: type_ as i32,
-            ..self.command_type(UnitCommandType::Build, false)
+            ..self.command_type(UnitCommandType::Build_Addon, false)
         })
     }
 
@@ -1123,18 +1127,17 @@ impl Unit {
     }
 
     pub fn unload_all<P: Into<Position>, OP: Into<Option<P>>>(&self, target: OP) -> BwResult<bool> {
-        let target = target.into();
-        if let Some(target) = target {
-            let target = target.into();
-            self.issue_command(UnitCommand {
+        self.issue_command(self.unload_all_command(target.into().map(Into::into)))
+    }
+
+    pub(crate) fn unload_all_command(&self, target: Option<Position>) -> UnitCommand {
+        match target {
+            Some(target) => UnitCommand {
                 x: target.x,
                 y: target.y,
-                ..self.command_type(UnitCommandType::Unload_All, false)
-            })
-        } else {
-            self.issue_command(UnitCommand {
-                ..self.command_type(UnitCommandType::Unload_All, false)
-            })
+                ..self.command_type(UnitCommandType::Unload_All_Position, false)
+            },
+            None => self.command_type(UnitCommandType::Unload_All, false),
         }
     }
 
@@ -1299,7 +1302,7 @@ impl UnitOrPosition for &Unit {
     fn assign_use_tech(&self, tech: TechType, cmd: &mut UnitCommand) {
         cmd.targetIndex = self.id as i32;
         cmd.extra = tech as i32;
-        cmd.type_._base = UnitCommandType::Use_Tech as u32;
+        cmd.type_._base = UnitCommandType::Use_Tech_Unit as u32;
     }
     fn to_position(&self) -> Result<Position, PathErr> {
         if self.exists() {
@@ -1334,7 +1337,7 @@ impl<I: Into<Position> + Copy> UnitOrPosition for I {
         cmd.x = pos.x;
         cmd.y = pos.y;
         cmd.extra = tech as i32;
-        cmd.type_._base = UnitCommandType::Use_Tech as u32;
+        cmd.type_._base = UnitCommandType::Use_Tech_Position as u32;
     }
 
     fn to_position(&self) -> Result<Position, PathErr> {
