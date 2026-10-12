@@ -19,11 +19,6 @@ impl ParseCallbacks for FromPrimitiveDerive {
 }
 
 fn main() {
-    if env::var("CARGO_CFG_TARGET_OS").unwrap() != "windows" {
-        panic!(
-            "RSBWAPI does not yet support targeting OpenBW, please compile with a Windows target."
-        );
-    }
     println!("cargo::rerun-if-changed=bwapi");
 
     // The bindgen::Builder is the main entry point

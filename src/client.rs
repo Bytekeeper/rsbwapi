@@ -2,10 +2,14 @@ use crate::game::Game;
 use bwapi_wrapper::*;
 
 use std::ffi::CStr;
+#[cfg(windows)]
 use std::fs::File;
+#[cfg(windows)]
 use std::fs::OpenOptions;
 use std::io::Read;
 use std::io::Write;
+#[cfg(unix)]
+use std::os::unix::net::UnixStream;
 
 use std::thread;
 use std::time::Duration;
@@ -15,9 +19,14 @@ use crate::aimodule::AiModule;
 use super::shm;
 
 pub struct Client {
-    pipe: File,
+    pipe: SyncStream,
     game: Game,
 }
+
+#[cfg(windows)]
+type SyncStream = File;
+#[cfg(unix)]
+type SyncStream = UnixStream;
 
 pub trait ToStr {
     fn to_str(&self) -> &str;
@@ -39,7 +48,12 @@ impl ToStr for [i8] {
 
 impl Default for Client {
     fn default() -> Self {
+        #[cfg(unix)]
+        let selected_pid = std::env::var("RSBWAPI_SERVER_PID")
+            .ok()
+            .map(|pid| pid.parse::<u32>().expect("Invalid RSBWAPI_SERVER_PID"));
         'outer: loop {
+            #[cfg(windows)]
             if let Some(game_table) =
                 shm::map_memory::<BWAPI_GameTable>("Local\\bwapi_shared_memory_game_list")
             {
@@ -78,6 +92,66 @@ impl Default for Client {
                 println!("Game table mapping not found.");
                 thread::sleep(Duration::from_millis(1000));
             }
+
+            #[cfg(unix)]
+            if let Some(pid) = selected_pid {
+                if let Some(game_data) =
+                    shm::map_memory::<BWAPI_GameData>(&format!("/bwapi_shared_memory_{pid}"))
+                {
+                    if let Ok(mut pipe) = UnixStream::connect(format!("/tmp/bwapi_socket_{pid}")) {
+                        let mut code = [0];
+                        if pipe.read_exact(&mut code).is_ok() && code[0] == 2 {
+                            println!("Connected to {pid}");
+                            break 'outer Client {
+                                pipe,
+                                game: Game::new(game_data),
+                            };
+                        }
+                    }
+                }
+                thread::sleep(Duration::from_millis(100));
+                continue;
+            }
+
+            #[cfg(unix)]
+            if let Some(game_table) =
+                shm::map_memory::<BWAPI_GameTable>("/bwapi_shared_memory_game_list")
+            {
+                let mut instances: Vec<_> = game_table
+                    .get()
+                    .gameInstances
+                    .iter()
+                    .filter(|instance| {
+                        instance.serverProcessID != 0
+                            && !instance.isConnected
+                            && selected_pid.is_none_or(|pid| instance.serverProcessID == pid)
+                    })
+                    .collect();
+                instances.sort_by_key(|instance| std::cmp::Reverse(instance.lastKeepAliveTime));
+                for instance in instances {
+                    let pid = instance.serverProcessID;
+                    // OpenBW unlinks the game mapping as soon as it accepts the socket.
+                    let Some(game_data) =
+                        shm::map_memory::<BWAPI_GameData>(&format!("/bwapi_shared_memory_{pid}"))
+                    else {
+                        continue;
+                    };
+                    let Ok(mut pipe) = UnixStream::connect(format!("/tmp/bwapi_socket_{pid}"))
+                    else {
+                        continue;
+                    };
+                    let mut code = [0];
+                    if pipe.read_exact(&mut code).is_err() || code[0] != 2 {
+                        continue;
+                    }
+                    println!("Connected to {pid}");
+                    break 'outer Client {
+                        pipe,
+                        game: Game::new(game_data),
+                    };
+                }
+            }
+            thread::sleep(Duration::from_millis(100));
         }
     }
 }
