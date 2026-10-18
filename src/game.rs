@@ -1040,13 +1040,15 @@ impl Game {
         ];
 
         let Position { x, y } = position.into();
+        // As in BW and BWAPI, only our own Pylons power: an enemy's beside our base powers nothing.
+        let me = self.data.self_ as PlayerId;
 
         for i in self
             .inner
             .units
             .borrow()
             .iter()
-            .filter(|u| u.get_type() == UnitType::Protoss_Pylon)
+            .filter(|u| u.get_type() == UnitType::Protoss_Pylon && u.get_player().id == me)
         {
             if !i.exists() || !i.is_completed() {
                 continue;
