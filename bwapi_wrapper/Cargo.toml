@@ -23,4 +23,4 @@ derive_more.workspace = true
 
 
 [build-dependencies]
-bindgen = "0.72"
+bindgen = "0.73"
