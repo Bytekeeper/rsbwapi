@@ -109,6 +109,65 @@ mod placement_tests {
         assert!(blocks_placement(UnitType::Terran_Comsat_Station, UnitType::Terran_Supply_Depot));
         assert!(blocks_placement(UnitType::Terran_Barracks, UnitType::Terran_SCV));
     }
+
+    /// BW's rule: a depot keeps 3 tiles between its footprint and every resource.
+    fn clear_of_resources(game: &Game, lt: TilePosition) -> bool {
+        let minerals = (game.get_static_minerals().into_iter())
+            .map(|m| (m.get_initial_tile_position(), TilePosition::new(2, 1)));
+        let geysers = (game.get_static_geysers().into_iter())
+            .map(|g| (g.get_initial_tile_position(), TilePosition::new(4, 2)));
+        minerals.chain(geysers).all(|(p, size)| {
+            p.x + size.x + 3 <= lt.x
+                || lt.x + 4 + 3 <= p.x
+                || p.y + size.y + 3 <= lt.y
+                || lt.y + 3 + 3 <= p.y
+        })
+    }
+
+    #[test]
+    fn base_spots_keep_their_distance_to_resources_seen_or_not() {
+        let mut wrong = vec![];
+        for entry in std::fs::read_dir("resources/test").unwrap().flatten() {
+            let map = entry.file_name();
+            let mut data =
+                inflate::inflate_bytes_zlib(&std::fs::read(entry.path()).unwrap()).unwrap();
+            let mut game = Game::new(Shm::from_mut_slice(&mut data));
+            game.match_start();
+            game.refresh();
+            let bases = crate::sma::Map::new(&game).bases;
+            let resources = [game.get_static_minerals(), game.get_static_geysers()].concat();
+            for seen in [true, false] {
+                // The resources in sight, then nothing as after the start event.
+                *game.inner.visible_units.borrow_mut() =
+                    if seen { resources.clone() } else { vec![] };
+                game.refresh();
+                for base in &bases {
+                    let spot = base.position;
+                    let depot = UnitType::Terran_Command_Center;
+                    if !clear_of_resources(&game, spot) {
+                        wrong.push(format!("{map:?}: base {spot:?} too close"));
+                    } else if !game.get_start_locations().contains(&spot)
+                        && !matches!(game.can_build_here(None, spot, depot, false), Ok(true))
+                    {
+                        wrong.push(format!("{map:?} seen {seen}: base {spot:?} refused"));
+                    }
+                    for dx in -1..=1 {
+                        for dy in -1..=1 {
+                            let tile = spot + TilePosition::new(dx, dy);
+                            if !clear_of_resources(&game, tile)
+                                && matches!(game.can_build_here(None, tile, depot, false), Ok(true))
+                            {
+                                wrong.push(format!(
+                                    "{map:?} seen {seen}: {tile:?} too close but accepted"
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+    }
 }
 
 impl Game {
@@ -634,37 +693,29 @@ impl Game {
                 return Ok(false);
             }
 
-            // Resource Check (CC, Nex, Hatch)
+            // Resource Check (CC, Nex, Hatch): BW keeps every resource 3 tiles off the footprint, seen
+            // or not; a mineral field seen gone is mined out.
             if type_.is_resource_depot() {
-                let collides_with_resources = !self
-                    .get_units_in_rectangle(
-                        ((lt.x - 3) * 32, (lt.y - 3) * 32),
-                        ((rb.x + 4) * 32, (rb.y + 4) * 32),
-                        |unit: &Unit| {
-                            unit.get_type().is_mineral_field()
-                                || unit.get_type() == UnitType::Resource_Vespene_Geyser
-                        },
-                    )
-                    .is_empty();
-                if collides_with_resources {
+                let near = |resource: &Unit| {
+                    let at = resource.get_initial_position();
+                    let kind = resource.get_initial_type();
+                    at.x + kind.dimension_right() >= (lt.x - 3) * 32
+                        && at.x - kind.dimension_left() < (rb.x + 3) * 32
+                        && at.y + kind.dimension_down() >= (lt.y - 3) * 32
+                        && at.y - kind.dimension_up() < (rb.y + 3) * 32
+                };
+                let mined_out = |mineral: &Unit| {
+                    let tp = mineral.get_initial_tile_position();
+                    (self.is_visible(tp) || self.is_visible((tp.x + 1, tp.y))) && !mineral.exists()
+                };
+                if self
+                    .get_static_minerals()
+                    .iter()
+                    .any(|m| near(m) && !mined_out(m))
+                    || self.get_static_geysers().iter().any(near)
+                {
                     return Ok(false);
                 }
-                // Original port from BWAPI (with pixel precision bug):
-                // for m in self.get_static_minerals() {
-                //     let tp = m.get_initial_tile_position();
-                //     if (self.is_visible(tp) || self.is_visible((tp.x + 1, tp.y))) && !m.exists() {
-                //         continue;
-                //     }
-                //     if tp.x > lt.x - 5 && tp.y > lt.y - 4 && tp.x < lt.x + 7 && tp.y < lt.y + 6 {
-                //         return Ok(false);
-                //     }
-                // }
-                // for g in self.get_static_geysers() {
-                //     let tp = g.get_initial_tile_position();
-                //     if tp.x > lt.x - 7 && tp.y > lt.y - 5 && tp.x < lt.x + 7 && tp.y < lt.y + 6 {
-                //         return Ok(false);
-                //     }
-                // }
             }
         }
 
@@ -989,13 +1040,15 @@ impl Game {
         ];
 
         let Position { x, y } = position.into();
+        // As in BW and BWAPI, only our own Pylons power: an enemy's beside our base powers nothing.
+        let me = self.data.self_ as PlayerId;
 
         for i in self
             .inner
             .units
             .borrow()
             .iter()
-            .filter(|u| u.get_type() == UnitType::Protoss_Pylon)
+            .filter(|u| u.get_type() == UnitType::Protoss_Pylon && u.get_player().id == me)
         {
             if !i.exists() || !i.is_completed() {
                 continue;

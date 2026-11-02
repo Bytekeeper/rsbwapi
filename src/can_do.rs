@@ -362,7 +362,7 @@ impl CanTrain for bool {
             return Err(Error::Unit_Busy);
         }
         if !unit.get_type().can_produce()
-            && unit.get_type() != UnitType::Terran_Nuclear_Missile
+            && unit.get_type() != UnitType::Terran_Nuclear_Silo
             && unit.get_type() != UnitType::Zerg_Hydralisk
             && unit.get_type() != UnitType::Zerg_Mutalisk
             && unit.get_type() != UnitType::Zerg_Creep_Colony

@@ -119,8 +119,22 @@ impl Unit {
         self.get_position().y + self.get_type().dimension_down()
     }
 
+    /// `None` also for a value outside the unit types, which a game sent once and panicked on; the
+    /// first such value goes to stderr, so its cause can be found.
     pub fn get_build_type(&self) -> UnitType {
-        UnitType::new(self.inner.buildType)
+        static REPORTED: std::sync::Once = std::sync::Once::new();
+        num_traits::FromPrimitive::from_i32(self.inner.buildType).unwrap_or_else(|| {
+            REPORTED.call_once(|| {
+                eprintln!(
+                    "invalid build type {} of unit {} ({:?}, order {})",
+                    self.inner.buildType,
+                    self.id,
+                    self.get_type(),
+                    self.inner.order
+                )
+            });
+            UnitType::None
+        })
     }
 
     pub fn get_build_unit(&self) -> Option<Unit> {

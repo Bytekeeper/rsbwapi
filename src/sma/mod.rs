@@ -123,21 +123,22 @@ impl BaseFinder {
 
         let mut res: Vec<Unit> = Vec::with_capacity(200);
 
+        // Blocking minerals and empty geysers add no value, but BW keeps depots off them too.
         for u in game.get_static_minerals() {
+            let p = u.get_initial_tile_position();
+            finder.mark_res_block(p, 2, 1);
             if u.get_initial_resources() < MINERAL_MIN {
                 continue;
             }
-            let p = u.get_initial_tile_position();
-            finder.mark_res_block(p, 2, 1);
             finder.mark_border_value(p, 2, 1, 1);
             res.push(u);
         }
         for u in game.get_static_geysers() {
+            let p = u.get_initial_tile_position();
+            finder.mark_res_block(p, 4, 2);
             if u.get_initial_resources() == 0 {
                 continue;
             }
-            let p = u.get_initial_tile_position();
-            finder.mark_res_block(p, 4, 1);
             finder.mark_border_value(p, 4, 2, 3);
             res.push(u);
         }
@@ -202,9 +203,9 @@ impl BaseFinder {
             (self.mapy as i32 - 1).min(p.y + 2 + th),
         );
 
-        for y in p1.y..p2.y {
+        for y in p1.y..=p2.y {
             let mut off = self.tile_off(p1.x as usize, y as usize);
-            for _ in p1.x..p2.x {
+            for _ in p1.x..=p2.x {
                 self.resblock[off] = true;
                 off += 1;
             }
