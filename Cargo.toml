@@ -24,7 +24,7 @@ imageproc = "0.25"
 
 
 [package.metadata.docs.rs]
-targets = ["x86_64-pc-windows-msvc"]
+targets = ["x86_64-unknown-linux-gnu"]
 
 
 [dependencies]
